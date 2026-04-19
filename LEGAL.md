@@ -51,10 +51,10 @@ If the project ever redistributes a materially modified ArgyllCMS build, the mod
 
 ## 5. Documentation-Licensing Split
 
-This repository contains two different licensing situations:
+This project can involve two different licensing situations:
 
 - ArgyllUX application/repository code and original project materials
-- Argyll-derived documentation material under `docs/argyll-reference/`
+- Argyll-derived documentation material, including any local copies kept under `docs/argyll-reference/`
 
 The official ArgyllCMS documentation states that:
 
@@ -65,7 +65,7 @@ That means the application-license decision and the documentation-license obliga
 
 ## 6. Repo-Specific Notice
 
-`docs/argyll-reference/` is described in this repository as sourced from the official ArgyllCMS documentation. Any redistribution of those derivative documentation materials should preserve attribution and remain consistent with the upstream documentation terms.
+If local Argyll-derived reference docs are kept under `docs/argyll-reference/`, any redistribution of those derivative documentation materials should preserve attribution and remain consistent with the upstream documentation terms.
 
 ## 7. Upstream Sources Used for This Guidance
 

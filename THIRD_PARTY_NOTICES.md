@@ -18,13 +18,13 @@ Project assumption for distribution:
 
 ## ArgyllCMS Documentation Materials
 
-The material under `docs/argyll-reference/` is sourced from the official ArgyllCMS documentation.
+If local material is kept under `docs/argyll-reference/`, it is sourced from the official ArgyllCMS documentation.
 
 - Author: Graeme Gill
 - Upstream source: https://www.argyllcms.com/doc/ArgyllDoc.html
 - Upstream documentation license, per upstream docs: GNU Free Documentation License, Version 1.3
 
-Those documentation materials should be treated separately from the ArgyllUX application code when preparing releases or republishing docs.
+Those documentation materials should be treated separately from the ArgyllUX application code when preparing releases or republishing docs. Local copies are intentionally excluded from git.
 
 ## Local-Only Development Assets
 

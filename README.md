@@ -2,7 +2,7 @@
 
 ArgyllUX is an open-source desktop application for printer profiling and print troubleshooting built around ArgyllCMS.
 
-This repository currently holds the product specification and Argyll reference material used by the project.
+This repository currently holds the product specification and release/legal documentation for the project.
 
 ## Intended Distribution Model
 
@@ -20,10 +20,6 @@ This repository currently holds the product specification and Argyll reference m
 - Project distribution guidance: [LEGAL.md](LEGAL.md)
 - Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
-## Documentation Note
-
-The reference material under `docs/argyll-reference/` is sourced from the official ArgyllCMS documentation and carries separate documentation-license considerations from the ArgyllUX application code. See [docs/argyll-reference/README.md](docs/argyll-reference/README.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
 ## Local-Only Dev Files
 
-Developer-local agent and plugin folders such as `.agents/` and `plugins/` are intentionally not tracked in git.
+Developer-local agent and plugin folders, plus local Argyll reference docs under `docs/argyll-reference/`, are intentionally not tracked in git.
