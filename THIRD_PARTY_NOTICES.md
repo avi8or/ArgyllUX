@@ -1,0 +1,35 @@
+# Third-Party Notices
+
+This file tracks the third-party materials that affect this repository and its intended releases.
+
+## ArgyllCMS
+
+ArgyllUX is built around ArgyllCMS, but this repository does not currently vendor ArgyllCMS source or binaries as part of the default project model.
+
+- Upstream project: https://www.argyllcms.com/
+- Upstream documentation index: https://www.argyllcms.com/doc/ArgyllDoc.html
+- Upstream commercial licensing page: https://www.argyllcms.com/commercialuse.html
+
+Project assumption for distribution:
+
+- ArgyllUX works with a user-selected, locally installed copy of ArgyllCMS.
+- ArgyllUX scans for an existing installation and otherwise guides the user to the official upstream install flow.
+- If a future release bundles, mirrors, or patches ArgyllCMS, that release must add the upstream ArgyllCMS license texts and source-availability details to the release package.
+
+## ArgyllCMS Documentation Materials
+
+The material under `docs/argyll-reference/` is sourced from the official ArgyllCMS documentation.
+
+- Author: Graeme Gill
+- Upstream source: https://www.argyllcms.com/doc/ArgyllDoc.html
+- Upstream documentation license, per upstream docs: GNU Free Documentation License, Version 1.3
+
+Those documentation materials should be treated separately from the ArgyllUX application code when preparing releases or republishing docs.
+
+## Vendored Repo-Local Skills
+
+The repo-local plugin at `plugins/argyllux-apple-client/` vendors several third-party skills and documents them in its own notice file:
+
+- [plugins/argyllux-apple-client/THIRD_PARTY.md](plugins/argyllux-apple-client/THIRD_PARTY.md)
+
+At the time of writing, that notice file identifies the vendored skill sources and lists them as MIT-licensed.
