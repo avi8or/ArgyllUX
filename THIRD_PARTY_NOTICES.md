@@ -26,10 +26,6 @@ The material under `docs/argyll-reference/` is sourced from the official ArgyllC
 
 Those documentation materials should be treated separately from the ArgyllUX application code when preparing releases or republishing docs.
 
-## Vendored Repo-Local Skills
+## Local-Only Development Assets
 
-The repo-local plugin at `plugins/argyllux-apple-client/` vendors several third-party skills and documents them in its own notice file:
-
-- [plugins/argyllux-apple-client/THIRD_PARTY.md](plugins/argyllux-apple-client/THIRD_PARTY.md)
-
-At the time of writing, that notice file identifies the vendored skill sources and lists them as MIT-licensed.
+Developer-local agent and plugin folders are intentionally excluded from git and are not part of the published repository contents.
