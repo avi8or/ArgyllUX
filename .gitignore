@@ -2,3 +2,9 @@
 .agents/
 plugins/
 docs/argyll-reference/
+target/
+.cargo-home/
+.build/
+DerivedData/
+apple/ArgyllUX/Bridge/Generated/*
+!apple/ArgyllUX/Bridge/Generated/.gitkeep

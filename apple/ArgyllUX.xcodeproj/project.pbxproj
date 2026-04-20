@@ -1,0 +1,533 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* ArgyllUXApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* ArgyllUXApp.swift */; };
+		A10000000000000000000002 /* AppRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* AppRoute.swift */; };
+		A10000000000000000000003 /* DashboardContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* DashboardContent.swift */; };
+		A10000000000000000000004 /* StoragePaths.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* StoragePaths.swift */; };
+		A10000000000000000000005 /* EngineBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* EngineBridge.swift */; };
+		A10000000000000000000006 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* AppModel.swift */; };
+		A10000000000000000000007 /* PathSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* PathSelection.swift */; };
+		A10000000000000000000008 /* StatusBadgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* StatusBadgeView.swift */; };
+		A10000000000000000000009 /* ActiveWorkDockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* ActiveWorkDockView.swift */; };
+		A1000000000000000000000A /* InspectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* InspectorView.swift */; };
+		A1000000000000000000000B /* PlaceholderRouteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* PlaceholderRouteView.swift */; };
+		A1000000000000000000000C /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* HomeView.swift */; };
+		A1000000000000000000000D /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* SettingsView.swift */; };
+		A1000000000000000000000E /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* AppShellView.swift */; };
+		A1000000000000000000000F /* argyllux.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* argyllux.swift */; };
+		A10000000000000000000010 /* libargyllux_engine.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* libargyllux_engine.a */; };
+		A10000000000000000000011 /* AppModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* AppModelTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A30000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A40000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A50000000000000000000001;
+			remoteInfo = ArgyllUX;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		A20000000000000000000001 /* ArgyllUXApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArgyllUXApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* AppRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRoute.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* DashboardContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardContent.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* StoragePaths.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoragePaths.swift; sourceTree = "<group>"; };
+		A20000000000000000000005 /* EngineBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineBridge.swift; sourceTree = "<group>"; };
+		A20000000000000000000006 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		A20000000000000000000007 /* PathSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathSelection.swift; sourceTree = "<group>"; };
+		A20000000000000000000008 /* StatusBadgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBadgeView.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* ActiveWorkDockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkDockView.swift; sourceTree = "<group>"; };
+		A2000000000000000000000A /* InspectorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InspectorView.swift; sourceTree = "<group>"; };
+		A2000000000000000000000B /* PlaceholderRouteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceholderRouteView.swift; sourceTree = "<group>"; };
+		A2000000000000000000000C /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		A2000000000000000000000D /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A2000000000000000000000E /* AppShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellView.swift; sourceTree = "<group>"; };
+		A2000000000000000000000F /* ArgyllUX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ArgyllUX.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000010 /* argyllux.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = argyllux.swift; path = ArgyllUX/Bridge/Generated/argyllux.swift; sourceTree = SOURCE_ROOT; };
+		A20000000000000000000011 /* libargyllux_engine.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libargyllux_engine.a; path = ArgyllUX/Bridge/Generated/libargyllux_engine.a; sourceTree = SOURCE_ROOT; };
+		A20000000000000000000012 /* AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000013 /* ArgyllUXTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ArgyllUXTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A60000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000010 /* libargyllux_engine.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A60000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A70000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A70000000000000000000002 /* ArgyllUX */,
+				A70000000000000000000007 /* ArgyllUXTests */,
+				A70000000000000000000008 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A70000000000000000000002 /* ArgyllUX */ = {
+			isa = PBXGroup;
+			path = ArgyllUX;
+			sourceTree = "<group>";
+			children = (
+				A70000000000000000000003 /* Sources */,
+				A70000000000000000000006 /* Bridge */,
+			);
+		};
+		A70000000000000000000003 /* Sources */ = {
+			isa = PBXGroup;
+			path = Sources;
+			sourceTree = "<group>";
+			children = (
+				A70000000000000000000004 /* App */,
+				A70000000000000000000005 /* Models */,
+				A70000000000000000000009 /* Views */,
+				A7000000000000000000000A /* Support */,
+			);
+		};
+		A70000000000000000000004 /* App */ = {
+			isa = PBXGroup;
+			path = App;
+			sourceTree = "<group>";
+			children = (
+				A20000000000000000000001 /* ArgyllUXApp.swift */,
+			);
+		};
+		A70000000000000000000005 /* Models */ = {
+			isa = PBXGroup;
+			path = Models;
+			sourceTree = "<group>";
+			children = (
+				A20000000000000000000002 /* AppRoute.swift */,
+				A20000000000000000000003 /* DashboardContent.swift */,
+				A20000000000000000000004 /* StoragePaths.swift */,
+				A20000000000000000000005 /* EngineBridge.swift */,
+				A20000000000000000000006 /* AppModel.swift */,
+			);
+		};
+		A70000000000000000000006 /* Bridge */ = {
+			isa = PBXGroup;
+			path = Bridge;
+			sourceTree = "<group>";
+			children = (
+				A7000000000000000000000B /* Generated */,
+			);
+		};
+		A70000000000000000000007 /* ArgyllUXTests */ = {
+			isa = PBXGroup;
+			path = ArgyllUXTests;
+			sourceTree = "<group>";
+			children = (
+				A20000000000000000000012 /* AppModelTests.swift */,
+			);
+		};
+		A70000000000000000000008 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000000F /* ArgyllUX.app */,
+				A20000000000000000000013 /* ArgyllUXTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A70000000000000000000009 /* Views */ = {
+			isa = PBXGroup;
+			path = Views;
+			sourceTree = "<group>";
+			children = (
+				A20000000000000000000008 /* StatusBadgeView.swift */,
+				A20000000000000000000009 /* ActiveWorkDockView.swift */,
+				A2000000000000000000000A /* InspectorView.swift */,
+				A2000000000000000000000B /* PlaceholderRouteView.swift */,
+				A2000000000000000000000C /* HomeView.swift */,
+				A2000000000000000000000D /* SettingsView.swift */,
+				A2000000000000000000000E /* AppShellView.swift */,
+			);
+		};
+		A7000000000000000000000A /* Support */ = {
+			isa = PBXGroup;
+			path = Support;
+			sourceTree = "<group>";
+			children = (
+				A20000000000000000000007 /* PathSelection.swift */,
+			);
+		};
+		A7000000000000000000000B /* Generated */ = {
+			isa = PBXGroup;
+			path = Generated;
+			sourceTree = "<group>";
+			children = (
+				A20000000000000000000010 /* argyllux.swift */,
+				A20000000000000000000011 /* libargyllux_engine.a */,
+			);
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A50000000000000000000001 /* ArgyllUX */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A90000000000000000000001 /* Build configuration list for PBXNativeTarget "ArgyllUX" */;
+			buildPhases = (
+				A60000000000000000000003 /* Build Swift Bridge */,
+				A60000000000000000000004 /* Sources */,
+				A60000000000000000000001 /* Frameworks */,
+				A60000000000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ArgyllUX;
+			productName = ArgyllUX;
+			productReference = A2000000000000000000000F /* ArgyllUX.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A50000000000000000000002 /* ArgyllUXTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A90000000000000000000002 /* Build configuration list for PBXNativeTarget "ArgyllUXTests" */;
+			buildPhases = (
+				A60000000000000000000006 /* Sources */,
+				A60000000000000000000002 /* Frameworks */,
+				A60000000000000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A80000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = ArgyllUXTests;
+			productName = ArgyllUXTests;
+			productReference = A20000000000000000000013 /* ArgyllUXTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A40000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				ORGANIZATIONNAME = ArgyllUX;
+				TargetAttributes = {
+					A50000000000000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					A50000000000000000000002 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = A50000000000000000000001;
+					};
+				};
+			};
+			buildConfigurationList = A90000000000000000000003 /* Build configuration list for PBXProject "ArgyllUX" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A70000000000000000000001;
+			productRefGroup = A70000000000000000000008 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A50000000000000000000001 /* ArgyllUX */,
+				A50000000000000000000002 /* ArgyllUXTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A60000000000000000000005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A60000000000000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A60000000000000000000003 /* Build Swift Bridge */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Build Swift Bridge";
+			outputPaths = (
+				"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated/argyllux.swift",
+				"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated/argylluxFFI.h",
+				"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated/argylluxFFI.modulemap",
+				"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated/libargyllux_engine.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/zsh;
+			shellScript = "\"$PROJECT_DIR/../scripts/build-swift-bridge.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A60000000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* ArgyllUXApp.swift in Sources */,
+				A10000000000000000000002 /* AppRoute.swift in Sources */,
+				A10000000000000000000003 /* DashboardContent.swift in Sources */,
+				A10000000000000000000004 /* StoragePaths.swift in Sources */,
+				A10000000000000000000005 /* EngineBridge.swift in Sources */,
+				A10000000000000000000006 /* AppModel.swift in Sources */,
+				A10000000000000000000007 /* PathSelection.swift in Sources */,
+				A10000000000000000000008 /* StatusBadgeView.swift in Sources */,
+				A10000000000000000000009 /* ActiveWorkDockView.swift in Sources */,
+				A1000000000000000000000A /* InspectorView.swift in Sources */,
+				A1000000000000000000000B /* PlaceholderRouteView.swift in Sources */,
+				A1000000000000000000000C /* HomeView.swift in Sources */,
+				A1000000000000000000000D /* SettingsView.swift in Sources */,
+				A1000000000000000000000E /* AppShellView.swift in Sources */,
+				A1000000000000000000000F /* argyllux.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A60000000000000000000006 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000011 /* AppModelTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A80000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A50000000000000000000001 /* ArgyllUX */;
+			targetProxy = A30000000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		AA0000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		AA0000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		AA0000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated",
+				);
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_SWIFT_FLAGS = (
+					"$(inherited)",
+					"-Xcc",
+					"-fmodule-map-file=$(PROJECT_DIR)/ArgyllUX/Bridge/Generated/argylluxFFI.modulemap",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.argyllux.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+			};
+			name = Debug;
+		};
+		AA0000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated",
+				);
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				OTHER_SWIFT_FLAGS = (
+					"$(inherited)",
+					"-Xcc",
+					"-fmodule-map-file=$(PROJECT_DIR)/ArgyllUX/Bridge/Generated/argylluxFFI.modulemap",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.argyllux.mac;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+			};
+			name = Release;
+		};
+		AA0000000000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_SWIFT_FLAGS = (
+					"$(inherited)",
+					"-Xcc",
+					"-fmodule-map-file=$(PROJECT_DIR)/ArgyllUX/Bridge/Generated/argylluxFFI.modulemap",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.argyllux.mac.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ArgyllUX.app/Contents/MacOS/ArgyllUX";
+				TEST_TARGET_NAME = ArgyllUX;
+			};
+			name = Debug;
+		};
+		AA0000000000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				OTHER_SWIFT_FLAGS = (
+					"$(inherited)",
+					"-Xcc",
+					"-fmodule-map-file=$(PROJECT_DIR)/ArgyllUX/Bridge/Generated/argylluxFFI.modulemap",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.argyllux.mac.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ArgyllUX.app/Contents/MacOS/ArgyllUX";
+				TEST_TARGET_NAME = ArgyllUX;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A90000000000000000000001 /* Build configuration list for PBXNativeTarget "ArgyllUX" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000003 /* Debug */,
+				AA0000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A90000000000000000000002 /* Build configuration list for PBXNativeTarget "ArgyllUXTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000005 /* Debug */,
+				AA0000000000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A90000000000000000000003 /* Build configuration list for PBXProject "ArgyllUX" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000001 /* Debug */,
+				AA0000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A40000000000000000000001 /* Project object */;
+}

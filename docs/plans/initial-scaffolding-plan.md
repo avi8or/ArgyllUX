@@ -26,15 +26,14 @@ It does **not** build profiling, measurement, job execution, or direct instrumen
 
 - Build the native macOS shell with the final top-level route structure from the product docs, but as placeholders for now:
   - Home
-  - Print Configurations
-  - Profiles & Links
-  - Verification & Maintenance
-  - Black & White
-  - Advanced & Lab
-  - Instruments
+  - Printer Profiles
+  - Troubleshoot
+  - Inspect
+  - B&W Tuning
   - Settings
 - Only **Home** and **Settings** need real content in this pass.
 - The other routes should be explicit placeholders so the navigation shape is locked early.
+- The shell should also include the planned right inspector container and bottom active-work dock as structural placeholders, even though the first pass only fills them with foundation-level content.
 
 ### 3. Rust engine bootstrap
 
@@ -105,6 +104,7 @@ Do **not** launch measurement commands yet.
 ## Test Plan
 
 - Swift app launches and renders the shell on macOS.
+- The shell presents the six canonical routes from the consolidated product docs.
 - Rust engine loads through UniFFI and responds to bootstrap/health calls.
 - First-run bootstrap creates directories and initializes SQLite cleanly.
 - Re-launch uses the existing DB without migration errors.

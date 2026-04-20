@@ -1,0 +1,2 @@
+[bindings.swift]
+experimental_sendable_value_types = true
