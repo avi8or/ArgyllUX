@@ -3,6 +3,7 @@ use crate::support::{iso_timestamp, normalized_directory_candidates};
 use std::collections::HashSet;
 use std::env;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 const REQUIRED_EXECUTABLES: &[&str] = &[
     "targen",
@@ -29,6 +30,7 @@ struct CandidateResult {
     path: PathBuf,
     discovered: Vec<String>,
     missing: Vec<String>,
+    argyll_version: Option<String>,
 }
 
 pub fn required_executables() -> &'static [&'static str] {
@@ -96,6 +98,7 @@ fn discover_toolchain_internal(
                 .iter()
                 .map(|item| (*item).to_string())
                 .collect(),
+            argyll_version: None,
             last_validation_time: Some(iso_timestamp()),
         }
     }
@@ -123,10 +126,14 @@ fn inspect_candidate(path: &Path) -> CandidateResult {
         }
     }
 
+    let argyll_version = preferred_version_probe(&discovered)
+        .and_then(|executable| probe_argyll_version(&path.join(executable)));
+
     CandidateResult {
         path: path.to_path_buf(),
         discovered,
         missing,
+        argyll_version,
     }
 }
 
@@ -136,8 +143,47 @@ fn status_from_candidate(state: ToolchainState, candidate: CandidateResult) -> T
         resolved_install_path: Some(candidate.path.to_string_lossy().to_string()),
         discovered_executables: candidate.discovered,
         missing_executables: candidate.missing,
+        argyll_version: candidate.argyll_version,
         last_validation_time: Some(iso_timestamp()),
     }
+}
+
+fn preferred_version_probe(discovered: &[String]) -> Option<&str> {
+    discovered
+        .iter()
+        .find(|item| item.as_str() == "targen")
+        .map(String::as_str)
+        .or_else(|| discovered.first().map(String::as_str))
+}
+
+fn probe_argyll_version(executable_path: &Path) -> Option<String> {
+    let output = Command::new(executable_path).arg("-?").output().ok()?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    extract_version_from_output(&format!("{stdout}\n{stderr}"))
+}
+
+fn extract_version_from_output(output: &str) -> Option<String> {
+    for line in output.lines() {
+        let marker = "Version ";
+        let Some(index) = line.find(marker) else {
+            continue;
+        };
+
+        let version = line[index + marker.len()..]
+            .chars()
+            .take_while(|character| {
+                character.is_ascii_alphanumeric() || matches!(character, '.' | '-' | '_')
+            })
+            .collect::<String>();
+
+        if !version.is_empty() {
+            return Some(version);
+        }
+    }
+
+    None
 }
 
 #[cfg(test)]
@@ -216,5 +262,19 @@ mod tests {
         assert_eq!(status.state, ToolchainState::NotFound);
         assert!(status.discovered_executables.is_empty());
         assert_eq!(status.missing_executables.len(), REQUIRED_EXECUTABLES.len());
+    }
+
+    #[test]
+    fn extract_version_ignores_warning_lines() {
+        let output = r#"
+2026-04-19 18:45:12.846 targen[96970:54110597] Failure on line 688 in function id scheduleApplicationNotification(LSNotificationCode, NSWorkspaceNotificationCenter *): noErr == _LSModifyNotification(notificationID, 1, &code, 0, NULL, NULL, NULL)
+Generate Target deviceb test chart color values, Version 3.5.0
+Author: Graeme W. Gill, licensed under the AGPL Version 3
+"#;
+
+        assert_eq!(
+            extract_version_from_output(output).as_deref(),
+            Some("3.5.0")
+        );
     }
 }

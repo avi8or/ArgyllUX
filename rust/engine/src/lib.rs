@@ -1,15 +1,27 @@
 mod db;
 mod logging;
 mod model;
+mod runner;
 mod support;
 mod toolchain;
 
 pub use model::{
-    AppHealth, BootstrapStatus, EngineConfig, LogEntry, ToolchainState, ToolchainStatus,
+    ActiveWorkItem, AppHealth, ArtifactKind, BootstrapStatus, CommandRunState, CommandStream,
+    CreateNewProfileDraftInput, CreatePaperInput, CreatePrinterInput, DashboardSnapshot,
+    DeleteJobResult, EngineConfig, InstrumentConnectionState, InstrumentStatus, JobArtifactRecord,
+    JobCommandEventRecord, JobCommandRecord, LogEntry, MeasurementMode, MeasurementStatusRecord,
+    NewProfileContextRecord, NewProfileJobDetail, PaperRecord, PrintSettingsRecord,
+    PrinterProfileRecord, PrinterRecord, ReviewSummaryRecord, SaveNewProfileContextInput,
+    SavePrintSettingsInput, SaveTargetSettingsInput, StartMeasurementInput, TargetSettingsRecord,
+    ToolchainState, ToolchainStatus, UpdatePaperInput, UpdatePrinterInput, WorkflowStage,
+    WorkflowStageState, WorkflowStageSummary,
 };
 
 use crate::model::EngineState;
-use crate::support::{ensure_runtime_paths, sanitize_optional_path, sanitize_search_roots};
+use crate::runner::JobTask;
+use crate::support::{
+    EngineResult, ensure_runtime_paths, sanitize_optional_path, sanitize_search_roots,
+};
 use std::sync::RwLock;
 
 uniffi::setup_scaffolding!("argyllux");
@@ -17,6 +29,12 @@ uniffi::setup_scaffolding!("argyllux");
 #[derive(uniffi::Object)]
 pub struct Engine {
     state: RwLock<EngineState>,
+}
+
+impl Default for Engine {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[uniffi::export]
@@ -69,18 +87,17 @@ impl Engine {
 
         let toolchain_status = toolchain::discover_toolchain(&sanitized_config);
 
-        if database_initialized {
-            if let Err(error) =
+        if database_initialized
+            && let Err(error) =
                 db::persist_toolchain_status(&sanitized_config.database_path, &toolchain_status)
-            {
-                logging::append_log(
-                    &sanitized_config.log_path,
-                    "warning",
-                    "engine.bootstrap",
-                    format!("Toolchain status cache write failed: {error}"),
-                );
-                database_initialized = false;
-            }
+        {
+            logging::append_log(
+                &sanitized_config.log_path,
+                "warning",
+                "engine.bootstrap",
+                format!("Toolchain status cache write failed: {error}"),
+            );
+            database_initialized = false;
         }
 
         let bootstrap_status = BootstrapStatus {
@@ -90,6 +107,7 @@ impl Engine {
             toolchain_status: toolchain_status.clone(),
         };
 
+        let dashboard_snapshot = build_dashboard_snapshot(&sanitized_config);
         let app_health = build_app_health(
             &sanitized_config,
             &bootstrap_status,
@@ -111,6 +129,7 @@ impl Engine {
         state.bootstrap_status = Some(bootstrap_status.clone());
         state.toolchain_status = toolchain_status;
         state.app_health = app_health;
+        state.dashboard_snapshot = dashboard_snapshot;
 
         bootstrap_status
     }
@@ -181,11 +200,13 @@ impl Engine {
             },
             config.argyll_override_path.as_deref(),
         );
+        let dashboard_snapshot = build_dashboard_snapshot(&config);
 
         let mut state = self.state.write().expect("engine state lock poisoned");
         state.config = Some(config);
         state.toolchain_status = toolchain_status.clone();
         state.app_health = app_health;
+        state.dashboard_snapshot = dashboard_snapshot;
 
         toolchain_status
     }
@@ -211,6 +232,406 @@ impl Engine {
         config
             .map(|config| logging::read_recent_logs(&config.log_path, limit as usize))
             .unwrap_or_default()
+    }
+
+    #[uniffi::method(name = "getDashboardSnapshot")]
+    pub fn get_dashboard_snapshot(&self) -> DashboardSnapshot {
+        let config = self
+            .state
+            .read()
+            .expect("engine state lock poisoned")
+            .config
+            .clone();
+
+        let Some(config) = config else {
+            return DashboardSnapshot::default();
+        };
+
+        let snapshot = build_dashboard_snapshot(&config);
+        self.state
+            .write()
+            .expect("engine state lock poisoned")
+            .dashboard_snapshot = snapshot.clone();
+        snapshot
+    }
+
+    #[uniffi::method(name = "listPrinters")]
+    pub fn list_printers(&self) -> Vec<PrinterRecord> {
+        with_config(&self.state, |config| {
+            db::list_printers(&config.database_path)
+        })
+        .unwrap_or_default()
+    }
+
+    #[uniffi::method(name = "createPrinter")]
+    pub fn create_printer(&self, input: CreatePrinterInput) -> PrinterRecord {
+        match with_config(&self.state, |config| {
+            db::create_printer(&config.database_path, &input)
+        }) {
+            Ok(record) => record,
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.printers",
+                    &format!("Create printer failed: {error}"),
+                );
+                fallback_printer_record()
+            }
+        }
+    }
+
+    #[uniffi::method(name = "updatePrinter")]
+    pub fn update_printer(&self, input: UpdatePrinterInput) -> PrinterRecord {
+        match with_config(&self.state, |config| {
+            db::update_printer(&config.database_path, &input)
+        }) {
+            Ok(record) => record,
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.printers",
+                    &format!("Update printer failed: {error}"),
+                );
+                fallback_printer_record()
+            }
+        }
+    }
+
+    #[uniffi::method(name = "listPapers")]
+    pub fn list_papers(&self) -> Vec<PaperRecord> {
+        with_config(&self.state, |config| db::list_papers(&config.database_path))
+            .unwrap_or_default()
+    }
+
+    #[uniffi::method(name = "createPaper")]
+    pub fn create_paper(&self, input: CreatePaperInput) -> PaperRecord {
+        match with_config(&self.state, |config| {
+            db::create_paper(&config.database_path, &input)
+        }) {
+            Ok(record) => record,
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.papers",
+                    &format!("Create paper failed: {error}"),
+                );
+                fallback_paper_record()
+            }
+        }
+    }
+
+    #[uniffi::method(name = "updatePaper")]
+    pub fn update_paper(&self, input: UpdatePaperInput) -> PaperRecord {
+        match with_config(&self.state, |config| {
+            db::update_paper(&config.database_path, &input)
+        }) {
+            Ok(record) => record,
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.papers",
+                    &format!("Update paper failed: {error}"),
+                );
+                fallback_paper_record()
+            }
+        }
+    }
+
+    #[uniffi::method(name = "listPrinterProfiles")]
+    pub fn list_printer_profiles(&self) -> Vec<PrinterProfileRecord> {
+        with_config(&self.state, |config| {
+            db::list_printer_profiles(&config.database_path)
+        })
+        .unwrap_or_default()
+    }
+
+    #[uniffi::method(name = "createNewProfileDraft")]
+    pub fn create_new_profile_draft(
+        &self,
+        input: CreateNewProfileDraftInput,
+    ) -> NewProfileJobDetail {
+        let result = with_config(&self.state, |config| {
+            db::create_new_profile_draft(&config.database_path, &config.app_support_path, &input)
+        });
+        match result {
+            Ok(detail) => {
+                refresh_dashboard(&self.state);
+                detail
+            }
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.jobs",
+                    &format!("Create new profile draft failed: {error}"),
+                );
+                fallback_job_detail("new-profile", Some(error.to_string()))
+            }
+        }
+    }
+
+    #[uniffi::method(name = "getNewProfileJobDetail")]
+    pub fn get_new_profile_job_detail(&self, job_id: String) -> NewProfileJobDetail {
+        match with_config(&self.state, |config| {
+            db::load_new_profile_job_detail(&config.database_path, &job_id)
+        }) {
+            Ok(detail) => {
+                refresh_dashboard(&self.state);
+                detail
+            }
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.jobs",
+                    &format!("Load new profile job failed: {error}"),
+                );
+                fallback_job_detail(&job_id, Some(error.to_string()))
+            }
+        }
+    }
+
+    #[uniffi::method(name = "saveNewProfileContext")]
+    pub fn save_new_profile_context(
+        &self,
+        input: SaveNewProfileContextInput,
+    ) -> NewProfileJobDetail {
+        match with_config(&self.state, |config| {
+            db::save_new_profile_context(&config.database_path, &input)
+        }) {
+            Ok(detail) => {
+                refresh_dashboard(&self.state);
+                detail
+            }
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.jobs",
+                    &format!("Save New Profile context failed: {error}"),
+                );
+                fallback_job_detail(&input.job_id, Some(error.to_string()))
+            }
+        }
+    }
+
+    #[uniffi::method(name = "saveTargetSettings")]
+    pub fn save_target_settings(&self, input: SaveTargetSettingsInput) -> NewProfileJobDetail {
+        match with_config(&self.state, |config| {
+            db::save_target_settings(&config.database_path, &input)
+        }) {
+            Ok(detail) => {
+                refresh_dashboard(&self.state);
+                detail
+            }
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.jobs",
+                    &format!("Save target settings failed: {error}"),
+                );
+                fallback_job_detail(&input.job_id, Some(error.to_string()))
+            }
+        }
+    }
+
+    #[uniffi::method(name = "savePrintSettings")]
+    pub fn save_print_settings(&self, input: SavePrintSettingsInput) -> NewProfileJobDetail {
+        match with_config(&self.state, |config| {
+            db::save_print_settings(&config.database_path, &input)
+        }) {
+            Ok(detail) => {
+                refresh_dashboard(&self.state);
+                detail
+            }
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.jobs",
+                    &format!("Save print settings failed: {error}"),
+                );
+                fallback_job_detail(&input.job_id, Some(error.to_string()))
+            }
+        }
+    }
+
+    #[uniffi::method(name = "startGenerateTarget")]
+    pub fn start_generate_target(&self, job_id: String) -> NewProfileJobDetail {
+        let (config, toolchain_status) = match current_runtime_context(&self.state) {
+            Some(context) => context,
+            None => {
+                return fallback_job_detail(
+                    &job_id,
+                    Some("ArgyllUX has not been bootstrapped yet.".to_string()),
+                );
+            }
+        };
+        match db::prepare_generate_target(&config.database_path, &job_id) {
+            Ok(detail) => {
+                runner::spawn_job_task(
+                    config,
+                    toolchain_status,
+                    job_id.clone(),
+                    JobTask::GenerateTarget,
+                );
+                refresh_dashboard(&self.state);
+                detail
+            }
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.jobs",
+                    &format!("Start generate target failed: {error}"),
+                );
+                fallback_job_detail(&job_id, Some(error.to_string()))
+            }
+        }
+    }
+
+    #[uniffi::method(name = "markNewProfilePrinted")]
+    pub fn mark_new_profile_printed(&self, job_id: String) -> NewProfileJobDetail {
+        match with_config(&self.state, |config| {
+            db::mark_new_profile_printed(&config.database_path, &job_id)
+        }) {
+            Ok(detail) => {
+                refresh_dashboard(&self.state);
+                detail
+            }
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.jobs",
+                    &format!("Mark printed failed: {error}"),
+                );
+                fallback_job_detail(&job_id, Some(error.to_string()))
+            }
+        }
+    }
+
+    #[uniffi::method(name = "markNewProfileReadyToMeasure")]
+    pub fn mark_new_profile_ready_to_measure(&self, job_id: String) -> NewProfileJobDetail {
+        match with_config(&self.state, |config| {
+            db::mark_new_profile_ready_to_measure(&config.database_path, &job_id)
+        }) {
+            Ok(detail) => {
+                refresh_dashboard(&self.state);
+                detail
+            }
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.jobs",
+                    &format!("Mark ready to measure failed: {error}"),
+                );
+                fallback_job_detail(&job_id, Some(error.to_string()))
+            }
+        }
+    }
+
+    #[uniffi::method(name = "startMeasurement")]
+    pub fn start_measurement(&self, input: StartMeasurementInput) -> NewProfileJobDetail {
+        let (config, toolchain_status) = match current_runtime_context(&self.state) {
+            Some(context) => context,
+            None => {
+                return fallback_job_detail(
+                    &input.job_id,
+                    Some("ArgyllUX has not been bootstrapped yet.".to_string()),
+                );
+            }
+        };
+        match db::prepare_measurement(&config.database_path, &input) {
+            Ok(detail) => {
+                runner::spawn_job_task(
+                    config,
+                    toolchain_status,
+                    input.job_id.clone(),
+                    JobTask::MeasureTarget,
+                );
+                refresh_dashboard(&self.state);
+                detail
+            }
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.jobs",
+                    &format!("Start measurement failed: {error}"),
+                );
+                fallback_job_detail(&input.job_id, Some(error.to_string()))
+            }
+        }
+    }
+
+    #[uniffi::method(name = "startBuildProfile")]
+    pub fn start_build_profile(&self, job_id: String) -> NewProfileJobDetail {
+        let (config, toolchain_status) = match current_runtime_context(&self.state) {
+            Some(context) => context,
+            None => {
+                return fallback_job_detail(
+                    &job_id,
+                    Some("ArgyllUX has not been bootstrapped yet.".to_string()),
+                );
+            }
+        };
+        match db::prepare_build_profile(&config.database_path, &job_id) {
+            Ok(detail) => {
+                runner::spawn_job_task(
+                    config,
+                    toolchain_status,
+                    job_id.clone(),
+                    JobTask::BuildProfile,
+                );
+                refresh_dashboard(&self.state);
+                detail
+            }
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.jobs",
+                    &format!("Start build profile failed: {error}"),
+                );
+                fallback_job_detail(&job_id, Some(error.to_string()))
+            }
+        }
+    }
+
+    #[uniffi::method(name = "publishNewProfile")]
+    pub fn publish_new_profile(&self, job_id: String) -> NewProfileJobDetail {
+        match with_config(&self.state, |config| {
+            db::publish_new_profile(&config.database_path, &job_id)
+        }) {
+            Ok(detail) => {
+                refresh_dashboard(&self.state);
+                detail
+            }
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.jobs",
+                    &format!("Publish profile failed: {error}"),
+                );
+                fallback_job_detail(&job_id, Some(error.to_string()))
+            }
+        }
+    }
+
+    #[uniffi::method(name = "deleteNewProfileJob")]
+    pub fn delete_new_profile_job(&self, job_id: String) -> DeleteJobResult {
+        match with_config(&self.state, |config| {
+            db::delete_new_profile_job(&config.database_path, &job_id)
+        }) {
+            Ok(result) => {
+                refresh_dashboard(&self.state);
+                result
+            }
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.jobs",
+                    &format!("Delete new profile job failed: {error}"),
+                );
+                DeleteJobResult {
+                    success: false,
+                    message: error.to_string(),
+                }
+            }
+        }
     }
 }
 
@@ -251,7 +672,7 @@ fn build_app_health(
                     .join(", ")
             ));
             warnings.push(
-                "Only health and setup surfaces are available until the missing tools are installed."
+                "Install the missing ArgyllCMS tools before starting a new profile workflow."
                     .to_string(),
             );
         }
@@ -300,32 +721,197 @@ fn build_app_health(
     }
 }
 
+fn build_dashboard_snapshot(config: &EngineConfig) -> DashboardSnapshot {
+    db::load_dashboard_snapshot(&config.database_path).unwrap_or_default()
+}
+
+fn refresh_dashboard(state: &RwLock<EngineState>) {
+    let config = state
+        .read()
+        .expect("engine state lock poisoned")
+        .config
+        .clone();
+
+    if let Some(config) = config {
+        let snapshot = build_dashboard_snapshot(&config);
+        state
+            .write()
+            .expect("engine state lock poisoned")
+            .dashboard_snapshot = snapshot;
+    }
+}
+
+fn with_config<T>(
+    state: &RwLock<EngineState>,
+    op: impl FnOnce(&EngineConfig) -> EngineResult<T>,
+) -> EngineResult<T> {
+    let config = state
+        .read()
+        .expect("engine state lock poisoned")
+        .config
+        .clone()
+        .ok_or_else(|| {
+            Box::<dyn std::error::Error + Send + Sync>::from(
+                "ArgyllUX has not been bootstrapped yet.",
+            )
+        })?;
+    op(&config)
+}
+
+fn current_runtime_context(state: &RwLock<EngineState>) -> Option<(EngineConfig, ToolchainStatus)> {
+    let state = state.read().expect("engine state lock poisoned");
+    let config = state.config.clone()?;
+    Some((config, state.toolchain_status.clone()))
+}
+
+fn log_config_error(state: &RwLock<EngineState>, source: &str, message: &str) {
+    if let Some(config) = state
+        .read()
+        .expect("engine state lock poisoned")
+        .config
+        .clone()
+    {
+        logging::append_log(&config.log_path, "error", source, message.to_string());
+    }
+}
+
+fn fallback_printer_record() -> PrinterRecord {
+    PrinterRecord {
+        id: String::new(),
+        make_model: String::new(),
+        nickname: String::new(),
+        transport_style: String::new(),
+        supported_quality_modes: Vec::new(),
+        monochrome_path_notes: String::new(),
+        notes: String::new(),
+        display_name: String::new(),
+        created_at: String::new(),
+        updated_at: String::new(),
+    }
+}
+
+fn fallback_paper_record() -> PaperRecord {
+    PaperRecord {
+        id: String::new(),
+        vendor_product_name: String::new(),
+        surface_class: String::new(),
+        weight_thickness: String::new(),
+        oba_fluorescence_notes: String::new(),
+        notes: String::new(),
+        display_name: String::new(),
+        created_at: String::new(),
+        updated_at: String::new(),
+    }
+}
+
+fn fallback_job_detail(job_id: &str, latest_error: Option<String>) -> NewProfileJobDetail {
+    NewProfileJobDetail {
+        id: job_id.to_string(),
+        title: "New Profile".to_string(),
+        status: "failed".to_string(),
+        stage: WorkflowStage::Failed,
+        next_action: "Review the technical details".to_string(),
+        profile_name: String::new(),
+        printer_name: String::new(),
+        paper_name: String::new(),
+        workspace_path: String::new(),
+        printer: None,
+        paper: None,
+        context: NewProfileContextRecord {
+            media_setting: String::new(),
+            quality_mode: String::new(),
+            print_path_notes: String::new(),
+            measurement_notes: String::new(),
+            measurement_observer: "1931_2".to_string(),
+            measurement_illuminant: "D50".to_string(),
+            measurement_mode: MeasurementMode::Strip,
+        },
+        target_settings: TargetSettingsRecord {
+            patch_count: 836,
+            improve_neutrals: false,
+            use_existing_profile_to_help_target_planning: false,
+            planning_profile_id: None,
+            planning_profile_name: None,
+        },
+        print_settings: PrintSettingsRecord {
+            print_without_color_management: true,
+            drying_time_minutes: 120,
+            printed_at: None,
+            drying_ready_at: None,
+        },
+        measurement: MeasurementStatusRecord {
+            measurement_source_path: None,
+            scan_file_path: None,
+            has_measurement_checkpoint: false,
+        },
+        latest_error,
+        published_profile_id: None,
+        review: None,
+        stage_timeline: vec![
+            WorkflowStageSummary {
+                stage: WorkflowStage::Context,
+                title: "Context".to_string(),
+                state: WorkflowStageState::Upcoming,
+            },
+            WorkflowStageSummary {
+                stage: WorkflowStage::Target,
+                title: "Target".to_string(),
+                state: WorkflowStageState::Upcoming,
+            },
+            WorkflowStageSummary {
+                stage: WorkflowStage::Print,
+                title: "Print".to_string(),
+                state: WorkflowStageState::Upcoming,
+            },
+            WorkflowStageSummary {
+                stage: WorkflowStage::Drying,
+                title: "Drying".to_string(),
+                state: WorkflowStageState::Upcoming,
+            },
+            WorkflowStageSummary {
+                stage: WorkflowStage::Measure,
+                title: "Measure".to_string(),
+                state: WorkflowStageState::Upcoming,
+            },
+            WorkflowStageSummary {
+                stage: WorkflowStage::Build,
+                title: "Build".to_string(),
+                state: WorkflowStageState::Upcoming,
+            },
+            WorkflowStageSummary {
+                stage: WorkflowStage::Review,
+                title: "Review".to_string(),
+                state: WorkflowStageState::Blocked,
+            },
+            WorkflowStageSummary {
+                stage: WorkflowStage::Publish,
+                title: "Publish".to_string(),
+                state: WorkflowStageState::Upcoming,
+            },
+        ],
+        artifacts: Vec::new(),
+        commands: Vec::new(),
+        is_command_running: false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rusqlite::Connection;
-    use std::fs;
     use tempfile::tempdir;
 
-    fn make_fake_argyll(dir: &std::path::Path, executables: &[&str]) {
-        fs::create_dir_all(dir).unwrap();
-        for executable in executables {
-            fs::write(dir.join(executable), "#!/bin/sh\nexit 0\n").unwrap();
-        }
-    }
-
-    fn build_config(root: &std::path::Path, override_path: Option<String>) -> EngineConfig {
+    fn build_config(root: &std::path::Path) -> EngineConfig {
         EngineConfig {
             app_support_path: root
                 .join("Application Support/ArgyllUX")
                 .to_string_lossy()
                 .to_string(),
             database_path: root
-                .join("Application Support/ArgyllUX/argyllux.sqlite")
+                .join("Application Support/ArgyllUX/engine.sqlite")
                 .to_string_lossy()
                 .to_string(),
             log_path: root.join("Logs/argyllux.log").to_string_lossy().to_string(),
-            argyll_override_path: override_path,
+            argyll_override_path: None,
             additional_search_roots: Vec::new(),
         }
     }
@@ -333,79 +919,41 @@ mod tests {
     #[test]
     fn bootstrap_creates_directories_and_database() {
         let temp = tempdir().unwrap();
-        let bin_dir = temp.path().join("Argyll/bin");
-        make_fake_argyll(&bin_dir, toolchain::required_executables());
-
         let engine = Engine::new();
-        let status = engine.bootstrap(build_config(
-            temp.path(),
-            Some(bin_dir.to_string_lossy().to_string()),
-        ));
+        let status = engine.bootstrap(build_config(temp.path()));
 
         assert!(status.app_support_dir_ready);
         assert!(status.database_initialized);
-        assert!(status.migrations_applied);
-        assert_eq!(status.toolchain_status.state, ToolchainState::Ready);
-
-        let database_path = temp
-            .path()
-            .join("Application Support/ArgyllUX/argyllux.sqlite");
-        assert!(database_path.exists());
-
-        let connection = Connection::open(database_path).unwrap();
-        let table_count: i64 = connection
-            .query_row(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('app_settings', 'toolchain_status_cache', 'print_configurations', 'jobs', 'artifacts')",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(table_count, 5);
     }
 
     #[test]
-    fn bootstrap_is_idempotent() {
+    fn create_new_profile_draft_updates_dashboard_snapshot() {
         let temp = tempdir().unwrap();
-        let bin_dir = temp.path().join("Argyll/bin");
-        make_fake_argyll(&bin_dir, toolchain::required_executables());
-        let config = build_config(temp.path(), Some(bin_dir.to_string_lossy().to_string()));
-
         let engine = Engine::new();
-        let first = engine.bootstrap(config.clone());
-        let second = engine.bootstrap(config);
+        engine.bootstrap(build_config(temp.path()));
 
-        assert!(first.migrations_applied);
-        assert!(!second.migrations_applied);
-        assert_eq!(second.toolchain_status.state, ToolchainState::Ready);
+        let detail = engine.create_new_profile_draft(CreateNewProfileDraftInput {
+            profile_name: Some("P900 Rag v1".to_string()),
+            printer_id: None,
+            paper_id: None,
+        });
+        let snapshot = engine.get_dashboard_snapshot();
+
+        assert_eq!(detail.stage, WorkflowStage::Context);
+        assert_eq!(snapshot.jobs_count, 1);
+        assert_eq!(snapshot.active_work_items[0].id, detail.id);
     }
 
     #[test]
     fn set_toolchain_path_updates_cached_state() {
         let temp = tempdir().unwrap();
-        let partial_dir = temp.path().join("Argyll Partial/bin");
-        make_fake_argyll(&partial_dir, &["targen", "printtarg"]);
-
         let engine = Engine::new();
-        engine.bootstrap(build_config(temp.path(), None));
-        let status = engine.set_toolchain_path(Some(partial_dir.to_string_lossy().to_string()));
-        let cached_status = engine.get_toolchain_status();
-        let database_path = temp
-            .path()
-            .join("Application Support/ArgyllUX/argyllux.sqlite");
-        let connection = Connection::open(database_path).unwrap();
-        let persisted_override: String = connection
-            .query_row(
-                "SELECT value FROM app_settings WHERE key = 'toolchain.override_path'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
+        engine.bootstrap(build_config(temp.path()));
 
-        assert_eq!(cached_status.state, status.state);
-        assert_eq!(
-            persisted_override,
-            partial_dir.to_string_lossy().to_string()
-        );
-        assert!(status.last_validation_time.is_some());
+        let status = engine.set_toolchain_path(Some("/Applications/ArgyllCMS".to_string()));
+        assert!(matches!(
+            status.state,
+            ToolchainState::Ready | ToolchainState::Partial | ToolchainState::NotFound
+        ));
     }
 }

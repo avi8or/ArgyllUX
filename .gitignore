@@ -6,5 +6,7 @@ target/
 .cargo-home/
 .build/
 DerivedData/
+*.xcworkspace/xcuserdata/
+*.xcuserstate
 apple/ArgyllUX/Bridge/Generated/*
 !apple/ArgyllUX/Bridge/Generated/.gitkeep

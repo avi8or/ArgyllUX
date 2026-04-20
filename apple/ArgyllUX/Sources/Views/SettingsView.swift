@@ -72,17 +72,131 @@ struct SettingsView: View {
                 }
 
                 settingsSection("Printers") {
-                    Text("Printer definitions land here next so the shell can stay profile-first.")
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 16) {
+                        if model.printers.isEmpty {
+                            emptyState("Create a printer here or inline from New Profile.")
+                        } else {
+                            ForEach(model.printers, id: \.id) { printer in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack(alignment: .top) {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(printer.displayName)
+                                                .font(.headline)
+                                            if !printer.transportStyle.isEmpty {
+                                                Text(printer.transportStyle)
+                                                    .font(.subheadline)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            if !printer.supportedQualityModes.isEmpty {
+                                                Text(printer.supportedQualityModes.joined(separator: ", "))
+                                                    .font(.footnote)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                        }
+
+                                        Spacer()
+
+                                        HStack(spacing: 10) {
+                                            Button("Use in New Profile") {
+                                                model.startNewProfileFromSettings(printerId: printer.id)
+                                            }
+
+                                            Button("Edit") {
+                                                model.editPrinter(printer)
+                                            }
+                                        }
+                                    }
+
+                                    if !printer.notes.isEmpty {
+                                        Text(printer.notes)
+                                            .font(.footnote)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.vertical, 6)
+                            }
+                        }
+
+                        PrinterEditorForm(
+                            title: model.settingsPrinterDraft.title,
+                            draft: $model.settingsPrinterDraft,
+                            saveTitle: model.settingsPrinterDraft.id == nil ? "Create Printer" : "Save Printer",
+                            secondaryTitle: "Reset",
+                            isSaveDisabled: model.settingsPrinterDraft.makeModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                            onSave: {
+                                Task { await model.saveSettingsPrinter() }
+                            },
+                            onSecondary: {
+                                model.resetSettingsPrinterDraft()
+                            }
+                        )
+                    }
                 }
 
                 settingsSection("Papers") {
-                    Text("Paper presets and related defaults stay here rather than becoming a top-level library.")
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 16) {
+                        if model.papers.isEmpty {
+                            emptyState("Create a paper here or inline from New Profile.")
+                        } else {
+                            ForEach(model.papers, id: \.id) { paper in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack(alignment: .top) {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(paper.displayName)
+                                                .font(.headline)
+                                            if !paper.surfaceClass.isEmpty {
+                                                Text(paper.surfaceClass)
+                                                    .font(.subheadline)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            if !paper.weightThickness.isEmpty {
+                                                Text(paper.weightThickness)
+                                                    .font(.footnote)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                        }
+
+                                        Spacer()
+
+                                        HStack(spacing: 10) {
+                                            Button("Use in New Profile") {
+                                                model.startNewProfileFromSettings(paperId: paper.id)
+                                            }
+
+                                            Button("Edit") {
+                                                model.editPaper(paper)
+                                            }
+                                        }
+                                    }
+
+                                    if !paper.notes.isEmpty {
+                                        Text(paper.notes)
+                                            .font(.footnote)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.vertical, 6)
+                            }
+                        }
+
+                        PaperEditorForm(
+                            title: model.settingsPaperDraft.title,
+                            draft: $model.settingsPaperDraft,
+                            saveTitle: model.settingsPaperDraft.id == nil ? "Create Paper" : "Save Paper",
+                            secondaryTitle: "Reset",
+                            isSaveDisabled: model.settingsPaperDraft.vendorProductName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                            onSave: {
+                                Task { await model.saveSettingsPaper() }
+                            },
+                            onSecondary: {
+                                model.resetSettingsPaperDraft()
+                            }
+                        )
+                    }
                 }
 
                 settingsSection("Defaults") {
-                    Text("Application-wide defaults land here after the foundation pass.")
+                    Text("Application defaults stay separate from Printer and Paper records in v1.")
                         .foregroundStyle(.secondary)
                 }
 
@@ -97,27 +211,6 @@ struct SettingsView: View {
 
                             if !appHealth.warnings.isEmpty {
                                 detailList(title: "Warnings", items: appHealth.warnings)
-                            }
-                        }
-
-                        if !model.recentLogs.isEmpty {
-                            Divider()
-
-                            Text("Recent logs")
-                                .font(.headline)
-
-                            ForEach(model.recentLogs, id: \.timestamp) { entry in
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("\(entry.level.uppercased()) • \(entry.source)")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.secondary)
-                                    Text(entry.message)
-                                        .font(.subheadline)
-                                    Text(entry.timestamp)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(.vertical, 6)
                             }
                         }
                     }
@@ -168,5 +261,104 @@ struct SettingsView: View {
                     .font(.subheadline)
             }
         }
+    }
+
+    private func emptyState(_ message: String) -> some View {
+        Text(message)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+struct PrinterEditorForm: View {
+    let title: String
+    @Binding var draft: PrinterDraft
+    let saveTitle: String
+    let secondaryTitle: String
+    let isSaveDisabled: Bool
+    let onSave: () -> Void
+    let onSecondary: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+
+            TextField("Make / model", text: $draft.makeModel)
+                .textFieldStyle(.roundedBorder)
+
+            TextField("Nickname", text: $draft.nickname)
+                .textFieldStyle(.roundedBorder)
+
+            TextField("Transport style", text: $draft.transportStyle)
+                .textFieldStyle(.roundedBorder)
+
+            TextField("Supported quality modes", text: $draft.supportedQualityModesText, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(2...4)
+
+            TextField("Monochrome path notes", text: $draft.monochromePathNotes, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(2...4)
+
+            TextField("Notes", text: $draft.notes, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(2...4)
+
+            HStack(spacing: 10) {
+                Button(saveTitle, action: onSave)
+                    .disabled(isSaveDisabled)
+
+                Button(secondaryTitle, action: onSecondary)
+            }
+        }
+        .padding(16)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+struct PaperEditorForm: View {
+    let title: String
+    @Binding var draft: PaperDraft
+    let saveTitle: String
+    let secondaryTitle: String
+    let isSaveDisabled: Bool
+    let onSave: () -> Void
+    let onSecondary: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+
+            TextField("Vendor / product name", text: $draft.vendorProductName)
+                .textFieldStyle(.roundedBorder)
+
+            TextField("Surface class", text: $draft.surfaceClass)
+                .textFieldStyle(.roundedBorder)
+
+            TextField("Weight / thickness", text: $draft.weightThickness)
+                .textFieldStyle(.roundedBorder)
+
+            TextField("OBA / fluorescence notes", text: $draft.obaFluorescenceNotes, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(2...4)
+
+            TextField("Notes", text: $draft.notes, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(2...4)
+
+            HStack(spacing: 10) {
+                Button(saveTitle, action: onSave)
+                    .disabled(isSaveDisabled)
+
+                Button(secondaryTitle, action: onSecondary)
+            }
+        }
+        .padding(16)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
     }
 }

@@ -17,6 +17,9 @@ struct HomeView: View {
                     LazyVGrid(columns: gridColumns, alignment: .leading, spacing: 12) {
                         ForEach(model.launcherActions) { action in
                             Button {
+                                if action.kind == .newProfile {
+                                    Task { await model.openNewProfileWorkflow() }
+                                }
                             } label: {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text(action.title)
@@ -31,47 +34,63 @@ struct HomeView: View {
                                 .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
                             }
                             .buttonStyle(.plain)
-                            .disabled(true)
+                            .disabled(action.kind != .newProfile)
                         }
                     }
-                    Text("This foundation pass locks the action language and layout before workflow launchers go live.")
+
+                    Text("The vertical slice starts with New Profile. The other launchers stay visible so the shell language remains locked.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
                 section("Active work") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(model.activeWorkItems) { item in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(item.title)
-                                    .font(.headline)
-                                Text("Next: \(item.nextAction)")
-                                    .foregroundStyle(.secondary)
+                    if model.activeWorkItems.isEmpty {
+                        emptyState(ActiveWorkCopy.emptyStateMessage)
+                    } else {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(model.activeWorkItems, id: \.id) { item in
+                                HStack(alignment: .top, spacing: 12) {
+                                    Button {
+                                        model.openActiveWorkItem(item)
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Text(item.title)
+                                                .font(.headline)
+                                                .foregroundStyle(.primary)
+                                            Text(stageTitle(item.stage))
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(.secondary)
+                                            Text("Next: \(item.nextAction)")
+                                                .foregroundStyle(.secondary)
+                                            Text("\(item.printerName) | \(item.paperName)")
+                                                .font(.footnote)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .padding(14)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Button(role: .destructive) {
+                                        model.requestActiveWorkDeletion(item)
+                                    } label: {
+                                        Label(ActiveWorkCopy.deleteActionTitle, systemImage: "trash")
+                                            .labelStyle(.iconOnly)
+                                            .frame(width: 32, height: 32)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel(ActiveWorkCopy.deleteAccessibilityLabel(for: item.title))
+                                    .accessibilityHint(ActiveWorkCopy.deleteHint)
+                                    .help(ActiveWorkCopy.deleteActionTitle)
+                                }
+                                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
                             }
-                            .padding(14)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
                         }
                     }
                 }
 
                 section("Profile health") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(model.profileHealthItems) { item in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(item.title)
-                                    .font(.headline)
-                                Text(item.context)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                Text(item.result)
-                                    .font(.subheadline)
-                            }
-                            .padding(14)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
-                        }
-                    }
+                    emptyState("Profile trust summaries land after the first real job flow exists.")
                 }
 
                 section("Toolchain and app health") {
@@ -79,6 +98,7 @@ struct HomeView: View {
                         HStack(spacing: 10) {
                             StatusBadgeView(title: model.argyllStatusLabel, tone: toolchainTone)
                             StatusBadgeView(title: model.readinessLabel, tone: readinessTone)
+                            StatusBadgeView(title: model.instrumentStatusLabel, tone: model.instrumentStatusTone)
                             if model.isRefreshing {
                                 ProgressView()
                                     .controlSize(.small)
@@ -86,6 +106,7 @@ struct HomeView: View {
                         }
 
                         detailRow(title: "Detected path", value: model.detectedToolchainPath)
+                        detailRow(title: "ArgyllCMS version", value: model.argyllVersionLabel)
                         detailRow(title: "Last validation", value: model.lastValidationLabel)
 
                         if let appHealth = model.appHealth {
@@ -138,6 +159,15 @@ struct HomeView: View {
         }
     }
 
+    private func emptyState(_ message: String) -> some View {
+        Text(message)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+    }
+
     private func detailRow(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
@@ -158,6 +188,33 @@ struct HomeView: View {
                 Text(item)
                     .font(.subheadline)
             }
+        }
+    }
+
+    private func stageTitle(_ stage: WorkflowStage) -> String {
+        switch stage {
+        case .context:
+            "Context"
+        case .target:
+            "Target"
+        case .print:
+            "Print"
+        case .drying:
+            "Drying"
+        case .measure:
+            "Measure"
+        case .build:
+            "Build"
+        case .review:
+            "Review"
+        case .publish:
+            "Publish"
+        case .completed:
+            "Completed"
+        case .blocked:
+            "Blocked"
+        case .failed:
+            "Failed"
         }
     }
 }

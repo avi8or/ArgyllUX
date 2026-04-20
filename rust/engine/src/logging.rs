@@ -19,7 +19,7 @@ pub fn read_recent_logs(log_path: &str, limit: usize) -> Vec<LogEntry> {
     let reader = BufReader::new(file);
     let mut entries = reader
         .lines()
-        .filter_map(|line| line.ok())
+        .map_while(Result::ok)
         .filter_map(|line| serde_json::from_str::<LogEntry>(&line).ok())
         .collect::<Vec<_>>();
 
