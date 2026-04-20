@@ -55,6 +55,18 @@ actor EngineBridge {
         engine.updatePaper(input: input)
     }
 
+    func listPrinterPaperPresets() -> [PrinterPaperPresetRecord] {
+        engine.listPrinterPaperPresets()
+    }
+
+    func createPrinterPaperPreset(input: CreatePrinterPaperPresetInput) -> PrinterPaperPresetRecord {
+        engine.createPrinterPaperPreset(input: input)
+    }
+
+    func updatePrinterPaperPreset(input: UpdatePrinterPaperPresetInput) -> PrinterPaperPresetRecord {
+        engine.updatePrinterPaperPreset(input: input)
+    }
+
     func listPrinterProfiles() -> [PrinterProfileRecord] {
         engine.listPrinterProfiles()
     }

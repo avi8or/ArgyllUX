@@ -58,12 +58,12 @@ struct HomeView: View {
                                                 .font(.headline)
                                                 .foregroundStyle(.primary)
                                             Text(stageTitle(item.stage))
-                                                .font(.caption.weight(.semibold))
+                                                .font(AppTypography.activeWorkStage)
                                                 .foregroundStyle(.secondary)
                                             Text("Next: \(item.nextAction)")
                                                 .foregroundStyle(.secondary)
                                             Text("\(item.printerName) | \(item.paperName)")
-                                                .font(.footnote)
+                                                .font(AppTypography.activeWorkSupporting)
                                                 .foregroundStyle(.secondary)
                                         }
                                         .padding(14)
@@ -105,9 +105,9 @@ struct HomeView: View {
                             }
                         }
 
-                        detailRow(title: "Detected path", value: model.detectedToolchainPath)
-                        detailRow(title: "ArgyllCMS version", value: model.argyllVersionLabel)
-                        detailRow(title: "Last validation", value: model.lastValidationLabel)
+                        OperationalDetailRow(title: "Detected path", value: model.detectedToolchainPath)
+                        OperationalDetailRow(title: "ArgyllCMS version", value: model.argyllVersionLabel)
+                        OperationalDetailRow(title: "Last validation", value: model.lastValidationLabel)
 
                         if let appHealth = model.appHealth {
                             if !appHealth.blockingIssues.isEmpty {
@@ -168,25 +168,14 @@ struct HomeView: View {
             .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
     }
 
-    private func detailRow(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.subheadline)
-                .textSelection(.enabled)
-        }
-    }
-
     private func detailList(title: String, items: [String]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.caption.weight(.semibold))
+                .font(AppTypography.detailLabel)
                 .foregroundStyle(.secondary)
             ForEach(items, id: \.self) { item in
                 Text(item)
-                    .font(.subheadline)
+                    .font(AppTypography.detailValue)
             }
         }
     }

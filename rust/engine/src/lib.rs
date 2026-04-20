@@ -6,15 +6,16 @@ mod support;
 mod toolchain;
 
 pub use model::{
-    ActiveWorkItem, AppHealth, ArtifactKind, BootstrapStatus, CommandRunState, CommandStream,
-    CreateNewProfileDraftInput, CreatePaperInput, CreatePrinterInput, DashboardSnapshot,
-    DeleteJobResult, EngineConfig, InstrumentConnectionState, InstrumentStatus, JobArtifactRecord,
-    JobCommandEventRecord, JobCommandRecord, LogEntry, MeasurementMode, MeasurementStatusRecord,
-    NewProfileContextRecord, NewProfileJobDetail, PaperRecord, PrintSettingsRecord,
+    ActiveWorkItem, AppHealth, ArtifactKind, BootstrapStatus, ColorantFamily, CommandRunState,
+    CommandStream, CreateNewProfileDraftInput, CreatePaperInput, CreatePrinterInput,
+    CreatePrinterPaperPresetInput, DashboardSnapshot, DeleteJobResult, EngineConfig,
+    InstrumentConnectionState, InstrumentStatus, JobArtifactRecord, JobCommandEventRecord,
+    JobCommandRecord, LogEntry, MeasurementMode, MeasurementStatusRecord, NewProfileContextRecord,
+    NewProfileJobDetail, PaperRecord, PrintSettingsRecord, PrinterPaperPresetRecord,
     PrinterProfileRecord, PrinterRecord, ReviewSummaryRecord, SaveNewProfileContextInput,
     SavePrintSettingsInput, SaveTargetSettingsInput, StartMeasurementInput, TargetSettingsRecord,
-    ToolchainState, ToolchainStatus, UpdatePaperInput, UpdatePrinterInput, WorkflowStage,
-    WorkflowStageState, WorkflowStageSummary,
+    ToolchainState, ToolchainStatus, UpdatePaperInput, UpdatePrinterInput,
+    UpdatePrinterPaperPresetInput, WorkflowStage, WorkflowStageState, WorkflowStageSummary,
 };
 
 use crate::model::EngineState;
@@ -333,6 +334,54 @@ impl Engine {
                     &format!("Update paper failed: {error}"),
                 );
                 fallback_paper_record()
+            }
+        }
+    }
+
+    #[uniffi::method(name = "listPrinterPaperPresets")]
+    pub fn list_printer_paper_presets(&self) -> Vec<PrinterPaperPresetRecord> {
+        with_config(&self.state, |config| {
+            db::list_printer_paper_presets(&config.database_path)
+        })
+        .unwrap_or_default()
+    }
+
+    #[uniffi::method(name = "createPrinterPaperPreset")]
+    pub fn create_printer_paper_preset(
+        &self,
+        input: CreatePrinterPaperPresetInput,
+    ) -> PrinterPaperPresetRecord {
+        match with_config(&self.state, |config| {
+            db::create_printer_paper_preset(&config.database_path, &input)
+        }) {
+            Ok(record) => record,
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.printer_paper_presets",
+                    &format!("Create printer-paper preset failed: {error}"),
+                );
+                fallback_printer_paper_preset_record()
+            }
+        }
+    }
+
+    #[uniffi::method(name = "updatePrinterPaperPreset")]
+    pub fn update_printer_paper_preset(
+        &self,
+        input: UpdatePrinterPaperPresetInput,
+    ) -> PrinterPaperPresetRecord {
+        match with_config(&self.state, |config| {
+            db::update_printer_paper_preset(&config.database_path, &input)
+        }) {
+            Ok(record) => record,
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.printer_paper_presets",
+                    &format!("Update printer-paper preset failed: {error}"),
+                );
+                fallback_printer_paper_preset_record()
             }
         }
     }
@@ -778,9 +827,14 @@ fn log_config_error(state: &RwLock<EngineState>, source: &str, message: &str) {
 fn fallback_printer_record() -> PrinterRecord {
     PrinterRecord {
         id: String::new(),
-        make_model: String::new(),
+        manufacturer: String::new(),
+        model: String::new(),
         nickname: String::new(),
         transport_style: String::new(),
+        colorant_family: ColorantFamily::Cmyk,
+        channel_count: 4,
+        channel_labels: Vec::new(),
+        supported_media_settings: Vec::new(),
         supported_quality_modes: Vec::new(),
         monochrome_path_notes: String::new(),
         notes: String::new(),
@@ -793,10 +847,38 @@ fn fallback_printer_record() -> PrinterRecord {
 fn fallback_paper_record() -> PaperRecord {
     PaperRecord {
         id: String::new(),
-        vendor_product_name: String::new(),
+        manufacturer: String::new(),
+        paper_line: String::new(),
         surface_class: String::new(),
-        weight_thickness: String::new(),
-        oba_fluorescence_notes: String::new(),
+        basis_weight_value: String::new(),
+        basis_weight_unit: crate::model::PaperWeightUnit::Unspecified,
+        thickness_value: String::new(),
+        thickness_unit: crate::model::PaperThicknessUnit::Unspecified,
+        surface_texture: String::new(),
+        base_material: String::new(),
+        media_color: String::new(),
+        opacity: String::new(),
+        whiteness: String::new(),
+        oba_content: String::new(),
+        ink_compatibility: String::new(),
+        notes: String::new(),
+        display_name: String::new(),
+        created_at: String::new(),
+        updated_at: String::new(),
+    }
+}
+
+fn fallback_printer_paper_preset_record() -> PrinterPaperPresetRecord {
+    PrinterPaperPresetRecord {
+        id: String::new(),
+        printer_id: String::new(),
+        paper_id: String::new(),
+        label: String::new(),
+        print_path: String::new(),
+        media_setting: String::new(),
+        quality_mode: String::new(),
+        total_ink_limit_percent: None,
+        black_ink_limit_percent: None,
         notes: String::new(),
         display_name: String::new(),
         created_at: String::new(),
@@ -818,8 +900,15 @@ fn fallback_job_detail(job_id: &str, latest_error: Option<String>) -> NewProfile
         printer: None,
         paper: None,
         context: NewProfileContextRecord {
+            printer_paper_preset_id: None,
+            print_path: String::new(),
             media_setting: String::new(),
             quality_mode: String::new(),
+            colorant_family: ColorantFamily::Cmyk,
+            channel_count: 4,
+            channel_labels: Vec::new(),
+            total_ink_limit_percent: None,
+            black_ink_limit_percent: None,
             print_path_notes: String::new(),
             measurement_notes: String::new(),
             measurement_observer: "1931_2".to_string(),

@@ -68,7 +68,7 @@ struct CliTranscriptWindowView: View {
                                             ForEach(command.events, id: \.id) { event in
                                                 HStack(alignment: .top, spacing: 8) {
                                                     Text(streamLabel(event.stream))
-                                                        .font(.caption2.weight(.semibold))
+                                                        .font(.caption.weight(.semibold))
                                                         .foregroundStyle(event.stream == .stderr ? Color.red : Color.secondary)
                                                         .frame(width: 42, alignment: .leading)
 

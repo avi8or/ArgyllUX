@@ -43,12 +43,71 @@ enum CliTranscriptState {
     }
 }
 
+let curatedPaperSurfaceClasses = [
+    "Matte",
+    "Luster",
+    "Glossy",
+    "Baryta",
+    "Canvas",
+]
+
+extension ColorantFamily {
+    static let structuredCases: [ColorantFamily] = [.grayK, .rgb, .cmy, .cmyk, .extendedN]
+
+    var displayLabel: String {
+        switch self {
+        case .grayK:
+            "1 channel (Gray/K)"
+        case .rgb:
+            "3 channel RGB"
+        case .cmy:
+            "3 channel CMY"
+        case .cmyk:
+            "4 channel CMYK"
+        case .extendedN:
+            "Extended N-color"
+        }
+    }
+
+    var fixedChannelCount: UInt32? {
+        switch self {
+        case .grayK:
+            1
+        case .rgb, .cmy:
+            3
+        case .cmyk:
+            4
+        case .extendedN:
+            nil
+        }
+    }
+
+    func hasBlackChannel(channelLabels: [String]) -> Bool {
+        switch self {
+        case .grayK, .cmyk:
+            true
+        case .extendedN:
+            channelLabels.contains { label in
+                let lowered = label.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                return lowered == "k" || lowered == "black"
+            }
+        case .rgb, .cmy:
+            false
+        }
+    }
+}
+
 struct PrinterDraft: Equatable {
     var id: String?
-    var makeModel = ""
+    var manufacturer = ""
+    var model = ""
     var nickname = ""
     var transportStyle = ""
-    var supportedQualityModesText = ""
+    var colorantFamily: ColorantFamily = .cmyk
+    var channelCount: UInt32 = 4
+    var channelLabels: [String] = []
+    var supportedMediaSettings: [String] = []
+    var supportedQualityModes: [String] = []
     var monochromePathNotes = ""
     var notes = ""
 
@@ -56,19 +115,25 @@ struct PrinterDraft: Equatable {
 
     init(record: PrinterRecord) {
         id = record.id
-        makeModel = record.makeModel
+        manufacturer = record.manufacturer
+        model = record.model
         nickname = record.nickname
         transportStyle = record.transportStyle
-        supportedQualityModesText = record.supportedQualityModes.joined(separator: ", ")
+        colorantFamily = record.colorantFamily
+        channelCount = record.channelCount
+        channelLabels = record.channelLabels
+        supportedMediaSettings = record.supportedMediaSettings
+        supportedQualityModes = record.supportedQualityModes
         monochromePathNotes = record.monochromePathNotes
         notes = record.notes
     }
 
-    var supportedQualityModes: [String] {
-        supportedQualityModesText
-            .split(whereSeparator: { $0 == "," || $0 == "\n" })
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+    var normalizedChannelCount: UInt32 {
+        colorantFamily.fixedChannelCount ?? channelCount
+    }
+
+    var hasBlackChannel: Bool {
+        colorantFamily.hasBlackChannel(channelLabels: channelLabels)
     }
 
     var title: String {
@@ -82,21 +147,55 @@ struct PrinterDraft: Equatable {
 
 struct PaperDraft: Equatable {
     var id: String?
-    var vendorProductName = ""
-    var surfaceClass = ""
-    var weightThickness = ""
-    var obaFluorescenceNotes = ""
+    var manufacturer = ""
+    var paperLine = ""
+    var surfaceClassSelection = ""
+    var surfaceClassOther = ""
+    var basisWeightValue = ""
+    var basisWeightUnit: PaperWeightUnit = .unspecified
+    var thicknessValue = ""
+    var thicknessUnit: PaperThicknessUnit = .unspecified
+    var surfaceTexture = ""
+    var baseMaterial = ""
+    var mediaColor = ""
+    var opacity = ""
+    var whiteness = ""
+    var obaContent = ""
+    var inkCompatibility = ""
     var notes = ""
 
     init() {}
 
     init(record: PaperRecord) {
         id = record.id
-        vendorProductName = record.vendorProductName
-        surfaceClass = record.surfaceClass
-        weightThickness = record.weightThickness
-        obaFluorescenceNotes = record.obaFluorescenceNotes
+        manufacturer = record.manufacturer
+        paperLine = record.paperLine
+        if record.surfaceClass.isEmpty || curatedPaperSurfaceClasses.contains(record.surfaceClass) {
+            surfaceClassSelection = record.surfaceClass
+            surfaceClassOther = ""
+        } else {
+            surfaceClassSelection = "Other"
+            surfaceClassOther = record.surfaceClass
+        }
+        basisWeightValue = record.basisWeightValue
+        basisWeightUnit = record.basisWeightUnit
+        thicknessValue = record.thicknessValue
+        thicknessUnit = record.thicknessUnit
+        surfaceTexture = record.surfaceTexture
+        baseMaterial = record.baseMaterial
+        mediaColor = record.mediaColor
+        opacity = record.opacity
+        whiteness = record.whiteness
+        obaContent = record.obaContent
+        inkCompatibility = record.inkCompatibility
         notes = record.notes
+    }
+
+    var surfaceClass: String {
+        if surfaceClassSelection == "Other" {
+            return surfaceClassOther.trimmed
+        }
+        return surfaceClassSelection.trimmed
     }
 
     var title: String {
@@ -106,6 +205,82 @@ struct PaperDraft: Equatable {
 
         return "New Paper"
     }
+}
+
+struct PrinterPaperPresetDraft: Equatable {
+    var id: String?
+    var printerId: String?
+    var paperId: String?
+    var label = ""
+    var printPath = ""
+    var mediaSetting = ""
+    var qualityMode = ""
+    var totalInkLimitPercentText = ""
+    var blackInkLimitPercentText = ""
+    var notes = ""
+
+    init() {}
+
+    init(record: PrinterPaperPresetRecord) {
+        id = record.id
+        printerId = record.printerId
+        paperId = record.paperId
+        label = record.label
+        printPath = record.printPath
+        mediaSetting = record.mediaSetting
+        qualityMode = record.qualityMode
+        totalInkLimitPercentText = record.totalInkLimitPercent.map(String.init) ?? ""
+        blackInkLimitPercentText = record.blackInkLimitPercent.map(String.init) ?? ""
+        notes = record.notes
+    }
+
+    var totalInkLimitPercent: UInt32? {
+        let trimmed = totalInkLimitPercentText.trimmed
+        return trimmed.isEmpty ? nil : UInt32(trimmed)
+    }
+
+    var blackInkLimitPercent: UInt32? {
+        let trimmed = blackInkLimitPercentText.trimmed
+        return trimmed.isEmpty ? nil : UInt32(trimmed)
+    }
+
+    var title: String {
+        if let id, !id.isEmpty {
+            return "Edit Printer and Paper Settings"
+        }
+        return "New Printer and Paper Settings"
+    }
+}
+
+func sanitizePrinterPaperPresetDraft(
+    _ draft: inout PrinterPaperPresetDraft,
+    selectedPrinter: PrinterRecord?
+) {
+    let availableMediaSettings = selectedPrinter?.supportedMediaSettings ?? []
+    let availableQualityModes = selectedPrinter?.supportedQualityModes ?? []
+    let hasBlackChannel = selectedPrinter?.colorantFamily.hasBlackChannel(
+        channelLabels: selectedPrinter?.channelLabels ?? []
+    ) ?? false
+
+    if !availableMediaSettings.contains(draft.mediaSetting) {
+        draft.mediaSetting = ""
+    }
+
+    if !availableQualityModes.contains(draft.qualityMode) {
+        draft.qualityMode = ""
+    }
+
+    if !hasBlackChannel {
+        draft.blackInkLimitPercentText = ""
+    }
+}
+
+func sanitizePrinterPaperPresetDraft(
+    _ draft: inout PrinterPaperPresetDraft,
+    printers: [PrinterRecord]
+) {
+    let selectedPrinter = printers.first(where: { $0.id == draft.printerId })
+    sanitizePrinterPaperPresetDraft(&draft, selectedPrinter: selectedPrinter)
 }
 
 private extension String {
@@ -128,6 +303,7 @@ final class AppModel: ObservableObject {
     @Published var activeWorkDeletionErrorMessage: String?
     @Published var printers: [PrinterRecord] = []
     @Published var papers: [PaperRecord] = []
+    @Published var printerPaperPresets: [PrinterPaperPresetRecord] = []
     @Published var printerProfiles: [PrinterProfileRecord] = []
     @Published var selectedPrinterProfileID: String?
     @Published var toolchainPathInput = ""
@@ -137,6 +313,8 @@ final class AppModel: ObservableObject {
     @Published var workflowProfileName = ""
     @Published var workflowSelectedPrinterID: String?
     @Published var workflowSelectedPaperID: String?
+    @Published var workflowSelectedPrinterPaperPresetID: String?
+    @Published var workflowPrintPath = ""
     @Published var workflowMediaSetting = ""
     @Published var workflowQualityMode = ""
     @Published var workflowPrintPathNotes = ""
@@ -155,10 +333,13 @@ final class AppModel: ObservableObject {
     @Published private(set) var cliTranscriptState: CliTranscriptState = .empty
     @Published var showWorkflowPrinterForm = false
     @Published var showWorkflowPaperForm = false
+    @Published var showWorkflowPresetForm = false
     @Published var workflowPrinterDraft = PrinterDraft()
     @Published var workflowPaperDraft = PaperDraft()
+    @Published var workflowPresetDraft = PrinterPaperPresetDraft()
     @Published var settingsPrinterDraft = PrinterDraft()
     @Published var settingsPaperDraft = PaperDraft()
+    @Published var settingsPresetDraft = PrinterPaperPresetDraft()
 
     let launcherActions: [LauncherAction] = [
         LauncherAction(title: "New Profile", detail: "Create a printer and paper profile.", kind: .newProfile),
@@ -316,7 +497,9 @@ final class AppModel: ObservableObject {
     var canSaveWorkflowContext: Bool {
         !workflowProfileName.trimmed.isEmpty &&
             workflowSelectedPrinterID != nil &&
-            workflowSelectedPaperID != nil
+            workflowSelectedPaperID != nil &&
+            !workflowMediaSetting.trimmed.isEmpty &&
+            !workflowQualityMode.trimmed.isEmpty
     }
 
     var canRunWorkflowPrimaryAction: Bool {
@@ -358,8 +541,39 @@ final class AppModel: ObservableObject {
         return papers.first { $0.id == workflowSelectedPaperID } ?? activeNewProfileDetail?.paper
     }
 
+    var workflowSelectedPrinterPaperPreset: PrinterPaperPresetRecord? {
+        guard let workflowSelectedPrinterPaperPresetID else { return nil }
+        return printerPaperPresets.first { $0.id == workflowSelectedPrinterPaperPresetID }
+    }
+
+    var showsWorkflowStandalonePrintPathEditor: Bool {
+        workflowSelectedPrinterPaperPreset == nil && !showWorkflowPresetForm
+    }
+
+    var workflowAvailablePrinterPaperPresets: [PrinterPaperPresetRecord] {
+        guard let printerID = workflowSelectedPrinterID, let paperID = workflowSelectedPaperID else { return [] }
+        return printerPaperPresets.filter { $0.printerId == printerID && $0.paperId == paperID }
+    }
+
+    var workflowAvailableMediaSettings: [String] {
+        workflowSelectedPrinter?.supportedMediaSettings ?? []
+    }
+
     var workflowAvailableQualityModes: [String] {
         workflowSelectedPrinter?.supportedQualityModes ?? []
+    }
+
+    var workflowSelectedPrinterHasBlackChannel: Bool {
+        guard let printer = workflowSelectedPrinter else { return false }
+        return printer.colorantFamily.hasBlackChannel(channelLabels: printer.channelLabels)
+    }
+
+    var workflowHasLegacyContextWithoutPreset: Bool {
+        guard let detail = activeNewProfileDetail else { return false }
+        return detail.context.printerPaperPresetId == nil &&
+            (!detail.context.printPath.isEmpty ||
+                !detail.context.mediaSetting.isEmpty ||
+                !detail.context.qualityMode.isEmpty)
     }
 
     var cliTranscriptDetail: NewProfileJobDetail? {
@@ -599,15 +813,25 @@ final class AppModel: ObservableObject {
 
     func selectWorkflowPrinter(_ printerId: String?) {
         workflowSelectedPrinterID = printerId
-        if let printer = printers.first(where: { $0.id == printerId }),
-           workflowQualityMode.trimmed.isEmpty,
-           let firstMode = printer.supportedQualityModes.first {
-            workflowQualityMode = firstMode
-        }
+        syncWorkflowPresetDraftToCurrentSelection()
+        syncWorkflowPresetSelectionAfterContextChange(autoSelect: true)
     }
 
     func selectWorkflowPaper(_ paperId: String?) {
         workflowSelectedPaperID = paperId
+        syncWorkflowPresetDraftToCurrentSelection()
+        syncWorkflowPresetSelectionAfterContextChange(autoSelect: true)
+    }
+
+    func selectWorkflowPrinterPaperPreset(_ presetId: String?) {
+        workflowSelectedPrinterPaperPresetID = presetId
+        if let preset = workflowSelectedPrinterPaperPreset {
+            populateWorkflowContext(from: preset)
+        } else if !workflowHasLegacyContextWithoutPreset {
+            workflowPrintPath = ""
+            workflowMediaSetting = ""
+            workflowQualityMode = ""
+        }
     }
 
     func resetSettingsPrinterDraft() {
@@ -618,12 +842,20 @@ final class AppModel: ObservableObject {
         settingsPaperDraft = PaperDraft()
     }
 
+    func resetSettingsPresetDraft() {
+        settingsPresetDraft = PrinterPaperPresetDraft()
+    }
+
     func editPrinter(_ printer: PrinterRecord) {
         settingsPrinterDraft = PrinterDraft(record: printer)
     }
 
     func editPaper(_ paper: PaperRecord) {
         settingsPaperDraft = PaperDraft(record: paper)
+    }
+
+    func editPrinterPaperPreset(_ preset: PrinterPaperPresetRecord) {
+        settingsPresetDraft = PrinterPaperPresetDraft(record: preset)
     }
 
     func beginWorkflowPrinterCreation() {
@@ -636,6 +868,17 @@ final class AppModel: ObservableObject {
         showWorkflowPaperForm = true
     }
 
+    func beginWorkflowPresetCreation() {
+        workflowPresetDraft = PrinterPaperPresetDraft()
+        workflowPresetDraft.printerId = workflowSelectedPrinterID
+        workflowPresetDraft.paperId = workflowSelectedPaperID
+        workflowPresetDraft.printPath = workflowPrintPath
+        workflowPresetDraft.mediaSetting = workflowMediaSetting
+        workflowPresetDraft.qualityMode = workflowQualityMode
+        sanitizePrinterPaperPresetDraft(&workflowPresetDraft, printers: printers)
+        showWorkflowPresetForm = true
+    }
+
     func cancelWorkflowPrinterCreation() {
         workflowPrinterDraft = PrinterDraft()
         showWorkflowPrinterForm = false
@@ -646,15 +889,25 @@ final class AppModel: ObservableObject {
         showWorkflowPaperForm = false
     }
 
+    func cancelWorkflowPresetCreation() {
+        workflowPresetDraft = PrinterPaperPresetDraft()
+        showWorkflowPresetForm = false
+    }
+
     func saveSettingsPrinter() async {
         await runRefresh {
             if let id = self.settingsPrinterDraft.id {
                 _ = await self.bridge.updatePrinter(
                     input: UpdatePrinterInput(
                         id: id,
-                        makeModel: self.settingsPrinterDraft.makeModel.trimmed,
+                        manufacturer: self.settingsPrinterDraft.manufacturer.trimmed,
+                        model: self.settingsPrinterDraft.model.trimmed,
                         nickname: self.settingsPrinterDraft.nickname.trimmed,
                         transportStyle: self.settingsPrinterDraft.transportStyle.trimmed,
+                        colorantFamily: self.settingsPrinterDraft.colorantFamily,
+                        channelCount: self.settingsPrinterDraft.normalizedChannelCount,
+                        channelLabels: self.settingsPrinterDraft.channelLabels,
+                        supportedMediaSettings: self.settingsPrinterDraft.supportedMediaSettings,
                         supportedQualityModes: self.settingsPrinterDraft.supportedQualityModes,
                         monochromePathNotes: self.settingsPrinterDraft.monochromePathNotes.trimmed,
                         notes: self.settingsPrinterDraft.notes.trimmed
@@ -663,9 +916,14 @@ final class AppModel: ObservableObject {
             } else {
                 _ = await self.bridge.createPrinter(
                     input: CreatePrinterInput(
-                        makeModel: self.settingsPrinterDraft.makeModel.trimmed,
+                        manufacturer: self.settingsPrinterDraft.manufacturer.trimmed,
+                        model: self.settingsPrinterDraft.model.trimmed,
                         nickname: self.settingsPrinterDraft.nickname.trimmed,
                         transportStyle: self.settingsPrinterDraft.transportStyle.trimmed,
+                        colorantFamily: self.settingsPrinterDraft.colorantFamily,
+                        channelCount: self.settingsPrinterDraft.normalizedChannelCount,
+                        channelLabels: self.settingsPrinterDraft.channelLabels,
+                        supportedMediaSettings: self.settingsPrinterDraft.supportedMediaSettings,
                         supportedQualityModes: self.settingsPrinterDraft.supportedQualityModes,
                         monochromePathNotes: self.settingsPrinterDraft.monochromePathNotes.trimmed,
                         notes: self.settingsPrinterDraft.notes.trimmed
@@ -686,20 +944,40 @@ final class AppModel: ObservableObject {
                 _ = await self.bridge.updatePaper(
                     input: UpdatePaperInput(
                         id: id,
-                        vendorProductName: self.settingsPaperDraft.vendorProductName.trimmed,
-                        surfaceClass: self.settingsPaperDraft.surfaceClass.trimmed,
-                        weightThickness: self.settingsPaperDraft.weightThickness.trimmed,
-                        obaFluorescenceNotes: self.settingsPaperDraft.obaFluorescenceNotes.trimmed,
+                        manufacturer: self.settingsPaperDraft.manufacturer.trimmed,
+                        paperLine: self.settingsPaperDraft.paperLine.trimmed,
+                        surfaceClass: self.settingsPaperDraft.surfaceClass,
+                        basisWeightValue: self.settingsPaperDraft.basisWeightValue.trimmed,
+                        basisWeightUnit: self.settingsPaperDraft.basisWeightUnit,
+                        thicknessValue: self.settingsPaperDraft.thicknessValue.trimmed,
+                        thicknessUnit: self.settingsPaperDraft.thicknessUnit,
+                        surfaceTexture: self.settingsPaperDraft.surfaceTexture.trimmed,
+                        baseMaterial: self.settingsPaperDraft.baseMaterial.trimmed,
+                        mediaColor: self.settingsPaperDraft.mediaColor.trimmed,
+                        opacity: self.settingsPaperDraft.opacity.trimmed,
+                        whiteness: self.settingsPaperDraft.whiteness.trimmed,
+                        obaContent: self.settingsPaperDraft.obaContent.trimmed,
+                        inkCompatibility: self.settingsPaperDraft.inkCompatibility.trimmed,
                         notes: self.settingsPaperDraft.notes.trimmed
                     )
                 )
             } else {
                 _ = await self.bridge.createPaper(
                     input: CreatePaperInput(
-                        vendorProductName: self.settingsPaperDraft.vendorProductName.trimmed,
-                        surfaceClass: self.settingsPaperDraft.surfaceClass.trimmed,
-                        weightThickness: self.settingsPaperDraft.weightThickness.trimmed,
-                        obaFluorescenceNotes: self.settingsPaperDraft.obaFluorescenceNotes.trimmed,
+                        manufacturer: self.settingsPaperDraft.manufacturer.trimmed,
+                        paperLine: self.settingsPaperDraft.paperLine.trimmed,
+                        surfaceClass: self.settingsPaperDraft.surfaceClass,
+                        basisWeightValue: self.settingsPaperDraft.basisWeightValue.trimmed,
+                        basisWeightUnit: self.settingsPaperDraft.basisWeightUnit,
+                        thicknessValue: self.settingsPaperDraft.thicknessValue.trimmed,
+                        thicknessUnit: self.settingsPaperDraft.thicknessUnit,
+                        surfaceTexture: self.settingsPaperDraft.surfaceTexture.trimmed,
+                        baseMaterial: self.settingsPaperDraft.baseMaterial.trimmed,
+                        mediaColor: self.settingsPaperDraft.mediaColor.trimmed,
+                        opacity: self.settingsPaperDraft.opacity.trimmed,
+                        whiteness: self.settingsPaperDraft.whiteness.trimmed,
+                        obaContent: self.settingsPaperDraft.obaContent.trimmed,
+                        inkCompatibility: self.settingsPaperDraft.inkCompatibility.trimmed,
                         notes: self.settingsPaperDraft.notes.trimmed
                     )
                 )
@@ -712,15 +990,62 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func saveSettingsPreset() async {
+        guard isSettingsPresetDraftValid else { return }
+
+        await runRefresh {
+            if let id = self.settingsPresetDraft.id {
+                _ = await self.bridge.updatePrinterPaperPreset(
+                    input: UpdatePrinterPaperPresetInput(
+                        id: id,
+                        printerId: self.settingsPresetDraft.printerId ?? "",
+                        paperId: self.settingsPresetDraft.paperId ?? "",
+                        label: self.settingsPresetDraft.label.trimmed,
+                        printPath: self.settingsPresetDraft.printPath.trimmed,
+                        mediaSetting: self.settingsPresetDraft.mediaSetting.trimmed,
+                        qualityMode: self.settingsPresetDraft.qualityMode.trimmed,
+                        totalInkLimitPercent: self.settingsPresetDraft.totalInkLimitPercent,
+                        blackInkLimitPercent: self.settingsPresetDraft.blackInkLimitPercent,
+                        notes: self.settingsPresetDraft.notes.trimmed
+                    )
+                )
+            } else {
+                _ = await self.bridge.createPrinterPaperPreset(
+                    input: CreatePrinterPaperPresetInput(
+                        printerId: self.settingsPresetDraft.printerId ?? "",
+                        paperId: self.settingsPresetDraft.paperId ?? "",
+                        label: self.settingsPresetDraft.label.trimmed,
+                        printPath: self.settingsPresetDraft.printPath.trimmed,
+                        mediaSetting: self.settingsPresetDraft.mediaSetting.trimmed,
+                        qualityMode: self.settingsPresetDraft.qualityMode.trimmed,
+                        totalInkLimitPercent: self.settingsPresetDraft.totalInkLimitPercent,
+                        blackInkLimitPercent: self.settingsPresetDraft.blackInkLimitPercent,
+                        notes: self.settingsPresetDraft.notes.trimmed
+                    )
+                )
+            }
+
+            self.settingsPresetDraft = PrinterPaperPresetDraft()
+            await self.refreshReferenceData()
+            await self.refreshDashboardSnapshot()
+            await self.reloadActiveWorkflowIfNeeded(forceEditorSync: true)
+        }
+    }
+
     func createWorkflowPrinter() async {
         guard isWorkflowPrinterDraftValid else { return }
 
         await runRefresh {
             let printer = await self.bridge.createPrinter(
                 input: CreatePrinterInput(
-                    makeModel: self.workflowPrinterDraft.makeModel.trimmed,
+                    manufacturer: self.workflowPrinterDraft.manufacturer.trimmed,
+                    model: self.workflowPrinterDraft.model.trimmed,
                     nickname: self.workflowPrinterDraft.nickname.trimmed,
                     transportStyle: self.workflowPrinterDraft.transportStyle.trimmed,
+                    colorantFamily: self.workflowPrinterDraft.colorantFamily,
+                    channelCount: self.workflowPrinterDraft.normalizedChannelCount,
+                    channelLabels: self.workflowPrinterDraft.channelLabels,
+                    supportedMediaSettings: self.workflowPrinterDraft.supportedMediaSettings,
                     supportedQualityModes: self.workflowPrinterDraft.supportedQualityModes,
                     monochromePathNotes: self.workflowPrinterDraft.monochromePathNotes.trimmed,
                     notes: self.workflowPrinterDraft.notes.trimmed
@@ -728,11 +1053,7 @@ final class AppModel: ObservableObject {
             )
 
             await self.refreshReferenceData()
-            self.workflowSelectedPrinterID = printer.id
-            if self.workflowQualityMode.trimmed.isEmpty,
-               let firstMode = printer.supportedQualityModes.first {
-                self.workflowQualityMode = firstMode
-            }
+            self.selectWorkflowPrinter(printer.id)
             self.workflowPrinterDraft = PrinterDraft()
             self.showWorkflowPrinterForm = false
         }
@@ -744,27 +1065,73 @@ final class AppModel: ObservableObject {
         await runRefresh {
             let paper = await self.bridge.createPaper(
                 input: CreatePaperInput(
-                    vendorProductName: self.workflowPaperDraft.vendorProductName.trimmed,
-                    surfaceClass: self.workflowPaperDraft.surfaceClass.trimmed,
-                    weightThickness: self.workflowPaperDraft.weightThickness.trimmed,
-                    obaFluorescenceNotes: self.workflowPaperDraft.obaFluorescenceNotes.trimmed,
+                    manufacturer: self.workflowPaperDraft.manufacturer.trimmed,
+                    paperLine: self.workflowPaperDraft.paperLine.trimmed,
+                    surfaceClass: self.workflowPaperDraft.surfaceClass,
+                    basisWeightValue: self.workflowPaperDraft.basisWeightValue.trimmed,
+                    basisWeightUnit: self.workflowPaperDraft.basisWeightUnit,
+                    thicknessValue: self.workflowPaperDraft.thicknessValue.trimmed,
+                    thicknessUnit: self.workflowPaperDraft.thicknessUnit,
+                    surfaceTexture: self.workflowPaperDraft.surfaceTexture.trimmed,
+                    baseMaterial: self.workflowPaperDraft.baseMaterial.trimmed,
+                    mediaColor: self.workflowPaperDraft.mediaColor.trimmed,
+                    opacity: self.workflowPaperDraft.opacity.trimmed,
+                    whiteness: self.workflowPaperDraft.whiteness.trimmed,
+                    obaContent: self.workflowPaperDraft.obaContent.trimmed,
+                    inkCompatibility: self.workflowPaperDraft.inkCompatibility.trimmed,
                     notes: self.workflowPaperDraft.notes.trimmed
                 )
             )
 
             await self.refreshReferenceData()
-            self.workflowSelectedPaperID = paper.id
+            self.selectWorkflowPaper(paper.id)
             self.workflowPaperDraft = PaperDraft()
             self.showWorkflowPaperForm = false
         }
     }
 
     var isWorkflowPrinterDraftValid: Bool {
-        !workflowPrinterDraft.makeModel.trimmed.isEmpty
+        !workflowPrinterDraft.manufacturer.trimmed.isEmpty &&
+            !workflowPrinterDraft.model.trimmed.isEmpty &&
+            (workflowPrinterDraft.colorantFamily != .extendedN || (6...15).contains(workflowPrinterDraft.channelCount))
     }
 
     var isWorkflowPaperDraftValid: Bool {
-        !workflowPaperDraft.vendorProductName.trimmed.isEmpty
+        !workflowPaperDraft.paperLine.trimmed.isEmpty &&
+            (workflowPaperDraft.surfaceClassSelection != "Other" || !workflowPaperDraft.surfaceClassOther.trimmed.isEmpty)
+    }
+
+    var isSettingsPresetDraftValid: Bool {
+        isPresetDraftValid(settingsPresetDraft)
+    }
+
+    func createWorkflowPreset() async {
+        guard isWorkflowPresetDraftValid else { return }
+
+        await runRefresh {
+            let preset = await self.bridge.createPrinterPaperPreset(
+                input: CreatePrinterPaperPresetInput(
+                    printerId: self.workflowPresetDraft.printerId ?? "",
+                    paperId: self.workflowPresetDraft.paperId ?? "",
+                    label: self.workflowPresetDraft.label.trimmed,
+                    printPath: self.workflowPresetDraft.printPath.trimmed,
+                    mediaSetting: self.workflowPresetDraft.mediaSetting.trimmed,
+                    qualityMode: self.workflowPresetDraft.qualityMode.trimmed,
+                    totalInkLimitPercent: self.workflowPresetDraft.totalInkLimitPercent,
+                    blackInkLimitPercent: self.workflowPresetDraft.blackInkLimitPercent,
+                    notes: self.workflowPresetDraft.notes.trimmed
+                )
+            )
+
+            await self.refreshReferenceData()
+            self.selectWorkflowPrinterPaperPreset(preset.id)
+            self.workflowPresetDraft = PrinterPaperPresetDraft()
+            self.showWorkflowPresetForm = false
+        }
+    }
+
+    var isWorkflowPresetDraftValid: Bool {
+        isPresetDraftValid(workflowPresetDraft)
     }
 
     func saveWorkflowContext() async {
@@ -777,6 +1144,8 @@ final class AppModel: ObservableObject {
                     profileName: self.workflowProfileName.trimmed,
                     printerId: self.workflowSelectedPrinterID,
                     paperId: self.workflowSelectedPaperID,
+                    printerPaperPresetId: self.workflowSelectedPrinterPaperPresetID,
+                    printPath: self.workflowPrintPath.trimmed,
                     mediaSetting: self.workflowMediaSetting.trimmed,
                     qualityMode: self.workflowQualityMode.trimmed,
                     printPathNotes: self.workflowPrintPathNotes.trimmed,
@@ -923,10 +1292,12 @@ final class AppModel: ObservableObject {
         activeWorkflow = .newProfile
         showWorkflowPrinterForm = false
         showWorkflowPaperForm = false
+        showWorkflowPresetForm = false
 
         let snapshot = await bridge.getDashboardSnapshot()
         let printers = await bridge.listPrinters()
         let papers = await bridge.listPapers()
+        let presets = await bridge.listPrinterPaperPresets()
         let profiles = await bridge.listPrinterProfiles()
         let status: ToolchainStatus
         if let toolchainStatus {
@@ -949,6 +1320,7 @@ final class AppModel: ObservableObject {
             health: health,
             printers: printers,
             papers: papers,
+            presets: presets,
             profiles: profiles
         )
 
@@ -997,6 +1369,7 @@ final class AppModel: ObservableObject {
         let snapshot = await bridge.getDashboardSnapshot()
         let printers = await bridge.listPrinters()
         let papers = await bridge.listPapers()
+        let presets = await bridge.listPrinterPaperPresets()
         let profiles = await bridge.listPrinterProfiles()
 
         apply(
@@ -1006,6 +1379,7 @@ final class AppModel: ObservableObject {
             health: health,
             printers: printers,
             papers: papers,
+            presets: presets,
             profiles: profiles
         )
     }
@@ -1013,9 +1387,11 @@ final class AppModel: ObservableObject {
     private func refreshReferenceData() async {
         let printers = await bridge.listPrinters()
         let papers = await bridge.listPapers()
+        let presets = await bridge.listPrinterPaperPresets()
         let profiles = await bridge.listPrinterProfiles()
         self.printers = printers
         self.papers = papers
+        self.printerPaperPresets = presets
         self.printerProfiles = profiles
 
         if selectedPrinterProfileID == nil || !profiles.contains(where: { $0.id == selectedPrinterProfileID }) {
@@ -1078,6 +1454,7 @@ final class AppModel: ObservableObject {
         health: AppHealth,
         printers: [PrinterRecord],
         papers: [PaperRecord],
+        presets: [PrinterPaperPresetRecord],
         profiles: [PrinterProfileRecord]
     ) {
         toolchainStatus = status
@@ -1086,6 +1463,7 @@ final class AppModel: ObservableObject {
         appHealth = health
         self.printers = printers
         self.papers = papers
+        printerPaperPresets = presets
         printerProfiles = profiles
 
         if selectedPrinterProfileID == nil || !profiles.contains(where: { $0.id == selectedPrinterProfileID }) {
@@ -1134,6 +1512,8 @@ final class AppModel: ObservableObject {
         workflowProfileName = detail.profileName
         workflowSelectedPrinterID = detail.printer?.id
         workflowSelectedPaperID = detail.paper?.id
+        workflowSelectedPrinterPaperPresetID = detail.context.printerPaperPresetId
+        workflowPrintPath = detail.context.printPath
         workflowMediaSetting = detail.context.mediaSetting
         workflowQualityMode = detail.context.qualityMode
         workflowPrintPathNotes = detail.context.printPathNotes
@@ -1148,10 +1528,103 @@ final class AppModel: ObservableObject {
         workflowPrintWithoutColorManagement = detail.printSettings.printWithoutColorManagement
         workflowDryingTimeMinutes = String(detail.printSettings.dryingTimeMinutes)
         workflowScanFilePath = detail.measurement.scanFilePath ?? ""
+        syncWorkflowPresetSelectionAfterContextChange(autoSelect: false)
     }
 
     private func workflowEditorSeed(for detail: NewProfileJobDetail) -> String {
-        "\(detail.id)|\(workflowStageIdentifier(detail.stage))"
+        [
+            detail.id,
+            workflowStageIdentifier(detail.stage),
+            detail.printer?.id ?? "",
+            detail.paper?.id ?? "",
+            detail.context.printerPaperPresetId ?? "",
+            detail.context.printPath,
+            detail.context.mediaSetting,
+            detail.context.qualityMode,
+        ].joined(separator: "|")
+    }
+
+    private func isPresetDraftValid(_ draft: PrinterPaperPresetDraft) -> Bool {
+        guard let printerID = draft.printerId, let paperID = draft.paperId else { return false }
+        guard let printer = printers.first(where: { $0.id == printerID }) else { return false }
+        guard papers.contains(where: { $0.id == paperID }) else { return false }
+
+        let mediaSetting = draft.mediaSetting.trimmed
+        let qualityMode = draft.qualityMode.trimmed
+        guard !mediaSetting.isEmpty, !qualityMode.isEmpty else { return false }
+        guard printer.supportedMediaSettings.contains(mediaSetting) else { return false }
+        guard printer.supportedQualityModes.contains(qualityMode) else { return false }
+
+        if !draft.totalInkLimitPercentText.trimmed.isEmpty {
+            guard let totalInkLimitPercent = draft.totalInkLimitPercent, (1 ... 400).contains(totalInkLimitPercent) else {
+                return false
+            }
+        }
+
+        if !draft.blackInkLimitPercentText.trimmed.isEmpty {
+            guard let blackInkLimitPercent = draft.blackInkLimitPercent, (1 ... 100).contains(blackInkLimitPercent) else {
+                return false
+            }
+            guard printer.colorantFamily.hasBlackChannel(channelLabels: printer.channelLabels) else {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    // While inline preset creation is open, the workflow's outer printer and
+    // paper pickers remain the authoritative pair selection.
+    private func syncWorkflowPresetDraftToCurrentSelection() {
+        guard showWorkflowPresetForm else { return }
+        guard let printerId = workflowSelectedPrinterID, let paperId = workflowSelectedPaperID else {
+            cancelWorkflowPresetCreation()
+            return
+        }
+
+        workflowPresetDraft.printerId = printerId
+        workflowPresetDraft.paperId = paperId
+        sanitizePrinterPaperPresetDraft(&workflowPresetDraft, printers: printers)
+    }
+
+    private func populateWorkflowContext(from preset: PrinterPaperPresetRecord) {
+        workflowPrintPath = preset.printPath
+        workflowMediaSetting = preset.mediaSetting
+        workflowQualityMode = preset.qualityMode
+    }
+
+    private func syncWorkflowPresetSelectionAfterContextChange(autoSelect: Bool) {
+        let matchingPresets = workflowAvailablePrinterPaperPresets
+        if let currentPresetID = workflowSelectedPrinterPaperPresetID,
+           let preset = matchingPresets.first(where: { $0.id == currentPresetID })
+        {
+            populateWorkflowContext(from: preset)
+            return
+        }
+
+        workflowSelectedPrinterPaperPresetID = nil
+
+        if autoSelect, let firstPreset = matchingPresets.first {
+            workflowSelectedPrinterPaperPresetID = firstPreset.id
+            populateWorkflowContext(from: firstPreset)
+            return
+        }
+
+        if !workflowAvailableMediaSettings.isEmpty,
+           !workflowAvailableMediaSettings.contains(workflowMediaSetting)
+        {
+            workflowMediaSetting = ""
+        }
+
+        if !workflowAvailableQualityModes.isEmpty,
+           !workflowAvailableQualityModes.contains(workflowQualityMode)
+        {
+            workflowQualityMode = ""
+        }
+
+        if !workflowHasLegacyContextWithoutPreset && workflowSelectedPrinterPaperPresetID == nil {
+            workflowPrintPath = ""
+        }
     }
 
     private func latestResumableNewProfileJobID(from snapshot: DashboardSnapshot) -> String? {

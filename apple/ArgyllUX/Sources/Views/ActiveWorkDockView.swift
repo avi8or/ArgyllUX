@@ -22,13 +22,13 @@ struct ActiveWorkDockView: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(item.title)
-                                    .font(.subheadline.weight(.semibold))
+                                    .font(AppTypography.activeWorkTitle)
                                     .foregroundStyle(.primary)
                                 Text(stageTitle(item.stage))
-                                    .font(.caption2.weight(.semibold))
+                                    .font(AppTypography.activeWorkStage)
                                     .foregroundStyle(.secondary)
                                 Text("Next: \(item.nextAction)")
-                                    .font(.caption)
+                                    .font(AppTypography.activeWorkSupporting)
                                     .foregroundStyle(.secondary)
                             }
                             .padding(.horizontal, 12)
@@ -40,7 +40,7 @@ struct ActiveWorkDockView: View {
                             onDelete(item)
                         } label: {
                             Image(systemName: "trash")
-                                .font(.caption.weight(.semibold))
+                                .font(AppTypography.shellUtility.weight(.semibold))
                                 .frame(width: 30, height: 30)
                         }
                         .buttonStyle(.plain)

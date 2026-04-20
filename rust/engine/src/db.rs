@@ -1,12 +1,14 @@
 use crate::model::{
-    ActiveWorkItem, ArtifactKind, CommandRunState, CommandStream, CreateNewProfileDraftInput,
-    CreatePaperInput, CreatePrinterInput, DashboardSnapshot, DeleteJobResult, EngineConfig,
+    ActiveWorkItem, ArtifactKind, ColorantFamily, CommandRunState, CommandStream,
+    CreateNewProfileDraftInput, CreatePaperInput, CreatePrinterInput,
+    CreatePrinterPaperPresetInput, DashboardSnapshot, DeleteJobResult, EngineConfig,
     InstrumentStatus, JobArtifactRecord, JobCommandEventRecord, JobCommandRecord, MeasurementMode,
     MeasurementStatusRecord, NewProfileContextRecord, NewProfileJobDetail, PaperRecord,
-    PrintSettingsRecord, PrinterProfileRecord, PrinterRecord, ReviewSummaryRecord,
-    SaveNewProfileContextInput, SavePrintSettingsInput, SaveTargetSettingsInput,
-    StartMeasurementInput, TargetSettingsRecord, ToolchainState, ToolchainStatus, UpdatePaperInput,
-    UpdatePrinterInput, WorkflowStage, WorkflowStageState, WorkflowStageSummary,
+    PaperThicknessUnit, PaperWeightUnit, PrintSettingsRecord, PrinterPaperPresetRecord,
+    PrinterProfileRecord, PrinterRecord, ReviewSummaryRecord, SaveNewProfileContextInput,
+    SavePrintSettingsInput, SaveTargetSettingsInput, StartMeasurementInput, TargetSettingsRecord,
+    ToolchainState, ToolchainStatus, UpdatePaperInput, UpdatePrinterInput,
+    UpdatePrinterPaperPresetInput, WorkflowStage, WorkflowStageState, WorkflowStageSummary,
 };
 use crate::support::{EngineResult, ensure_directory, iso_timestamp};
 use chrono::{Duration, Utc};
@@ -14,7 +16,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use std::path::Path;
 
 const TOOLCHAIN_OVERRIDE_KEY: &str = "toolchain.override_path";
-const DATABASE_VERSION: i64 = 3;
+const DATABASE_VERSION: i64 = 5;
 
 pub struct DatabaseStatus {
     pub initialized: bool,
@@ -28,10 +30,17 @@ pub(crate) struct NewProfileRunnerContext {
     pub title: String,
     pub profile_name: String,
     pub printer_name: String,
-    pub paper_name: String,
+    pub printer_manufacturer: String,
+    pub printer_model: String,
     pub workspace_path: String,
+    pub print_path: String,
     pub media_setting: String,
     pub quality_mode: String,
+    pub colorant_family: ColorantFamily,
+    pub channel_count: u32,
+    pub channel_labels: Vec<String>,
+    pub total_ink_limit_percent: Option<u32>,
+    pub black_ink_limit_percent: Option<u32>,
     pub measurement_observer: String,
     pub measurement_mode: MeasurementMode,
     pub patch_count: u32,
@@ -140,29 +149,50 @@ pub fn create_printer(
     let connection = open_connection(database_path)?;
     let id = format!("printer-{}", job_timestamp_seed());
     let now = iso_timestamp();
-    let display_name = display_printer_name(&input.make_model, &input.nickname);
+    let manufacturer = trim(&input.manufacturer);
+    let model = trim(&input.model);
+    validate_printer_identity(&manufacturer, &model)?;
+    let (channel_count, channel_labels) = normalize_channel_configuration(
+        &input.colorant_family,
+        input.channel_count,
+        input.channel_labels.clone(),
+    )?;
+    let supported_media_settings =
+        normalized_catalog_values(input.supported_media_settings.clone());
+    let supported_quality_modes = normalized_catalog_values(input.supported_quality_modes.clone());
+    let display_name = display_printer_name(&manufacturer, &model, &input.nickname);
 
     connection.execute(
         r#"
         INSERT INTO printers (
             id,
-            make_model,
+            manufacturer,
+            model,
             nickname,
             transport_style,
+            colorant_family,
+            channel_count,
+            channel_labels,
+            supported_media_settings,
             supported_quality_modes,
             monochrome_path_notes,
             notes,
             created_at,
             updated_at
         )
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
         "#,
         params![
             &id,
-            trim(&input.make_model),
+            &manufacturer,
+            &model,
             trim(&input.nickname),
             trim(&input.transport_style),
-            encode_json(&trimmed_strings(input.supported_quality_modes.clone()))?,
+            encode_colorant_family(&input.colorant_family),
+            channel_count,
+            encode_json(&channel_labels)?,
+            encode_json(&supported_media_settings)?,
+            encode_json(&supported_quality_modes)?,
             trim(&input.monochrome_path_notes),
             trim(&input.notes),
             &now,
@@ -172,10 +202,15 @@ pub fn create_printer(
 
     Ok(PrinterRecord {
         id,
-        make_model: trim(&input.make_model),
+        manufacturer,
+        model,
         nickname: trim(&input.nickname),
         transport_style: trim(&input.transport_style),
-        supported_quality_modes: trimmed_strings(input.supported_quality_modes.clone()),
+        colorant_family: input.colorant_family.clone(),
+        channel_count,
+        channel_labels,
+        supported_media_settings,
+        supported_quality_modes,
         monochrome_path_notes: trim(&input.monochrome_path_notes),
         notes: trim(&input.notes),
         display_name,
@@ -190,26 +225,47 @@ pub fn update_printer(
 ) -> EngineResult<PrinterRecord> {
     let connection = open_connection(database_path)?;
     let now = iso_timestamp();
+    let manufacturer = trim(&input.manufacturer);
+    let model = trim(&input.model);
+    validate_printer_identity(&manufacturer, &model)?;
+    let (channel_count, channel_labels) = normalize_channel_configuration(
+        &input.colorant_family,
+        input.channel_count,
+        input.channel_labels.clone(),
+    )?;
+    let supported_media_settings =
+        normalized_catalog_values(input.supported_media_settings.clone());
+    let supported_quality_modes = normalized_catalog_values(input.supported_quality_modes.clone());
 
     connection.execute(
         r#"
         UPDATE printers
         SET
-            make_model = ?2,
-            nickname = ?3,
-            transport_style = ?4,
-            supported_quality_modes = ?5,
-            monochrome_path_notes = ?6,
-            notes = ?7,
-            updated_at = ?8
+            manufacturer = ?2,
+            model = ?3,
+            nickname = ?4,
+            transport_style = ?5,
+            colorant_family = ?6,
+            channel_count = ?7,
+            channel_labels = ?8,
+            supported_media_settings = ?9,
+            supported_quality_modes = ?10,
+            monochrome_path_notes = ?11,
+            notes = ?12,
+            updated_at = ?13
         WHERE id = ?1
         "#,
         params![
             &input.id,
-            trim(&input.make_model),
+            &manufacturer,
+            &model,
             trim(&input.nickname),
             trim(&input.transport_style),
-            encode_json(&trimmed_strings(input.supported_quality_modes.clone()))?,
+            encode_colorant_family(&input.colorant_family),
+            channel_count,
+            encode_json(&channel_labels)?,
+            encode_json(&supported_media_settings)?,
+            encode_json(&supported_quality_modes)?,
             trim(&input.monochrome_path_notes),
             trim(&input.notes),
             &now
@@ -228,28 +284,51 @@ pub fn create_paper(database_path: &str, input: &CreatePaperInput) -> EngineResu
     let connection = open_connection(database_path)?;
     let id = format!("paper-{}", job_timestamp_seed());
     let now = iso_timestamp();
-    let display_name = display_paper_name(&input.vendor_product_name, &input.surface_class);
+    let manufacturer = trim(&input.manufacturer);
+    let paper_line = trim(&input.paper_line);
+    validate_paper_identity(&paper_line)?;
+    let display_name = display_paper_name(&manufacturer, &paper_line, &input.surface_class);
 
     connection.execute(
         r#"
         INSERT INTO papers (
             id,
-            vendor_product_name,
+            manufacturer,
+            paper_line,
             surface_class,
-            weight_thickness,
-            oba_fluorescence_notes,
+            basis_weight_value,
+            basis_weight_unit,
+            thickness_value,
+            thickness_unit,
+            surface_texture,
+            base_material,
+            media_color,
+            opacity,
+            whiteness,
+            oba_content,
+            ink_compatibility,
             notes,
             created_at,
             updated_at
         )
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
         "#,
         params![
             &id,
-            trim(&input.vendor_product_name),
+            &manufacturer,
+            &paper_line,
             trim(&input.surface_class),
-            trim(&input.weight_thickness),
-            trim(&input.oba_fluorescence_notes),
+            trim(&input.basis_weight_value),
+            encode_paper_weight_unit(&input.basis_weight_unit),
+            trim(&input.thickness_value),
+            encode_paper_thickness_unit(&input.thickness_unit),
+            trim(&input.surface_texture),
+            trim(&input.base_material),
+            trim(&input.media_color),
+            trim(&input.opacity),
+            trim(&input.whiteness),
+            trim(&input.oba_content),
+            trim(&input.ink_compatibility),
             trim(&input.notes),
             &now,
             &now
@@ -258,10 +337,20 @@ pub fn create_paper(database_path: &str, input: &CreatePaperInput) -> EngineResu
 
     Ok(PaperRecord {
         id,
-        vendor_product_name: trim(&input.vendor_product_name),
+        manufacturer,
+        paper_line,
         surface_class: trim(&input.surface_class),
-        weight_thickness: trim(&input.weight_thickness),
-        oba_fluorescence_notes: trim(&input.oba_fluorescence_notes),
+        basis_weight_value: trim(&input.basis_weight_value),
+        basis_weight_unit: input.basis_weight_unit.clone(),
+        thickness_value: trim(&input.thickness_value),
+        thickness_unit: input.thickness_unit.clone(),
+        surface_texture: trim(&input.surface_texture),
+        base_material: trim(&input.base_material),
+        media_color: trim(&input.media_color),
+        opacity: trim(&input.opacity),
+        whiteness: trim(&input.whiteness),
+        oba_content: trim(&input.oba_content),
+        ink_compatibility: trim(&input.ink_compatibility),
         notes: trim(&input.notes),
         display_name,
         created_at: now.clone(),
@@ -272,31 +361,188 @@ pub fn create_paper(database_path: &str, input: &CreatePaperInput) -> EngineResu
 pub fn update_paper(database_path: &str, input: &UpdatePaperInput) -> EngineResult<PaperRecord> {
     let connection = open_connection(database_path)?;
     let now = iso_timestamp();
+    let manufacturer = trim(&input.manufacturer);
+    let paper_line = trim(&input.paper_line);
+    validate_paper_identity(&paper_line)?;
 
     connection.execute(
         r#"
         UPDATE papers
         SET
-            vendor_product_name = ?2,
-            surface_class = ?3,
-            weight_thickness = ?4,
-            oba_fluorescence_notes = ?5,
-            notes = ?6,
-            updated_at = ?7
+            manufacturer = ?2,
+            paper_line = ?3,
+            surface_class = ?4,
+            basis_weight_value = ?5,
+            basis_weight_unit = ?6,
+            thickness_value = ?7,
+            thickness_unit = ?8,
+            surface_texture = ?9,
+            base_material = ?10,
+            media_color = ?11,
+            opacity = ?12,
+            whiteness = ?13,
+            oba_content = ?14,
+            ink_compatibility = ?15,
+            notes = ?16,
+            updated_at = ?17
         WHERE id = ?1
         "#,
         params![
             &input.id,
-            trim(&input.vendor_product_name),
+            &manufacturer,
+            &paper_line,
             trim(&input.surface_class),
-            trim(&input.weight_thickness),
-            trim(&input.oba_fluorescence_notes),
+            trim(&input.basis_weight_value),
+            encode_paper_weight_unit(&input.basis_weight_unit),
+            trim(&input.thickness_value),
+            encode_paper_thickness_unit(&input.thickness_unit),
+            trim(&input.surface_texture),
+            trim(&input.base_material),
+            trim(&input.media_color),
+            trim(&input.opacity),
+            trim(&input.whiteness),
+            trim(&input.oba_content),
+            trim(&input.ink_compatibility),
             trim(&input.notes),
             &now
         ],
     )?;
 
     load_paper(&connection, &input.id)?.ok_or_else(|| "paper not found".into())
+}
+
+pub fn list_printer_paper_presets(
+    database_path: &str,
+) -> EngineResult<Vec<PrinterPaperPresetRecord>> {
+    let connection = open_connection(database_path)?;
+    load_printer_paper_presets(&connection)
+}
+
+pub fn create_printer_paper_preset(
+    database_path: &str,
+    input: &CreatePrinterPaperPresetInput,
+) -> EngineResult<PrinterPaperPresetRecord> {
+    let connection = open_connection(database_path)?;
+    let id = format!("preset-{}", job_timestamp_seed());
+    let now = iso_timestamp();
+    let printer = load_printer(&connection, &input.printer_id)?.ok_or("printer not found")?;
+    let _paper = load_paper(&connection, &input.paper_id)?.ok_or("paper not found")?;
+    let validated = validate_printer_paper_preset(
+        &printer,
+        trim(&input.media_setting),
+        trim(&input.quality_mode),
+        input.total_ink_limit_percent,
+        input.black_ink_limit_percent,
+    )?;
+    let label = trim(&input.label);
+    let print_path = trim(&input.print_path);
+    let display_name = display_printer_paper_preset_name(
+        &label,
+        &print_path,
+        &validated.media_setting,
+        &validated.quality_mode,
+    );
+
+    connection.execute(
+        r#"
+        INSERT INTO printer_paper_presets (
+            id,
+            printer_id,
+            paper_id,
+            label,
+            print_path,
+            media_setting,
+            quality_mode,
+            total_ink_limit_percent,
+            black_ink_limit_percent,
+            notes,
+            created_at,
+            updated_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+        "#,
+        params![
+            &id,
+            &input.printer_id,
+            &input.paper_id,
+            &label,
+            &print_path,
+            &validated.media_setting,
+            &validated.quality_mode,
+            validated.total_ink_limit_percent.map(|value| value as i64),
+            validated.black_ink_limit_percent.map(|value| value as i64),
+            trim(&input.notes),
+            &now,
+            &now
+        ],
+    )?;
+
+    Ok(PrinterPaperPresetRecord {
+        id,
+        printer_id: input.printer_id.clone(),
+        paper_id: input.paper_id.clone(),
+        label,
+        print_path,
+        media_setting: validated.media_setting,
+        quality_mode: validated.quality_mode,
+        total_ink_limit_percent: validated.total_ink_limit_percent,
+        black_ink_limit_percent: validated.black_ink_limit_percent,
+        notes: trim(&input.notes),
+        display_name,
+        created_at: now.clone(),
+        updated_at: now,
+    })
+}
+
+pub fn update_printer_paper_preset(
+    database_path: &str,
+    input: &UpdatePrinterPaperPresetInput,
+) -> EngineResult<PrinterPaperPresetRecord> {
+    let connection = open_connection(database_path)?;
+    let now = iso_timestamp();
+    let printer = load_printer(&connection, &input.printer_id)?.ok_or("printer not found")?;
+    let _paper = load_paper(&connection, &input.paper_id)?.ok_or("paper not found")?;
+    let validated = validate_printer_paper_preset(
+        &printer,
+        trim(&input.media_setting),
+        trim(&input.quality_mode),
+        input.total_ink_limit_percent,
+        input.black_ink_limit_percent,
+    )?;
+
+    connection.execute(
+        r#"
+        UPDATE printer_paper_presets
+        SET
+            printer_id = ?2,
+            paper_id = ?3,
+            label = ?4,
+            print_path = ?5,
+            media_setting = ?6,
+            quality_mode = ?7,
+            total_ink_limit_percent = ?8,
+            black_ink_limit_percent = ?9,
+            notes = ?10,
+            updated_at = ?11
+        WHERE id = ?1
+        "#,
+        params![
+            &input.id,
+            &input.printer_id,
+            &input.paper_id,
+            trim(&input.label),
+            trim(&input.print_path),
+            &validated.media_setting,
+            &validated.quality_mode,
+            validated.total_ink_limit_percent.map(|value| value as i64),
+            validated.black_ink_limit_percent.map(|value| value as i64),
+            trim(&input.notes),
+            &now
+        ],
+    )?;
+
+    load_printer_paper_preset(&connection, &input.id)?
+        .ok_or_else(|| "printer-paper preset not found".into())
 }
 
 pub fn list_printer_profiles(database_path: &str) -> EngineResult<Vec<PrinterProfileRecord>> {
@@ -320,17 +566,37 @@ pub fn create_new_profile_draft(
     } else {
         profile_name.clone()
     };
-    let printer_name = input
+    let printer = input
         .printer_id
         .as_deref()
-        .and_then(|printer_id| load_printer(&connection, printer_id).ok().flatten())
-        .map(|printer| printer.display_name)
-        .unwrap_or_default();
-    let paper_name = input
+        .map(|printer_id| load_printer(&connection, printer_id))
+        .transpose()?
+        .flatten();
+    let paper = input
         .paper_id
         .as_deref()
-        .and_then(|paper_id| load_paper(&connection, paper_id).ok().flatten())
-        .map(|paper| paper.display_name)
+        .map(|paper_id| load_paper(&connection, paper_id))
+        .transpose()?
+        .flatten();
+    let printer_name = printer
+        .as_ref()
+        .map(|printer| printer.display_name.clone())
+        .unwrap_or_default();
+    let paper_name = paper
+        .as_ref()
+        .map(|paper| paper.display_name.clone())
+        .unwrap_or_default();
+    let snapshot_colorant_family = printer
+        .as_ref()
+        .map(|printer| printer.colorant_family.clone())
+        .unwrap_or(ColorantFamily::Cmyk);
+    let snapshot_channel_count = printer
+        .as_ref()
+        .map(|printer| printer.channel_count)
+        .unwrap_or(4);
+    let snapshot_channel_labels = printer
+        .as_ref()
+        .map(|printer| printer.channel_labels.clone())
         .unwrap_or_default();
 
     connection.execute(
@@ -371,8 +637,15 @@ pub fn create_new_profile_draft(
             profile_name,
             printer_id,
             paper_id,
+            printer_paper_preset_id,
+            print_path,
             media_setting,
             quality_mode,
+            colorant_family_snapshot,
+            channel_count_snapshot,
+            channel_labels_snapshot,
+            total_ink_limit_percent_snapshot,
+            black_ink_limit_percent_snapshot,
             print_path_notes,
             measurement_notes,
             measurement_observer,
@@ -394,7 +667,7 @@ pub fn create_new_profile_draft(
             created_at,
             updated_at
         )
-        VALUES (?1, ?2, ?3, ?4, ?5, '', '', '', '', '1931_2', 'D50', 'strip', 836, 0, 0, NULL, 1, 120, NULL, NULL, NULL, NULL, 0, NULL, NULL, ?6, ?7)
+        VALUES (?1, ?2, ?3, ?4, ?5, NULL, '', '', '', ?6, ?7, ?8, NULL, NULL, '', '', '1931_2', 'D50', 'strip', 836, 0, 0, NULL, 1, 120, NULL, NULL, NULL, NULL, 0, NULL, NULL, ?9, ?10)
         "#,
         params![
             &id,
@@ -402,6 +675,9 @@ pub fn create_new_profile_draft(
             &profile_name,
             input.printer_id.as_deref(),
             input.paper_id.as_deref(),
+            encode_colorant_family(&snapshot_colorant_family),
+            snapshot_channel_count as i64,
+            encode_json(&snapshot_channel_labels)?,
             &now,
             &now
         ],
@@ -460,17 +736,96 @@ pub fn save_new_profile_context(
 ) -> EngineResult<NewProfileJobDetail> {
     let connection = open_connection(database_path)?;
     let now = iso_timestamp();
-    let printer_name = input
+    let preset = input
+        .printer_paper_preset_id
+        .as_deref()
+        .map(|preset_id| load_printer_paper_preset(&connection, preset_id))
+        .transpose()?
+        .flatten();
+    let resolved_printer_id = input
         .printer_id
-        .as_deref()
-        .and_then(|printer_id| load_printer(&connection, printer_id).ok().flatten())
-        .map(|printer| printer.display_name)
-        .unwrap_or_default();
-    let paper_name = input
+        .clone()
+        .or_else(|| preset.as_ref().map(|record| record.printer_id.clone()));
+    let resolved_paper_id = input
         .paper_id
+        .clone()
+        .or_else(|| preset.as_ref().map(|record| record.paper_id.clone()));
+    let printer = resolved_printer_id
         .as_deref()
-        .and_then(|paper_id| load_paper(&connection, paper_id).ok().flatten())
-        .map(|paper| paper.display_name)
+        .map(|printer_id| load_printer(&connection, printer_id))
+        .transpose()?
+        .flatten();
+    let paper = resolved_paper_id
+        .as_deref()
+        .map(|paper_id| load_paper(&connection, paper_id))
+        .transpose()?
+        .flatten();
+    if let Some(preset) = &preset {
+        if resolved_printer_id.as_deref() != Some(preset.printer_id.as_str()) {
+            return Err("Selected printer settings do not belong to the chosen printer.".into());
+        }
+        if resolved_paper_id.as_deref() != Some(preset.paper_id.as_str()) {
+            return Err("Selected printer settings do not belong to the chosen paper.".into());
+        }
+    }
+    let resolved_media_setting = if let Some(preset) = &preset {
+        preset.media_setting.clone()
+    } else {
+        trim(&input.media_setting)
+    };
+    let resolved_print_path = if let Some(preset) = &preset {
+        preset.print_path.clone()
+    } else {
+        trim(&input.print_path)
+    };
+    let resolved_quality_mode = if let Some(preset) = &preset {
+        preset.quality_mode.clone()
+    } else {
+        trim(&input.quality_mode)
+    };
+    let (
+        colorant_family,
+        channel_count,
+        channel_labels,
+        total_ink_limit_percent,
+        black_ink_limit_percent,
+    ) = if let Some(printer) = &printer {
+        validate_context_catalog_selection(
+            printer,
+            &resolved_media_setting,
+            &resolved_quality_mode,
+        )?;
+        (
+            printer.colorant_family.clone(),
+            printer.channel_count,
+            printer.channel_labels.clone(),
+            preset
+                .as_ref()
+                .and_then(|record| record.total_ink_limit_percent),
+            preset
+                .as_ref()
+                .and_then(|record| record.black_ink_limit_percent),
+        )
+    } else {
+        (
+            ColorantFamily::Cmyk,
+            4,
+            Vec::new(),
+            preset
+                .as_ref()
+                .and_then(|record| record.total_ink_limit_percent),
+            preset
+                .as_ref()
+                .and_then(|record| record.black_ink_limit_percent),
+        )
+    };
+    let printer_name = printer
+        .as_ref()
+        .map(|record| record.display_name.clone())
+        .unwrap_or_default();
+    let paper_name = paper
+        .as_ref()
+        .map(|record| record.display_name.clone())
         .unwrap_or_default();
     let title = if trim(&input.profile_name).is_empty() {
         "New Profile".to_string()
@@ -485,24 +840,38 @@ pub fn save_new_profile_context(
             profile_name = ?2,
             printer_id = ?3,
             paper_id = ?4,
-            media_setting = ?5,
-            quality_mode = ?6,
-            print_path_notes = ?7,
-            measurement_notes = ?8,
-            measurement_observer = ?9,
-            measurement_illuminant = ?10,
-            measurement_mode = ?11,
+            printer_paper_preset_id = ?5,
+            print_path = ?6,
+            media_setting = ?7,
+            quality_mode = ?8,
+            colorant_family_snapshot = ?9,
+            channel_count_snapshot = ?10,
+            channel_labels_snapshot = ?11,
+            total_ink_limit_percent_snapshot = ?12,
+            black_ink_limit_percent_snapshot = ?13,
+            print_path_notes = ?14,
+            measurement_notes = ?15,
+            measurement_observer = ?16,
+            measurement_illuminant = ?17,
+            measurement_mode = ?18,
             latest_error = NULL,
-            updated_at = ?12
+            updated_at = ?19
         WHERE id = ?1
         "#,
         params![
             &input.job_id,
             trim(&input.profile_name),
-            input.printer_id.as_deref(),
-            input.paper_id.as_deref(),
-            trim(&input.media_setting),
-            trim(&input.quality_mode),
+            resolved_printer_id.as_deref(),
+            resolved_paper_id.as_deref(),
+            input.printer_paper_preset_id.as_deref(),
+            &resolved_print_path,
+            &resolved_media_setting,
+            &resolved_quality_mode,
+            encode_colorant_family(&colorant_family),
+            channel_count as i64,
+            encode_json(&channel_labels)?,
+            total_ink_limit_percent.map(|value| value as i64),
+            black_ink_limit_percent.map(|value| value as i64),
             trim(&input.print_path_notes),
             trim(&input.measurement_notes),
             trim(&input.measurement_observer),
@@ -866,10 +1235,25 @@ pub(crate) fn load_new_profile_runner_context(
         title: detail.title,
         profile_name: detail.profile_name,
         printer_name: detail.printer_name,
-        paper_name: detail.paper_name,
+        printer_manufacturer: detail
+            .printer
+            .as_ref()
+            .map(|printer| printer.manufacturer.clone())
+            .unwrap_or_default(),
+        printer_model: detail
+            .printer
+            .as_ref()
+            .map(|printer| printer.model.clone())
+            .unwrap_or_default(),
         workspace_path: detail.workspace_path,
+        print_path: detail.context.print_path,
         media_setting: detail.context.media_setting,
         quality_mode: detail.context.quality_mode,
+        colorant_family: detail.context.colorant_family,
+        channel_count: detail.context.channel_count,
+        channel_labels: detail.context.channel_labels,
+        total_ink_limit_percent: detail.context.total_ink_limit_percent,
+        black_ink_limit_percent: detail.context.black_ink_limit_percent,
         measurement_observer: detail.context.measurement_observer,
         measurement_mode: detail.context.measurement_mode,
         patch_count: detail.target_settings.patch_count,
@@ -1297,8 +1681,15 @@ fn load_new_profile_job_detail_from_connection(
                 new_profile_jobs.workspace_path,
                 new_profile_jobs.printer_id,
                 new_profile_jobs.paper_id,
+                new_profile_jobs.printer_paper_preset_id,
+                new_profile_jobs.print_path,
                 new_profile_jobs.media_setting,
                 new_profile_jobs.quality_mode,
+                new_profile_jobs.colorant_family_snapshot,
+                new_profile_jobs.channel_count_snapshot,
+                new_profile_jobs.channel_labels_snapshot,
+                new_profile_jobs.total_ink_limit_percent_snapshot,
+                new_profile_jobs.black_ink_limit_percent_snapshot,
                 new_profile_jobs.print_path_notes,
                 new_profile_jobs.measurement_notes,
                 new_profile_jobs.measurement_observer,
@@ -1335,26 +1726,33 @@ fn load_new_profile_job_detail_from_connection(
                     row.get::<_, String>(8)?,
                     row.get::<_, Option<String>>(9)?,
                     row.get::<_, Option<String>>(10)?,
-                    row.get::<_, String>(11)?,
+                    row.get::<_, Option<String>>(11)?,
                     row.get::<_, String>(12)?,
                     row.get::<_, String>(13)?,
                     row.get::<_, String>(14)?,
                     row.get::<_, String>(15)?,
-                    row.get::<_, String>(16)?,
+                    row.get::<_, i64>(16)?,
                     row.get::<_, String>(17)?,
-                    row.get::<_, i64>(18)?,
-                    row.get::<_, i64>(19)?,
-                    row.get::<_, i64>(20)?,
-                    row.get::<_, Option<String>>(21)?,
-                    row.get::<_, i64>(22)?,
-                    row.get::<_, i64>(23)?,
-                    row.get::<_, Option<String>>(24)?,
-                    row.get::<_, Option<String>>(25)?,
-                    row.get::<_, Option<String>>(26)?,
-                    row.get::<_, Option<String>>(27)?,
-                    row.get::<_, i64>(28)?,
-                    row.get::<_, Option<String>>(29)?,
-                    row.get::<_, Option<String>>(30)?,
+                    row.get::<_, Option<i64>>(18)?,
+                    row.get::<_, Option<i64>>(19)?,
+                    row.get::<_, String>(20)?,
+                    row.get::<_, String>(21)?,
+                    row.get::<_, String>(22)?,
+                    row.get::<_, String>(23)?,
+                    row.get::<_, String>(24)?,
+                    row.get::<_, i64>(25)?,
+                    row.get::<_, i64>(26)?,
+                    row.get::<_, i64>(27)?,
+                    row.get::<_, Option<String>>(28)?,
+                    row.get::<_, i64>(29)?,
+                    row.get::<_, i64>(30)?,
+                    row.get::<_, Option<String>>(31)?,
+                    row.get::<_, Option<String>>(32)?,
+                    row.get::<_, Option<String>>(33)?,
+                    row.get::<_, Option<String>>(34)?,
+                    row.get::<_, i64>(35)?,
+                    row.get::<_, Option<String>>(36)?,
+                    row.get::<_, Option<String>>(37)?,
                 ))
             },
         )
@@ -1374,7 +1772,7 @@ fn load_new_profile_job_detail_from_connection(
         .transpose()?
         .flatten();
     let planning_profile_name = row
-        .21
+        .28
         .as_deref()
         .map(|profile_id| {
             connection
@@ -1393,6 +1791,7 @@ fn load_new_profile_job_detail_from_connection(
     let is_command_running = commands
         .iter()
         .any(|command| command.state == CommandRunState::Running);
+    let channel_labels = decode_json::<Vec<String>>(&row.17);
 
     Ok(NewProfileJobDetail {
         id: row.0.clone(),
@@ -1407,34 +1806,41 @@ fn load_new_profile_job_detail_from_connection(
         printer,
         paper,
         context: NewProfileContextRecord {
-            media_setting: row.11,
-            quality_mode: row.12,
-            print_path_notes: row.13,
-            measurement_notes: row.14,
-            measurement_observer: row.15,
-            measurement_illuminant: row.16,
-            measurement_mode: decode_measurement_mode(&row.17),
+            printer_paper_preset_id: row.11,
+            print_path: row.12,
+            media_setting: row.13,
+            quality_mode: row.14,
+            colorant_family: decode_colorant_family(&row.15),
+            channel_count: row.16.max(1) as u32,
+            channel_labels,
+            total_ink_limit_percent: row.18.map(|value| value.max(1) as u32),
+            black_ink_limit_percent: row.19.map(|value| value.max(1) as u32),
+            print_path_notes: row.20,
+            measurement_notes: row.21,
+            measurement_observer: row.22,
+            measurement_illuminant: row.23,
+            measurement_mode: decode_measurement_mode(&row.24),
         },
         target_settings: TargetSettingsRecord {
-            patch_count: row.18.max(64) as u32,
-            improve_neutrals: decode_bool(row.19),
-            use_existing_profile_to_help_target_planning: decode_bool(row.20),
-            planning_profile_id: row.21,
+            patch_count: row.25.max(64) as u32,
+            improve_neutrals: decode_bool(row.26),
+            use_existing_profile_to_help_target_planning: decode_bool(row.27),
+            planning_profile_id: row.28,
             planning_profile_name,
         },
         print_settings: PrintSettingsRecord {
-            print_without_color_management: decode_bool(row.22),
-            drying_time_minutes: row.23.max(1) as u32,
-            printed_at: row.24,
-            drying_ready_at: row.25,
+            print_without_color_management: decode_bool(row.29),
+            drying_time_minutes: row.30.max(1) as u32,
+            printed_at: row.31,
+            drying_ready_at: row.32,
         },
         measurement: MeasurementStatusRecord {
-            measurement_source_path: row.26,
-            scan_file_path: row.27,
-            has_measurement_checkpoint: decode_bool(row.28),
+            measurement_source_path: row.33,
+            scan_file_path: row.34,
+            has_measurement_checkpoint: decode_bool(row.35),
         },
-        latest_error: row.29,
-        published_profile_id: row.30,
+        latest_error: row.36,
+        published_profile_id: row.37,
         review,
         stage_timeline: build_stage_timeline(&row.3),
         artifacts: load_job_artifacts(connection, &row.0)?,
@@ -1486,16 +1892,21 @@ fn load_printers(connection: &Connection) -> EngineResult<Vec<PrinterRecord>> {
         r#"
         SELECT
             id,
-            make_model,
+            manufacturer,
+            model,
             nickname,
             transport_style,
+            colorant_family,
+            channel_count,
+            channel_labels,
+            supported_media_settings,
             supported_quality_modes,
             monochrome_path_notes,
             notes,
             created_at,
             updated_at
         FROM printers
-        ORDER BY COALESCE(NULLIF(nickname, ''), make_model), updated_at DESC
+        ORDER BY COALESCE(NULLIF(nickname, ''), TRIM(manufacturer || ' ' || model), model), updated_at DESC
         "#,
     )?;
 
@@ -1508,19 +1919,56 @@ fn load_papers(connection: &Connection) -> EngineResult<Vec<PaperRecord>> {
         r#"
         SELECT
             id,
-            vendor_product_name,
+            manufacturer,
+            paper_line,
             surface_class,
-            weight_thickness,
-            oba_fluorescence_notes,
+            basis_weight_value,
+            basis_weight_unit,
+            thickness_value,
+            thickness_unit,
+            surface_texture,
+            base_material,
+            media_color,
+            opacity,
+            whiteness,
+            oba_content,
+            ink_compatibility,
             notes,
             created_at,
             updated_at
         FROM papers
-        ORDER BY vendor_product_name, updated_at DESC
+        ORDER BY manufacturer, paper_line, updated_at DESC
         "#,
     )?;
 
     let rows = statement.query_map([], map_paper_row)?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+fn load_printer_paper_presets(
+    connection: &Connection,
+) -> EngineResult<Vec<PrinterPaperPresetRecord>> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT
+            id,
+            printer_id,
+            paper_id,
+            label,
+            print_path,
+            media_setting,
+            quality_mode,
+            total_ink_limit_percent,
+            black_ink_limit_percent,
+            notes,
+            created_at,
+            updated_at
+        FROM printer_paper_presets
+        ORDER BY printer_id, paper_id, label, print_path, media_setting, quality_mode
+        "#,
+    )?;
+
+    let rows = statement.query_map([], map_printer_paper_preset_row)?;
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
@@ -1530,9 +1978,14 @@ fn load_printer(connection: &Connection, printer_id: &str) -> EngineResult<Optio
             r#"
             SELECT
                 id,
-                make_model,
+                manufacturer,
+                model,
                 nickname,
                 transport_style,
+                colorant_family,
+                channel_count,
+                channel_labels,
+                supported_media_settings,
                 supported_quality_modes,
                 monochrome_path_notes,
                 notes,
@@ -1548,16 +2001,56 @@ fn load_printer(connection: &Connection, printer_id: &str) -> EngineResult<Optio
         .map_err(Into::into)
 }
 
+fn load_printer_paper_preset(
+    connection: &Connection,
+    preset_id: &str,
+) -> EngineResult<Option<PrinterPaperPresetRecord>> {
+    connection
+        .query_row(
+            r#"
+            SELECT
+                id,
+                printer_id,
+                paper_id,
+                label,
+                print_path,
+                media_setting,
+                quality_mode,
+                total_ink_limit_percent,
+                black_ink_limit_percent,
+                notes,
+                created_at,
+                updated_at
+            FROM printer_paper_presets
+            WHERE id = ?1
+            "#,
+            params![preset_id],
+            map_printer_paper_preset_row,
+        )
+        .optional()
+        .map_err(Into::into)
+}
+
 fn load_paper(connection: &Connection, paper_id: &str) -> EngineResult<Option<PaperRecord>> {
     connection
         .query_row(
             r#"
             SELECT
                 id,
-                vendor_product_name,
+                manufacturer,
+                paper_line,
                 surface_class,
-                weight_thickness,
-                oba_fluorescence_notes,
+                basis_weight_value,
+                basis_weight_unit,
+                thickness_value,
+                thickness_unit,
+                surface_texture,
+                base_material,
+                media_color,
+                opacity,
+                whiteness,
+                oba_content,
+                ink_compatibility,
                 notes,
                 created_at,
                 updated_at
@@ -1572,40 +2065,87 @@ fn load_paper(connection: &Connection, paper_id: &str) -> EngineResult<Option<Pa
 }
 
 fn map_printer_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PrinterRecord> {
-    let make_model: String = row.get(1)?;
-    let nickname: String = row.get(2)?;
-    let quality_modes_json: String = row.get(4)?;
-    let supported_quality_modes: Vec<String> =
-        serde_json::from_str(&quality_modes_json).unwrap_or_default();
+    let manufacturer: String = row.get(1)?;
+    let model: String = row.get(2)?;
+    let nickname: String = row.get(3)?;
+    let channel_labels_json: String = row.get(7)?;
+    let supported_media_settings_json: String = row.get(8)?;
+    let supported_quality_modes_json: String = row.get(9)?;
 
     Ok(PrinterRecord {
         id: row.get(0)?,
-        make_model: make_model.clone(),
+        manufacturer: manufacturer.clone(),
+        model: model.clone(),
         nickname: nickname.clone(),
-        transport_style: row.get(3)?,
-        supported_quality_modes,
-        monochrome_path_notes: row.get(5)?,
-        notes: row.get(6)?,
-        display_name: display_printer_name(&make_model, &nickname),
-        created_at: row.get(7)?,
-        updated_at: row.get(8)?,
+        transport_style: row.get(4)?,
+        colorant_family: decode_colorant_family(&row.get::<_, String>(5)?),
+        channel_count: row.get::<_, i64>(6)? as u32,
+        channel_labels: decode_json(&channel_labels_json),
+        supported_media_settings: decode_json(&supported_media_settings_json),
+        supported_quality_modes: decode_json(&supported_quality_modes_json),
+        monochrome_path_notes: row.get(10)?,
+        notes: row.get(11)?,
+        display_name: display_printer_name(&manufacturer, &model, &nickname),
+        created_at: row.get(12)?,
+        updated_at: row.get(13)?,
     })
 }
 
 fn map_paper_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<PaperRecord> {
-    let vendor_product_name: String = row.get(1)?;
-    let surface_class: String = row.get(2)?;
+    let manufacturer: String = row.get(1)?;
+    let paper_line: String = row.get(2)?;
+    let surface_class: String = row.get(3)?;
 
     Ok(PaperRecord {
         id: row.get(0)?,
-        vendor_product_name: vendor_product_name.clone(),
+        manufacturer: manufacturer.clone(),
+        paper_line: paper_line.clone(),
         surface_class: surface_class.clone(),
-        weight_thickness: row.get(3)?,
-        oba_fluorescence_notes: row.get(4)?,
-        notes: row.get(5)?,
-        display_name: display_paper_name(&vendor_product_name, &surface_class),
-        created_at: row.get(6)?,
-        updated_at: row.get(7)?,
+        basis_weight_value: row.get(4)?,
+        basis_weight_unit: decode_paper_weight_unit(&row.get::<_, String>(5)?),
+        thickness_value: row.get(6)?,
+        thickness_unit: decode_paper_thickness_unit(&row.get::<_, String>(7)?),
+        surface_texture: row.get(8)?,
+        base_material: row.get(9)?,
+        media_color: row.get(10)?,
+        opacity: row.get(11)?,
+        whiteness: row.get(12)?,
+        oba_content: row.get(13)?,
+        ink_compatibility: row.get(14)?,
+        notes: row.get(15)?,
+        display_name: display_paper_name(&manufacturer, &paper_line, &surface_class),
+        created_at: row.get(16)?,
+        updated_at: row.get(17)?,
+    })
+}
+
+fn map_printer_paper_preset_row(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<PrinterPaperPresetRecord> {
+    let label: String = row.get(3)?;
+    let print_path: String = row.get(4)?;
+    let media_setting: String = row.get(5)?;
+    let quality_mode: String = row.get(6)?;
+
+    Ok(PrinterPaperPresetRecord {
+        id: row.get(0)?,
+        printer_id: row.get(1)?,
+        paper_id: row.get(2)?,
+        label: label.clone(),
+        print_path: print_path.clone(),
+        media_setting: media_setting.clone(),
+        quality_mode: quality_mode.clone(),
+        total_ink_limit_percent: row.get::<_, Option<i64>>(7)?.map(|value| value as u32),
+        black_ink_limit_percent: row.get::<_, Option<i64>>(8)?.map(|value| value as u32),
+        notes: row.get(9)?,
+        display_name: display_printer_paper_preset_name(
+            &label,
+            &print_path,
+            &media_setting,
+            &quality_mode,
+        ),
+        created_at: row.get(10)?,
+        updated_at: row.get(11)?,
     })
 }
 
@@ -1773,13 +2313,17 @@ fn sync_context_summary(
     paper_name: &str,
     detail: &mut NewProfileJobDetail,
 ) -> EngineResult<()> {
-    let next_action =
-        if profile_name.is_empty() || detail.printer.is_none() || detail.paper.is_none() {
-            "Select or create a printer and paper"
-        } else {
-            "Generate target files"
-        };
-    let stage = if profile_name.is_empty() || detail.printer.is_none() || detail.paper.is_none() {
+    let has_context = !profile_name.is_empty()
+        && detail.printer.is_some()
+        && detail.paper.is_some()
+        && !detail.context.media_setting.trim().is_empty()
+        && !detail.context.quality_mode.trim().is_empty();
+    let next_action = if has_context {
+        "Generate target files"
+    } else {
+        "Select printer and paper settings"
+    };
+    let stage = if !has_context {
         WorkflowStage::Context
     } else if matches!(detail.stage, WorkflowStage::Context) {
         WorkflowStage::Target
@@ -1896,6 +2440,12 @@ fn ensure_context_complete(detail: &NewProfileJobDetail) -> EngineResult<()> {
     if detail.paper.is_none() {
         return Err("Select or create a paper before generating target files.".into());
     }
+    if detail.context.media_setting.trim().is_empty() {
+        return Err("Choose the printer and paper settings before generating target files.".into());
+    }
+    if detail.context.quality_mode.trim().is_empty() {
+        return Err("Choose the printer and paper settings before generating target files.".into());
+    }
     Ok(())
 }
 
@@ -1974,9 +2524,14 @@ fn create_latest_schema(connection: &Connection) -> EngineResult<()> {
 
         CREATE TABLE IF NOT EXISTS printers (
             id TEXT PRIMARY KEY,
-            make_model TEXT NOT NULL,
+            manufacturer TEXT NOT NULL DEFAULT '',
+            model TEXT NOT NULL,
             nickname TEXT NOT NULL DEFAULT '',
             transport_style TEXT NOT NULL DEFAULT '',
+            colorant_family TEXT NOT NULL DEFAULT 'cmyk',
+            channel_count INTEGER NOT NULL DEFAULT 4,
+            channel_labels TEXT NOT NULL DEFAULT '[]',
+            supported_media_settings TEXT NOT NULL DEFAULT '[]',
             supported_quality_modes TEXT NOT NULL DEFAULT '[]',
             monochrome_path_notes TEXT NOT NULL DEFAULT '',
             notes TEXT NOT NULL DEFAULT '',
@@ -1986,10 +2541,35 @@ fn create_latest_schema(connection: &Connection) -> EngineResult<()> {
 
         CREATE TABLE IF NOT EXISTS papers (
             id TEXT PRIMARY KEY,
-            vendor_product_name TEXT NOT NULL,
+            manufacturer TEXT NOT NULL DEFAULT '',
+            paper_line TEXT NOT NULL DEFAULT '',
             surface_class TEXT NOT NULL DEFAULT '',
-            weight_thickness TEXT NOT NULL DEFAULT '',
-            oba_fluorescence_notes TEXT NOT NULL DEFAULT '',
+            basis_weight_value TEXT NOT NULL DEFAULT '',
+            basis_weight_unit TEXT NOT NULL DEFAULT '',
+            thickness_value TEXT NOT NULL DEFAULT '',
+            thickness_unit TEXT NOT NULL DEFAULT '',
+            surface_texture TEXT NOT NULL DEFAULT '',
+            base_material TEXT NOT NULL DEFAULT '',
+            media_color TEXT NOT NULL DEFAULT '',
+            opacity TEXT NOT NULL DEFAULT '',
+            whiteness TEXT NOT NULL DEFAULT '',
+            oba_content TEXT NOT NULL DEFAULT '',
+            ink_compatibility TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS printer_paper_presets (
+            id TEXT PRIMARY KEY,
+            printer_id TEXT NOT NULL REFERENCES printers(id),
+            paper_id TEXT NOT NULL REFERENCES papers(id),
+            label TEXT NOT NULL DEFAULT '',
+            print_path TEXT NOT NULL DEFAULT '',
+            media_setting TEXT NOT NULL,
+            quality_mode TEXT NOT NULL,
+            total_ink_limit_percent INTEGER,
+            black_ink_limit_percent INTEGER,
             notes TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -2001,8 +2581,15 @@ fn create_latest_schema(connection: &Connection) -> EngineResult<()> {
             profile_name TEXT NOT NULL DEFAULT '',
             printer_id TEXT REFERENCES printers(id),
             paper_id TEXT REFERENCES papers(id),
+            printer_paper_preset_id TEXT REFERENCES printer_paper_presets(id),
+            print_path TEXT NOT NULL DEFAULT '',
             media_setting TEXT NOT NULL DEFAULT '',
             quality_mode TEXT NOT NULL DEFAULT '',
+            colorant_family_snapshot TEXT NOT NULL DEFAULT 'cmyk',
+            channel_count_snapshot INTEGER NOT NULL DEFAULT 4,
+            channel_labels_snapshot TEXT NOT NULL DEFAULT '[]',
+            total_ink_limit_percent_snapshot INTEGER,
+            black_ink_limit_percent_snapshot INTEGER,
             print_path_notes TEXT NOT NULL DEFAULT '',
             measurement_notes TEXT NOT NULL DEFAULT '',
             measurement_observer TEXT NOT NULL DEFAULT '1931_2',
@@ -2125,11 +2712,257 @@ fn create_latest_schema(connection: &Connection) -> EngineResult<()> {
         "stage",
         "TEXT NOT NULL DEFAULT 'context'",
     )?;
+    ensure_column(
+        connection,
+        "printers",
+        "manufacturer",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    ensure_column(connection, "printers", "model", "TEXT NOT NULL DEFAULT ''")?;
+    ensure_column(
+        connection,
+        "printers",
+        "colorant_family",
+        "TEXT NOT NULL DEFAULT 'cmyk'",
+    )?;
+    ensure_column(
+        connection,
+        "printers",
+        "channel_count",
+        "INTEGER NOT NULL DEFAULT 4",
+    )?;
+    ensure_column(
+        connection,
+        "printers",
+        "channel_labels",
+        "TEXT NOT NULL DEFAULT '[]'",
+    )?;
+    ensure_column(
+        connection,
+        "printers",
+        "supported_media_settings",
+        "TEXT NOT NULL DEFAULT '[]'",
+    )?;
+    ensure_column(
+        connection,
+        "printers",
+        "supported_quality_modes",
+        "TEXT NOT NULL DEFAULT '[]'",
+    )?;
+    ensure_column(
+        connection,
+        "papers",
+        "manufacturer",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    ensure_column(
+        connection,
+        "papers",
+        "paper_line",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    ensure_column(
+        connection,
+        "papers",
+        "basis_weight_value",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    ensure_column(
+        connection,
+        "papers",
+        "basis_weight_unit",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    ensure_column(
+        connection,
+        "papers",
+        "thickness_value",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    ensure_column(
+        connection,
+        "papers",
+        "thickness_unit",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    ensure_column(
+        connection,
+        "papers",
+        "surface_texture",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    ensure_column(
+        connection,
+        "papers",
+        "base_material",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    ensure_column(
+        connection,
+        "papers",
+        "media_color",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    ensure_column(connection, "papers", "opacity", "TEXT NOT NULL DEFAULT ''")?;
+    ensure_column(
+        connection,
+        "papers",
+        "whiteness",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    ensure_column(
+        connection,
+        "papers",
+        "oba_content",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    ensure_column(
+        connection,
+        "papers",
+        "ink_compatibility",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    ensure_column(
+        connection,
+        "printer_paper_presets",
+        "print_path",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    ensure_column(
+        connection,
+        "new_profile_jobs",
+        "printer_paper_preset_id",
+        "TEXT",
+    )?;
+    ensure_column(
+        connection,
+        "new_profile_jobs",
+        "print_path",
+        "TEXT NOT NULL DEFAULT ''",
+    )?;
+    ensure_column(
+        connection,
+        "new_profile_jobs",
+        "colorant_family_snapshot",
+        "TEXT NOT NULL DEFAULT 'cmyk'",
+    )?;
+    ensure_column(
+        connection,
+        "new_profile_jobs",
+        "channel_count_snapshot",
+        "INTEGER NOT NULL DEFAULT 4",
+    )?;
+    ensure_column(
+        connection,
+        "new_profile_jobs",
+        "channel_labels_snapshot",
+        "TEXT NOT NULL DEFAULT '[]'",
+    )?;
+    ensure_column(
+        connection,
+        "new_profile_jobs",
+        "total_ink_limit_percent_snapshot",
+        "INTEGER",
+    )?;
+    ensure_column(
+        connection,
+        "new_profile_jobs",
+        "black_ink_limit_percent_snapshot",
+        "INTEGER",
+    )?;
 
     Ok(())
 }
 
 fn upgrade_legacy_jobs(connection: &Connection, app_support_path: &str) -> EngineResult<()> {
+    if table_has_column(connection, "printers", "make_model")? {
+        connection.execute(
+            r#"
+            UPDATE printers
+            SET
+                model = CASE
+                    WHEN COALESCE(NULLIF(model, ''), '') = '' THEN COALESCE(make_model, '')
+                    ELSE model
+                END,
+                manufacturer = COALESCE(manufacturer, '')
+            "#,
+            [],
+        )?;
+    }
+
+    if table_has_column(connection, "papers", "vendor_product_name")? {
+        connection.execute(
+            r#"
+            UPDATE papers
+            SET
+                paper_line = CASE
+                    WHEN COALESCE(NULLIF(paper_line, ''), '') = '' THEN COALESCE(vendor_product_name, '')
+                    ELSE paper_line
+                END
+            "#,
+            [],
+        )?;
+    }
+
+    if table_has_column(connection, "papers", "vendor")? {
+        connection.execute(
+            r#"
+            UPDATE papers
+            SET
+                manufacturer = CASE
+                    WHEN COALESCE(NULLIF(manufacturer, ''), '') = '' THEN COALESCE(vendor, '')
+                    ELSE manufacturer
+                END
+            "#,
+            [],
+        )?;
+    }
+
+    if table_has_column(connection, "papers", "product_name")? {
+        connection.execute(
+            r#"
+            UPDATE papers
+            SET
+                paper_line = CASE
+                    WHEN COALESCE(NULLIF(paper_line, ''), '') = '' THEN COALESCE(product_name, '')
+                    ELSE paper_line
+                END
+            "#,
+            [],
+        )?;
+    }
+
+    if table_has_column(connection, "papers", "oba_fluorescence_notes")? {
+        connection.execute(
+            r#"
+            UPDATE papers
+            SET
+                oba_content = CASE
+                    WHEN COALESCE(NULLIF(oba_content, ''), '') = '' THEN COALESCE(oba_fluorescence_notes, '')
+                    ELSE oba_content
+                END
+            "#,
+            [],
+        )?;
+    }
+
+    if table_has_column(connection, "papers", "weight_thickness")? {
+        connection.execute(
+            r#"
+            UPDATE papers
+            SET
+                notes = CASE
+                    WHEN COALESCE(NULLIF(weight_thickness, ''), '') = '' THEN COALESCE(notes, '')
+                    WHEN COALESCE(NULLIF(basis_weight_value, ''), '') <> '' OR COALESCE(NULLIF(thickness_value, ''), '') <> '' THEN COALESCE(notes, '')
+                    WHEN instr(COALESCE(notes, ''), 'Legacy weight/thickness: ') > 0 THEN notes
+                    WHEN COALESCE(NULLIF(notes, ''), '') = '' THEN 'Legacy weight/thickness: ' || weight_thickness
+                    ELSE notes || char(10) || char(10) || 'Legacy weight/thickness: ' || weight_thickness
+                END
+            "#,
+            [],
+        )?;
+    }
+
     connection.execute(
         r#"
         UPDATE jobs
@@ -2187,15 +3020,22 @@ fn upgrade_legacy_jobs(connection: &Connection, app_support_path: &str) -> Engin
                 id,
                 workspace_path,
                 profile_name,
-                printer_id,
-                paper_id,
-                media_setting,
-                quality_mode,
-                print_path_notes,
-                measurement_notes,
-                measurement_observer,
-                measurement_illuminant,
-                measurement_mode,
+            printer_id,
+            paper_id,
+            printer_paper_preset_id,
+            print_path,
+            media_setting,
+            quality_mode,
+            colorant_family_snapshot,
+            channel_count_snapshot,
+            channel_labels_snapshot,
+            total_ink_limit_percent_snapshot,
+            black_ink_limit_percent_snapshot,
+            print_path_notes,
+            measurement_notes,
+            measurement_observer,
+            measurement_illuminant,
+            measurement_mode,
                 patch_count,
                 improve_neutrals,
                 use_existing_profile_planning,
@@ -2207,12 +3047,12 @@ fn upgrade_legacy_jobs(connection: &Connection, app_support_path: &str) -> Engin
                 measurement_source_path,
                 scan_file_path,
                 has_measurement_checkpoint,
-                latest_error,
-                published_profile_id,
-                created_at,
-                updated_at
-            )
-            VALUES (?1, ?2, ?3, NULL, NULL, '', '', '', '', '1931_2', 'D50', 'strip', 836, 0, 0, NULL, 1, 120, NULL, NULL, NULL, NULL, 0, NULL, NULL, ?4, ?5)
+            latest_error,
+            published_profile_id,
+            created_at,
+            updated_at
+        )
+            VALUES (?1, ?2, ?3, NULL, NULL, NULL, '', '', '', 'cmyk', 4, '[]', NULL, NULL, '', '', '1931_2', 'D50', 'strip', 836, 0, 0, NULL, 1, 120, NULL, NULL, NULL, NULL, 0, NULL, NULL, ?4, ?5)
             "#,
             params![
                 &job_id,
@@ -2266,6 +3106,20 @@ fn upgrade_legacy_jobs(connection: &Connection, app_support_path: &str) -> Engin
             &paper_name,
         )?;
     }
+
+    connection.execute(
+        r#"
+        UPDATE new_profile_jobs
+        SET
+            colorant_family_snapshot = COALESCE(NULLIF(colorant_family_snapshot, ''), 'cmyk'),
+            channel_count_snapshot = CASE
+                WHEN channel_count_snapshot IS NULL OR channel_count_snapshot <= 0 THEN 4
+                ELSE channel_count_snapshot
+            END,
+            channel_labels_snapshot = COALESCE(NULLIF(channel_labels_snapshot, ''), '[]')
+        "#,
+        [],
+    )?;
 
     Ok(())
 }
@@ -2374,6 +3228,60 @@ fn decode_measurement_mode(value: &str) -> MeasurementMode {
     }
 }
 
+fn encode_colorant_family(value: &ColorantFamily) -> &'static str {
+    match value {
+        ColorantFamily::GrayK => "gray_k",
+        ColorantFamily::Rgb => "rgb",
+        ColorantFamily::Cmy => "cmy",
+        ColorantFamily::Cmyk => "cmyk",
+        ColorantFamily::ExtendedN => "extended_n",
+    }
+}
+
+fn decode_colorant_family(value: &str) -> ColorantFamily {
+    match value {
+        "gray_k" => ColorantFamily::GrayK,
+        "rgb" => ColorantFamily::Rgb,
+        "cmy" => ColorantFamily::Cmy,
+        "extended_n" => ColorantFamily::ExtendedN,
+        _ => ColorantFamily::Cmyk,
+    }
+}
+
+fn encode_paper_weight_unit(value: &PaperWeightUnit) -> &'static str {
+    match value {
+        PaperWeightUnit::Unspecified => "",
+        PaperWeightUnit::Gsm => "gsm",
+        PaperWeightUnit::Lb => "lb",
+    }
+}
+
+fn decode_paper_weight_unit(value: &str) -> PaperWeightUnit {
+    match value {
+        "gsm" => PaperWeightUnit::Gsm,
+        "lb" => PaperWeightUnit::Lb,
+        _ => PaperWeightUnit::Unspecified,
+    }
+}
+
+fn encode_paper_thickness_unit(value: &PaperThicknessUnit) -> &'static str {
+    match value {
+        PaperThicknessUnit::Unspecified => "",
+        PaperThicknessUnit::Mil => "mil",
+        PaperThicknessUnit::Mm => "mm",
+        PaperThicknessUnit::Micron => "micron",
+    }
+}
+
+fn decode_paper_thickness_unit(value: &str) -> PaperThicknessUnit {
+    match value {
+        "mil" => PaperThicknessUnit::Mil,
+        "mm" => PaperThicknessUnit::Mm,
+        "micron" => PaperThicknessUnit::Micron,
+        _ => PaperThicknessUnit::Unspecified,
+    }
+}
+
 fn encode_artifact_kind(kind: &ArtifactKind) -> &'static str {
     match kind {
         ArtifactKind::Ti1 => "ti1",
@@ -2442,23 +3350,227 @@ fn decode_json<T: serde::de::DeserializeOwned + Default>(value: &str) -> T {
     serde_json::from_str(value).unwrap_or_default()
 }
 
-fn display_printer_name(make_model: &str, nickname: &str) -> String {
-    let make_model = trim(make_model);
+fn display_printer_name(manufacturer: &str, model: &str, nickname: &str) -> String {
+    let manufacturer = trim(manufacturer);
+    let model = trim(model);
     let nickname = trim(nickname);
     if nickname.is_empty() {
-        make_model
+        if manufacturer.is_empty() {
+            model
+        } else if model.is_empty() {
+            manufacturer
+        } else {
+            format!("{manufacturer} {model}")
+        }
     } else {
         nickname
     }
 }
 
-fn display_paper_name(vendor_product_name: &str, surface_class: &str) -> String {
-    let vendor_product_name = trim(vendor_product_name);
+fn display_paper_name(manufacturer: &str, paper_line: &str, surface_class: &str) -> String {
+    let manufacturer = trim(manufacturer);
+    let paper_line = trim(paper_line);
     let surface_class = trim(surface_class);
-    if surface_class.is_empty() {
-        vendor_product_name
+    let base = if manufacturer.is_empty() {
+        paper_line
+    } else if paper_line.is_empty() {
+        manufacturer
     } else {
-        format!("{vendor_product_name} ({surface_class})")
+        format!("{manufacturer} {paper_line}")
+    };
+
+    if surface_class.is_empty() {
+        base
+    } else {
+        format!("{base} ({surface_class})")
+    }
+}
+
+fn display_printer_paper_preset_name(
+    label: &str,
+    print_path: &str,
+    media_setting: &str,
+    quality_mode: &str,
+) -> String {
+    let label = trim(label);
+    if !label.is_empty() {
+        return label;
+    }
+
+    let print_path = trim(print_path);
+    let media_setting = trim(media_setting);
+    let quality_mode = trim(quality_mode);
+
+    let mut parts = Vec::new();
+    if !print_path.is_empty() {
+        parts.push(print_path);
+    }
+    if !media_setting.is_empty() {
+        parts.push(media_setting);
+    }
+    if !quality_mode.is_empty() {
+        parts.push(quality_mode);
+    }
+
+    if parts.is_empty() {
+        "Printer and paper settings".to_string()
+    } else {
+        parts.join(" | ")
+    }
+}
+
+fn validate_printer_identity(manufacturer: &str, model: &str) -> EngineResult<()> {
+    if manufacturer.trim().is_empty() || model.trim().is_empty() {
+        return Err("Enter both a printer manufacturer and model.".into());
+    }
+    Ok(())
+}
+
+fn validate_paper_identity(paper_line: &str) -> EngineResult<()> {
+    if paper_line.trim().is_empty() {
+        return Err("Enter a paper line or make.".into());
+    }
+    Ok(())
+}
+
+fn normalized_catalog_values(values: Vec<String>) -> Vec<String> {
+    let mut normalized = Vec::new();
+    for value in trimmed_strings(values) {
+        if !normalized.contains(&value) {
+            normalized.push(value);
+        }
+    }
+    normalized
+}
+
+fn normalize_channel_configuration(
+    family: &ColorantFamily,
+    requested_channel_count: u32,
+    requested_labels: Vec<String>,
+) -> EngineResult<(u32, Vec<String>)> {
+    let normalized_labels = normalized_catalog_values(requested_labels);
+    match family {
+        ColorantFamily::GrayK => Ok((1, Vec::new())),
+        ColorantFamily::Rgb | ColorantFamily::Cmy => Ok((3, Vec::new())),
+        ColorantFamily::Cmyk => Ok((4, Vec::new())),
+        ColorantFamily::ExtendedN => {
+            if !(6..=15).contains(&requested_channel_count) {
+                return Err("Extended N-color printers must use between 6 and 15 channels.".into());
+            }
+            if !normalized_labels.is_empty()
+                && normalized_labels.len() != requested_channel_count as usize
+            {
+                return Err("Extended N-color channel labels must match the channel count.".into());
+            }
+            Ok((requested_channel_count, normalized_labels))
+        }
+    }
+}
+
+fn validate_context_catalog_selection(
+    printer: &PrinterRecord,
+    media_setting: &str,
+    quality_mode: &str,
+) -> EngineResult<()> {
+    if !media_setting.trim().is_empty()
+        && !printer.supported_media_settings.is_empty()
+        && !printer
+            .supported_media_settings
+            .iter()
+            .any(|item| item == media_setting)
+    {
+        return Err("Choose a media setting that belongs to this printer.".into());
+    }
+    if !quality_mode.trim().is_empty()
+        && !printer.supported_quality_modes.is_empty()
+        && !printer
+            .supported_quality_modes
+            .iter()
+            .any(|item| item == quality_mode)
+    {
+        return Err("Choose a quality mode that belongs to this printer.".into());
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+struct ValidatedPrinterPaperPreset {
+    media_setting: String,
+    quality_mode: String,
+    total_ink_limit_percent: Option<u32>,
+    black_ink_limit_percent: Option<u32>,
+}
+
+fn validate_printer_paper_preset(
+    printer: &PrinterRecord,
+    media_setting: String,
+    quality_mode: String,
+    total_ink_limit_percent: Option<u32>,
+    black_ink_limit_percent: Option<u32>,
+) -> EngineResult<ValidatedPrinterPaperPreset> {
+    if media_setting.is_empty() {
+        return Err("Choose a media setting before saving printer and paper settings.".into());
+    }
+    if quality_mode.is_empty() {
+        return Err("Choose a quality mode before saving printer and paper settings.".into());
+    }
+    if printer.supported_media_settings.is_empty()
+        || !printer
+            .supported_media_settings
+            .iter()
+            .any(|item| item == &media_setting)
+    {
+        return Err("Choose a media setting from this printer's saved media settings.".into());
+    }
+    if printer.supported_quality_modes.is_empty()
+        || !printer
+            .supported_quality_modes
+            .iter()
+            .any(|item| item == &quality_mode)
+    {
+        return Err("Choose a quality mode from this printer's saved quality modes.".into());
+    }
+    let total_ink_limit_percent =
+        validate_percent_limit(total_ink_limit_percent, 400, "total ink limit")?;
+    let black_ink_limit_percent =
+        validate_percent_limit(black_ink_limit_percent, 100, "black ink limit")?;
+    if black_ink_limit_percent.is_some() && !printer_has_black_channel(printer) {
+        return Err(
+            "Black ink limit is only available when the printer setup includes a black channel."
+                .into(),
+        );
+    }
+
+    Ok(ValidatedPrinterPaperPreset {
+        media_setting,
+        quality_mode,
+        total_ink_limit_percent,
+        black_ink_limit_percent,
+    })
+}
+
+fn validate_percent_limit(value: Option<u32>, max: u32, label: &str) -> EngineResult<Option<u32>> {
+    match value {
+        Some(value) if value == 0 || value > max => {
+            Err(format!("Choose a valid {label} between 1 and {max}%.").into())
+        }
+        Some(value) => Ok(Some(value)),
+        None => Ok(None),
+    }
+}
+
+fn printer_has_black_channel(printer: &PrinterRecord) -> bool {
+    colorant_family_has_black_channel(&printer.colorant_family, &printer.channel_labels)
+}
+
+fn colorant_family_has_black_channel(family: &ColorantFamily, channel_labels: &[String]) -> bool {
+    match family {
+        ColorantFamily::GrayK | ColorantFamily::Cmyk => true,
+        ColorantFamily::ExtendedN => channel_labels.iter().any(|label| {
+            let lowered = label.trim().to_ascii_lowercase();
+            lowered == "k" || lowered == "black"
+        }),
+        ColorantFamily::Rgb | ColorantFamily::Cmy => false,
     }
 }
 
@@ -2536,7 +3648,9 @@ fn job_timestamp_seed() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{InstrumentConnectionState, SaveNewProfileContextInput};
+    use crate::model::{
+        InstrumentConnectionState, PaperThicknessUnit, PaperWeightUnit, SaveNewProfileContextInput,
+    };
     use tempfile::tempdir;
 
     fn build_config(root: &Path) -> EngineConfig {
@@ -2552,6 +3666,26 @@ mod tests {
         }
     }
 
+    fn sample_paper_input() -> CreatePaperInput {
+        CreatePaperInput {
+            manufacturer: "Canson".to_string(),
+            paper_line: "Rag".to_string(),
+            surface_class: "Matte".to_string(),
+            basis_weight_value: "310".to_string(),
+            basis_weight_unit: PaperWeightUnit::Gsm,
+            thickness_value: String::new(),
+            thickness_unit: PaperThicknessUnit::Unspecified,
+            surface_texture: "Smooth".to_string(),
+            base_material: "Cotton rag".to_string(),
+            media_color: "White".to_string(),
+            opacity: "98%".to_string(),
+            whiteness: "89".to_string(),
+            oba_content: "Low OBA".to_string(),
+            ink_compatibility: "Pigment".to_string(),
+            notes: String::new(),
+        }
+    }
+
     #[test]
     fn dashboard_snapshot_returns_persisted_jobs() {
         let temp = tempdir().unwrap();
@@ -2562,9 +3696,14 @@ mod tests {
         let printer = create_printer(
             &config.database_path,
             &CreatePrinterInput {
-                make_model: "Epson P900".to_string(),
+                manufacturer: "Epson".to_string(),
+                model: "P900".to_string(),
                 nickname: "P900".to_string(),
                 transport_style: "Sheet-fed".to_string(),
+                colorant_family: ColorantFamily::Cmyk,
+                channel_count: 4,
+                channel_labels: Vec::new(),
+                supported_media_settings: vec!["Premium Luster".to_string()],
                 supported_quality_modes: vec!["1440 dpi".to_string()],
                 monochrome_path_notes: "".to_string(),
                 notes: "".to_string(),
@@ -2574,11 +3713,8 @@ mod tests {
         let paper = create_paper(
             &config.database_path,
             &CreatePaperInput {
-                vendor_product_name: "Canson Rag".to_string(),
-                surface_class: "Matte".to_string(),
-                weight_thickness: "".to_string(),
-                oba_fluorescence_notes: "".to_string(),
                 notes: "".to_string(),
+                ..sample_paper_input()
             },
         )
         .unwrap();
@@ -2600,6 +3736,8 @@ mod tests {
                 profile_name: "P900 Rag v1".to_string(),
                 printer_id: Some(printer.id.clone()),
                 paper_id: Some(paper.id.clone()),
+                printer_paper_preset_id: None,
+                print_path: "Canon driver".to_string(),
                 media_setting: "Premium Luster".to_string(),
                 quality_mode: "1440 dpi".to_string(),
                 print_path_notes: "".to_string(),
@@ -2741,6 +3879,98 @@ mod tests {
     }
 
     #[test]
+    fn migration_backfills_paper_identity_without_guessing_specs() {
+        let temp = tempdir().unwrap();
+        let database_path = temp.path().join("legacy-paper.sqlite");
+        let connection = Connection::open(&database_path).unwrap();
+
+        connection
+            .execute_batch(
+                r#"
+                CREATE TABLE app_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE toolchain_status_cache (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    state TEXT NOT NULL,
+                    resolved_install_path TEXT,
+                    discovered_executables TEXT NOT NULL,
+                    missing_executables TEXT NOT NULL,
+                    last_validation_time TEXT
+                );
+                CREATE TABLE papers (
+                    id TEXT PRIMARY KEY,
+                    vendor TEXT NOT NULL DEFAULT '',
+                    product_name TEXT NOT NULL DEFAULT '',
+                    surface_class TEXT NOT NULL DEFAULT '',
+                    weight_thickness TEXT NOT NULL DEFAULT '',
+                    oba_fluorescence_notes TEXT NOT NULL DEFAULT '',
+                    notes TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                PRAGMA user_version = 4;
+                INSERT INTO papers (
+                    id,
+                    vendor,
+                    product_name,
+                    surface_class,
+                    weight_thickness,
+                    oba_fluorescence_notes,
+                    notes,
+                    created_at,
+                    updated_at
+                )
+                VALUES (
+                    'paper-1',
+                    'Canson',
+                    'Rag Photographique',
+                    'Matte',
+                    '310 gsm / 0.47 mm',
+                    'Low OBA',
+                    'Gallery stock',
+                    '2026-04-19T00:00:00Z',
+                    '2026-04-19T00:00:00Z'
+                );
+                "#,
+            )
+            .unwrap();
+
+        let config = EngineConfig {
+            app_support_path: temp
+                .path()
+                .join("app-support")
+                .to_string_lossy()
+                .to_string(),
+            database_path: database_path.to_string_lossy().to_string(),
+            log_path: temp
+                .path()
+                .join("logs/engine.log")
+                .to_string_lossy()
+                .to_string(),
+            argyll_override_path: None,
+            additional_search_roots: Vec::new(),
+        };
+
+        initialize_database(&config).unwrap();
+
+        let paper = list_papers(&config.database_path).unwrap().remove(0);
+        assert_eq!(paper.manufacturer, "Canson");
+        assert_eq!(paper.paper_line, "Rag Photographique");
+        assert_eq!(paper.oba_content, "Low OBA");
+        assert_eq!(paper.basis_weight_value, "");
+        assert_eq!(paper.thickness_value, "");
+        assert!(paper.notes.contains("Gallery stock"));
+        assert!(
+            paper
+                .notes
+                .contains("Legacy weight/thickness: 310 gsm / 0.47 mm")
+        );
+    }
+
+    #[test]
     fn printer_and_paper_round_trip() {
         let temp = tempdir().unwrap();
         let config = build_config(temp.path());
@@ -2750,26 +3980,21 @@ mod tests {
         let printer = create_printer(
             &config.database_path,
             &CreatePrinterInput {
-                make_model: "Epson P900".to_string(),
+                manufacturer: "Epson".to_string(),
+                model: "P900".to_string(),
                 nickname: "Studio P900".to_string(),
                 transport_style: "Sheet-fed".to_string(),
+                colorant_family: ColorantFamily::Cmyk,
+                channel_count: 4,
+                channel_labels: Vec::new(),
+                supported_media_settings: vec!["Premium Luster".to_string()],
                 supported_quality_modes: vec!["1440 dpi".to_string(), "2880 dpi".to_string()],
                 monochrome_path_notes: "ABW".to_string(),
                 notes: "North wall".to_string(),
             },
         )
         .unwrap();
-        let paper = create_paper(
-            &config.database_path,
-            &CreatePaperInput {
-                vendor_product_name: "Canson Rag".to_string(),
-                surface_class: "Matte".to_string(),
-                weight_thickness: "310 gsm".to_string(),
-                oba_fluorescence_notes: "Low OBA".to_string(),
-                notes: "".to_string(),
-            },
-        )
-        .unwrap();
+        let paper = create_paper(&config.database_path, &sample_paper_input()).unwrap();
 
         let printers = list_printers(&config.database_path).unwrap();
         let papers = list_papers(&config.database_path).unwrap();
@@ -2778,5 +4003,183 @@ mod tests {
         assert_eq!(papers.len(), 1);
         assert_eq!(printers[0].id, printer.id);
         assert_eq!(papers[0].id, paper.id);
+        assert_eq!(papers[0].manufacturer, "Canson");
+        assert_eq!(papers[0].paper_line, "Rag");
+        assert_eq!(papers[0].basis_weight_unit, PaperWeightUnit::Gsm);
+
+        let updated = update_paper(
+            &config.database_path,
+            &UpdatePaperInput {
+                id: paper.id.clone(),
+                manufacturer: "Hahnemuhle".to_string(),
+                paper_line: "William Turner".to_string(),
+                surface_class: "Matte".to_string(),
+                basis_weight_value: "310".to_string(),
+                basis_weight_unit: PaperWeightUnit::Gsm,
+                thickness_value: "0.62".to_string(),
+                thickness_unit: PaperThicknessUnit::Mm,
+                surface_texture: "Textured".to_string(),
+                base_material: "100% cotton".to_string(),
+                media_color: "White".to_string(),
+                opacity: "99%".to_string(),
+                whiteness: "88.5".to_string(),
+                oba_content: "None".to_string(),
+                ink_compatibility: "Pigment".to_string(),
+                notes: "Archive stock".to_string(),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(updated.manufacturer, "Hahnemuhle");
+        assert_eq!(updated.paper_line, "William Turner");
+        assert_eq!(updated.thickness_unit, PaperThicknessUnit::Mm);
+        assert_eq!(updated.surface_texture, "Textured");
+    }
+
+    #[test]
+    fn preset_round_trip_and_job_snapshots_remain_stable_after_updates() {
+        let temp = tempdir().unwrap();
+        let config = build_config(temp.path());
+        std::fs::create_dir_all(temp.path().join("app-support")).unwrap();
+        initialize_database(&config).unwrap();
+
+        let printer = create_printer(
+            &config.database_path,
+            &CreatePrinterInput {
+                manufacturer: "Epson".to_string(),
+                model: "P900".to_string(),
+                nickname: "Studio P900".to_string(),
+                transport_style: "Sheet-fed".to_string(),
+                colorant_family: ColorantFamily::Cmyk,
+                channel_count: 4,
+                channel_labels: Vec::new(),
+                supported_media_settings: vec![
+                    "Premium Luster".to_string(),
+                    "Ultra Premium Presentation Matte".to_string(),
+                ],
+                supported_quality_modes: vec!["1440 dpi".to_string(), "2880 dpi".to_string()],
+                monochrome_path_notes: "ABW".to_string(),
+                notes: String::new(),
+            },
+        )
+        .unwrap();
+        let paper = create_paper(&config.database_path, &sample_paper_input()).unwrap();
+        let preset = create_printer_paper_preset(
+            &config.database_path,
+            &CreatePrinterPaperPresetInput {
+                printer_id: printer.id.clone(),
+                paper_id: paper.id.clone(),
+                label: "Studio Matte".to_string(),
+                print_path: "Mirage".to_string(),
+                media_setting: "Premium Luster".to_string(),
+                quality_mode: "1440 dpi".to_string(),
+                total_ink_limit_percent: Some(280),
+                black_ink_limit_percent: Some(90),
+                notes: "Primary path".to_string(),
+            },
+        )
+        .unwrap();
+
+        let presets = list_printer_paper_presets(&config.database_path).unwrap();
+        assert_eq!(presets.len(), 1);
+        assert_eq!(presets[0].id, preset.id);
+
+        let job = create_new_profile_draft(
+            &config.database_path,
+            &config.app_support_path,
+            &CreateNewProfileDraftInput {
+                profile_name: Some("P900 Rag v1".to_string()),
+                printer_id: Some(printer.id.clone()),
+                paper_id: Some(paper.id.clone()),
+            },
+        )
+        .unwrap();
+        save_new_profile_context(
+            &config.database_path,
+            &SaveNewProfileContextInput {
+                job_id: job.id.clone(),
+                profile_name: "P900 Rag v1".to_string(),
+                printer_id: Some(printer.id.clone()),
+                paper_id: Some(paper.id.clone()),
+                printer_paper_preset_id: Some(preset.id.clone()),
+                print_path: preset.print_path.clone(),
+                media_setting: preset.media_setting.clone(),
+                quality_mode: preset.quality_mode.clone(),
+                print_path_notes: "Rear tray".to_string(),
+                measurement_notes: String::new(),
+                measurement_observer: "1931_2".to_string(),
+                measurement_illuminant: "D50".to_string(),
+                measurement_mode: MeasurementMode::Strip,
+            },
+        )
+        .unwrap();
+
+        update_printer(
+            &config.database_path,
+            &UpdatePrinterInput {
+                id: printer.id.clone(),
+                manufacturer: "Epson".to_string(),
+                model: "P900".to_string(),
+                nickname: "Studio P900".to_string(),
+                transport_style: "Sheet-fed".to_string(),
+                colorant_family: ColorantFamily::ExtendedN,
+                channel_count: 6,
+                channel_labels: vec![
+                    "C".to_string(),
+                    "M".to_string(),
+                    "Y".to_string(),
+                    "K".to_string(),
+                    "Lc".to_string(),
+                    "Lm".to_string(),
+                ],
+                supported_media_settings: vec![
+                    "Premium Luster".to_string(),
+                    "Ultra Premium Presentation Matte".to_string(),
+                ],
+                supported_quality_modes: vec!["1440 dpi".to_string(), "2880 dpi".to_string()],
+                monochrome_path_notes: "ABW".to_string(),
+                notes: String::new(),
+            },
+        )
+        .unwrap();
+        update_printer_paper_preset(
+            &config.database_path,
+            &UpdatePrinterPaperPresetInput {
+                id: preset.id.clone(),
+                printer_id: printer.id.clone(),
+                paper_id: paper.id.clone(),
+                label: "Studio Matte".to_string(),
+                print_path: "Photoshop -> Canon driver".to_string(),
+                media_setting: "Ultra Premium Presentation Matte".to_string(),
+                quality_mode: "2880 dpi".to_string(),
+                total_ink_limit_percent: Some(300),
+                black_ink_limit_percent: Some(95),
+                notes: "Updated path".to_string(),
+            },
+        )
+        .unwrap();
+
+        let detail = load_new_profile_job_detail(&config.database_path, &job.id).unwrap();
+        assert_eq!(
+            detail.context.printer_paper_preset_id,
+            Some(preset.id.clone())
+        );
+        assert_eq!(detail.context.print_path, "Mirage");
+        assert_eq!(detail.context.media_setting, "Premium Luster");
+        assert_eq!(detail.context.quality_mode, "1440 dpi");
+        assert_eq!(detail.context.colorant_family, ColorantFamily::Cmyk);
+        assert_eq!(detail.context.channel_count, 4);
+        assert_eq!(detail.context.total_ink_limit_percent, Some(280));
+        assert_eq!(detail.context.black_ink_limit_percent, Some(90));
+
+        let runner_context =
+            load_new_profile_runner_context(&config.database_path, &job.id).unwrap();
+        assert_eq!(runner_context.colorant_family, ColorantFamily::Cmyk);
+        assert_eq!(runner_context.channel_count, 4);
+        assert_eq!(runner_context.print_path, "Mirage");
+        assert_eq!(runner_context.media_setting, "Premium Luster");
+        assert_eq!(runner_context.quality_mode, "1440 dpi");
+        assert_eq!(runner_context.total_ink_limit_percent, Some(280));
+        assert_eq!(runner_context.black_ink_limit_percent, Some(90));
     }
 }

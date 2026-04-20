@@ -1,7 +1,8 @@
 use crate::db;
 use crate::logging;
 use crate::model::{
-    CommandStream, MeasurementMode, ReviewSummaryRecord, ToolchainStatus, WorkflowStage,
+    ColorantFamily, CommandStream, MeasurementMode, ReviewSummaryRecord, ToolchainStatus,
+    WorkflowStage,
 };
 use crate::support::EngineResult;
 use crate::support::ensure_directory;
@@ -65,24 +66,7 @@ fn run_generate_target(
     let targen_path = resolve_executable_path(toolchain_status, "targen")?;
     let printtarg_path = resolve_executable_path(toolchain_status, "printtarg")?;
 
-    let mut targen_args = vec![
-        "-v".to_string(),
-        "-G".to_string(),
-        "-d4".to_string(),
-        "-f".to_string(),
-        context.patch_count.to_string(),
-    ];
-    if context.improve_neutrals {
-        targen_args.push("-n".to_string());
-        targen_args.push("16".to_string());
-        targen_args.push("-N".to_string());
-        targen_args.push("0.75".to_string());
-    }
-    if let Some(planning_profile_path) = &context.planning_profile_path {
-        targen_args.push("-c".to_string());
-        targen_args.push(planning_profile_path.clone());
-    }
-    targen_args.push(basename.to_string_lossy().to_string());
+    let targen_args = build_targen_args(context, &basename);
 
     run_command_with_transcript(
         config,
@@ -94,17 +78,7 @@ fn run_generate_target(
         Some(Path::new(&context.workspace_path)),
     )?;
 
-    let mut printtarg_args = vec![
-        "-v".to_string(),
-        "-p".to_string(),
-        "A4".to_string(),
-        "-T".to_string(),
-        "300".to_string(),
-    ];
-    if matches!(context.measurement_mode, MeasurementMode::ScanFile) {
-        printtarg_args.push("-s".to_string());
-    }
-    printtarg_args.push(basename.to_string_lossy().to_string());
+    let printtarg_args = build_printtarg_args(context, &basename);
 
     run_command_with_transcript(
         config,
@@ -258,18 +232,7 @@ fn run_build_profile(
     let colprof_path = resolve_executable_path(toolchain_status, "colprof")?;
     let profcheck_path = resolve_executable_path(toolchain_status, "profcheck")?;
 
-    let colprof_args = vec![
-        "-v".to_string(),
-        "-D".to_string(),
-        context.profile_name.clone(),
-        "-A".to_string(),
-        context.printer_name.clone(),
-        "-M".to_string(),
-        context.paper_name.clone(),
-        "-O".to_string(),
-        profile_path.to_string_lossy().to_string(),
-        basename.to_string_lossy().to_string(),
-    ];
+    let colprof_args = build_colprof_args(context, &basename, &profile_path);
     run_command_with_transcript(
         config,
         context,
@@ -522,11 +485,7 @@ fn build_review_summary(
     ReviewSummaryRecord {
         result,
         verified_against_file: measurement_path.to_string(),
-        print_settings: format!(
-            "{} | {}",
-            blank_fallback(&context.media_setting, "Media setting not recorded"),
-            blank_fallback(&context.quality_mode, "Quality mode not recorded")
-        ),
+        print_settings: build_print_settings_summary(context),
         last_verification_date: Some(crate::support::iso_timestamp()),
         average_de00,
         maximum_de00,
@@ -579,10 +538,328 @@ fn blank_fallback(value: &str, fallback: &str) -> String {
     }
 }
 
+fn blank_metadata(primary: &str, fallback: &str) -> String {
+    let trimmed_primary = primary.trim();
+    if trimmed_primary.is_empty() {
+        fallback.trim().to_string()
+    } else {
+        trimmed_primary.to_string()
+    }
+}
+
+fn build_print_settings_summary(context: &db::NewProfileRunnerContext) -> String {
+    let mut parts = Vec::new();
+    if !context.print_path.trim().is_empty() {
+        parts.push(context.print_path.trim().to_string());
+    }
+    parts.push(blank_fallback(
+        &context.media_setting,
+        "Media setting not recorded",
+    ));
+    parts.push(blank_fallback(
+        &context.quality_mode,
+        "Quality mode not recorded",
+    ));
+    parts.push(channel_setup_label(context));
+
+    let options_suffix = build_options_suffix(context);
+    if options_suffix.is_empty() {
+        parts.join(" | ")
+    } else {
+        format!("{}{}", parts.join(" | "), options_suffix)
+    }
+}
+
+fn build_targen_args(context: &db::NewProfileRunnerContext, basename: &Path) -> Vec<String> {
+    let mut targen_args = vec![
+        "-v".to_string(),
+        "-G".to_string(),
+        format!("-d{}", targen_device_code(context)),
+        "-f".to_string(),
+        context.patch_count.to_string(),
+    ];
+    if let Some(total_ink_limit_percent) = context.total_ink_limit_percent {
+        targen_args.push("-l".to_string());
+        targen_args.push(total_ink_limit_percent.to_string());
+    }
+    if context.improve_neutrals {
+        targen_args.push("-n".to_string());
+        targen_args.push("16".to_string());
+        targen_args.push("-N".to_string());
+        targen_args.push("0.75".to_string());
+    }
+    if let Some(planning_profile_path) = &context.planning_profile_path {
+        targen_args.push("-c".to_string());
+        targen_args.push(planning_profile_path.clone());
+    }
+    targen_args.push(basename.to_string_lossy().to_string());
+    targen_args
+}
+
+fn build_printtarg_args(context: &db::NewProfileRunnerContext, basename: &Path) -> Vec<String> {
+    let mut printtarg_args = vec![
+        "-v".to_string(),
+        "-p".to_string(),
+        "A4".to_string(),
+        "-T".to_string(),
+        "300".to_string(),
+    ];
+    if matches!(context.measurement_mode, MeasurementMode::ScanFile) {
+        printtarg_args.push("-s".to_string());
+    }
+    if context.channel_count > 4 {
+        printtarg_args.push("-N".to_string());
+    }
+    printtarg_args.push(basename.to_string_lossy().to_string());
+    printtarg_args
+}
+
+fn build_colprof_args(
+    context: &db::NewProfileRunnerContext,
+    basename: &Path,
+    profile_path: &Path,
+) -> Vec<String> {
+    let mut colprof_args = vec![
+        "-v".to_string(),
+        "-D".to_string(),
+        context.profile_name.clone(),
+        "-A".to_string(),
+        blank_metadata(&context.printer_manufacturer, &context.printer_name),
+        "-M".to_string(),
+        blank_metadata(&context.printer_model, &context.printer_name),
+        "-O".to_string(),
+        profile_path.to_string_lossy().to_string(),
+    ];
+    if let Some(total_ink_limit_percent) = context.total_ink_limit_percent {
+        colprof_args.push("-l".to_string());
+        colprof_args.push(total_ink_limit_percent.to_string());
+    }
+    if let Some(black_ink_limit_percent) = context.black_ink_limit_percent
+        && has_black_channel(context)
+    {
+        colprof_args.push("-L".to_string());
+        colprof_args.push(black_ink_limit_percent.to_string());
+    }
+    colprof_args.push(basename.to_string_lossy().to_string());
+    colprof_args
+}
+
+fn targen_device_code(context: &db::NewProfileRunnerContext) -> u32 {
+    match context.colorant_family {
+        ColorantFamily::GrayK => 0,
+        ColorantFamily::Rgb => 2,
+        ColorantFamily::Cmy => 5,
+        ColorantFamily::Cmyk => 4,
+        ColorantFamily::ExtendedN => context.channel_count.max(6),
+    }
+}
+
+fn channel_setup_label(context: &db::NewProfileRunnerContext) -> String {
+    match context.colorant_family {
+        ColorantFamily::GrayK => "Gray/K (1 channel)".to_string(),
+        ColorantFamily::Rgb => "RGB (3 channels)".to_string(),
+        ColorantFamily::Cmy => "CMY (3 channels)".to_string(),
+        ColorantFamily::Cmyk => "CMYK (4 channels)".to_string(),
+        ColorantFamily::ExtendedN => {
+            if context.channel_labels.is_empty() {
+                format!("Extended N-color ({} channels)", context.channel_count)
+            } else {
+                format!(
+                    "Extended N-color ({} channels: {})",
+                    context.channel_count,
+                    context.channel_labels.join(", ")
+                )
+            }
+        }
+    }
+}
+
+fn build_options_suffix(context: &db::NewProfileRunnerContext) -> String {
+    let mut parts = Vec::new();
+    if let Some(total_ink_limit_percent) = context.total_ink_limit_percent {
+        parts.push(format!("TAC {}%", total_ink_limit_percent));
+    }
+    if let Some(black_ink_limit_percent) = context.black_ink_limit_percent {
+        parts.push(format!("Black {}%", black_ink_limit_percent));
+    }
+    if parts.is_empty() {
+        String::new()
+    } else {
+        format!(" | {}", parts.join(" | "))
+    }
+}
+
+fn has_black_channel(context: &db::NewProfileRunnerContext) -> bool {
+    match context.colorant_family {
+        ColorantFamily::GrayK | ColorantFamily::Cmyk => true,
+        ColorantFamily::ExtendedN => context.channel_labels.iter().any(|label| {
+            let lowered = label.trim().to_ascii_lowercase();
+            lowered == "k" || lowered == "black"
+        }),
+        ColorantFamily::Rgb | ColorantFamily::Cmy => false,
+    }
+}
+
 fn error_stage(task: &JobTask) -> WorkflowStage {
     match task {
         JobTask::GenerateTarget => WorkflowStage::Target,
         JobTask::MeasureTarget => WorkflowStage::Measure,
         JobTask::BuildProfile => WorkflowStage::Build,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_context() -> db::NewProfileRunnerContext {
+        db::NewProfileRunnerContext {
+            job_id: "job-1".to_string(),
+            title: "P900 Rag v1".to_string(),
+            profile_name: "P900 Rag v1".to_string(),
+            printer_name: "Studio P900".to_string(),
+            printer_manufacturer: "Epson".to_string(),
+            printer_model: "SureColor P900".to_string(),
+            workspace_path: "/tmp/job-1".to_string(),
+            print_path: "Mirage".to_string(),
+            media_setting: "Premium Luster".to_string(),
+            quality_mode: "1440 dpi".to_string(),
+            colorant_family: ColorantFamily::Cmyk,
+            channel_count: 4,
+            channel_labels: Vec::new(),
+            total_ink_limit_percent: None,
+            black_ink_limit_percent: None,
+            measurement_observer: "1931_2".to_string(),
+            measurement_mode: MeasurementMode::Strip,
+            patch_count: 928,
+            improve_neutrals: true,
+            planning_profile_path: None,
+            measurement_source_path: Some("/tmp/job-1/measurements.ti3".to_string()),
+            scan_file_path: None,
+            has_measurement_checkpoint: false,
+        }
+    }
+
+    #[test]
+    fn targen_args_follow_argyll_channel_device_codes() {
+        let basename = Path::new("job-1/profile");
+        let cases = [
+            (ColorantFamily::GrayK, 1, Vec::new(), "-d0"),
+            (ColorantFamily::Rgb, 3, Vec::new(), "-d2"),
+            (ColorantFamily::Cmy, 3, Vec::new(), "-d5"),
+            (ColorantFamily::Cmyk, 4, Vec::new(), "-d4"),
+            (
+                ColorantFamily::ExtendedN,
+                6,
+                vec![
+                    "C".to_string(),
+                    "M".to_string(),
+                    "Y".to_string(),
+                    "K".to_string(),
+                ],
+                "-d6",
+            ),
+        ];
+
+        for (family, channel_count, channel_labels, expected_device_arg) in cases {
+            let mut context = sample_context();
+            context.colorant_family = family;
+            context.channel_count = channel_count;
+            context.channel_labels = channel_labels;
+            let args = build_targen_args(&context, basename);
+
+            assert!(
+                args.iter().any(|arg| arg == expected_device_arg),
+                "missing {expected_device_arg} in {:?}",
+                args
+            );
+        }
+    }
+
+    #[test]
+    fn targen_legacy_cmyk_context_stays_on_current_default_device_code() {
+        let args = build_targen_args(&sample_context(), Path::new("job-1/profile"));
+        assert!(args.iter().any(|arg| arg == "-d4"));
+    }
+
+    #[test]
+    fn colprof_args_use_structured_metadata_and_limit_flags() {
+        let basename = Path::new("job-1/profile");
+        let profile_path = Path::new("/tmp/job-1/profile.icc");
+
+        let mut cmyk_context = sample_context();
+        cmyk_context.total_ink_limit_percent = Some(280);
+        cmyk_context.black_ink_limit_percent = Some(90);
+        let cmyk_args = build_colprof_args(&cmyk_context, basename, profile_path);
+        assert!(
+            cmyk_args
+                .windows(2)
+                .any(|pair| pair[0] == "-A" && pair[1] == "Epson")
+        );
+        assert!(
+            cmyk_args
+                .windows(2)
+                .any(|pair| pair[0] == "-M" && pair[1] == "SureColor P900")
+        );
+        assert!(
+            cmyk_args
+                .windows(2)
+                .any(|pair| pair[0] == "-l" && pair[1] == "280")
+        );
+        assert!(
+            cmyk_args
+                .windows(2)
+                .any(|pair| pair[0] == "-L" && pair[1] == "90")
+        );
+
+        let mut rgb_context = sample_context();
+        rgb_context.colorant_family = ColorantFamily::Rgb;
+        rgb_context.channel_count = 3;
+        rgb_context.total_ink_limit_percent = Some(240);
+        rgb_context.black_ink_limit_percent = Some(75);
+        let rgb_args = build_colprof_args(&rgb_context, basename, profile_path);
+        assert!(
+            rgb_args
+                .windows(2)
+                .any(|pair| pair[0] == "-l" && pair[1] == "240")
+        );
+        assert!(!rgb_args.iter().any(|arg| arg == "-L"));
+
+        let mut extended_context = sample_context();
+        extended_context.colorant_family = ColorantFamily::ExtendedN;
+        extended_context.channel_count = 6;
+        extended_context.channel_labels = vec![
+            "C".to_string(),
+            "M".to_string(),
+            "Y".to_string(),
+            "K".to_string(),
+            "Lc".to_string(),
+            "Lm".to_string(),
+        ];
+        extended_context.black_ink_limit_percent = Some(85);
+        let extended_args = build_colprof_args(&extended_context, basename, profile_path);
+        assert!(
+            extended_args
+                .windows(2)
+                .any(|pair| pair[0] == "-L" && pair[1] == "85")
+        );
+    }
+
+    #[test]
+    fn print_path_is_context_only_and_does_not_change_command_args() {
+        let basename = Path::new("job-1/profile");
+        let profile_path = Path::new("/tmp/job-1/profile.icc");
+        let mut context = sample_context();
+        let baseline_targen = build_targen_args(&context, basename);
+        let baseline_colprof = build_colprof_args(&context, basename, profile_path);
+
+        context.print_path = "Photoshop -> Canon driver".to_string();
+
+        assert_eq!(build_targen_args(&context, basename), baseline_targen);
+        assert_eq!(
+            build_colprof_args(&context, basename, profile_path),
+            baseline_colprof
+        );
+        assert!(build_print_settings_summary(&context).starts_with("Photoshop -> Canon driver |"));
     }
 }

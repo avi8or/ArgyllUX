@@ -28,6 +28,8 @@
 		A10000000000000000000013 /* FooterStatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* FooterStatusBarView.swift */; };
 		A10000000000000000000014 /* LogViewerSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* LogViewerSheetView.swift */; };
 		A10000000000000000000015 /* CliTranscriptWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* CliTranscriptWindowView.swift */; };
+		A10000000000000000000016 /* AppTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* AppTypography.swift */; };
+		A10000000000000000000017 /* OperationalDetailRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* OperationalDetailRow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -64,6 +66,8 @@
 		A20000000000000000000015 /* FooterStatusBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FooterStatusBarView.swift; sourceTree = "<group>"; };
 		A20000000000000000000016 /* LogViewerSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogViewerSheetView.swift; sourceTree = "<group>"; };
 		A20000000000000000000017 /* CliTranscriptWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CliTranscriptWindowView.swift; sourceTree = "<group>"; };
+		A20000000000000000000018 /* AppTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTypography.swift; sourceTree = "<group>"; };
+		A20000000000000000000019 /* OperationalDetailRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationalDetailRow.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -173,6 +177,7 @@
 				A20000000000000000000015 /* FooterStatusBarView.swift */,
 				A20000000000000000000016 /* LogViewerSheetView.swift */,
 				A20000000000000000000017 /* CliTranscriptWindowView.swift */,
+				A20000000000000000000019 /* OperationalDetailRow.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -180,6 +185,7 @@
 		A7000000000000000000000A /* Support */ = {
 			isa = PBXGroup;
 			children = (
+				A20000000000000000000018 /* AppTypography.swift */,
 				A20000000000000000000007 /* PathSelection.swift */,
 			);
 			path = Support;
@@ -333,6 +339,8 @@
 				A10000000000000000000013 /* FooterStatusBarView.swift in Sources */,
 				A10000000000000000000014 /* LogViewerSheetView.swift in Sources */,
 				A10000000000000000000015 /* CliTranscriptWindowView.swift in Sources */,
+				A10000000000000000000016 /* AppTypography.swift in Sources */,
+				A10000000000000000000017 /* OperationalDetailRow.swift in Sources */,
 				A1000000000000000000000F /* argyllux.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

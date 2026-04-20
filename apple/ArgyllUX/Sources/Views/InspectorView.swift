@@ -19,9 +19,12 @@ struct InspectorView: View {
                     Text("Technical")
                         .font(.headline)
 
-                    detailRow(title: "Toolchain", value: technicalToolchainLabel)
-                    detailRow(title: "Last validation", value: toolchainStatus?.lastValidationTime ?? "Waiting for validation")
-                    detailRow(title: "Readiness", value: appHealth?.readiness.capitalized ?? "Blocked")
+                    OperationalDetailRow(title: "Toolchain", value: technicalToolchainLabel)
+                    OperationalDetailRow(
+                        title: "Last validation",
+                        value: toolchainStatus?.lastValidationTime ?? "Waiting for validation"
+                    )
+                    OperationalDetailRow(title: "Readiness", value: appHealth?.readiness.capitalized ?? "Blocked")
                 }
             }
             .padding(20)
@@ -50,14 +53,4 @@ struct InspectorView: View {
         }
     }
 
-    private func detailRow(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.subheadline)
-                .textSelection(.enabled)
-        }
-    }
 }

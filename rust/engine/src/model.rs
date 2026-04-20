@@ -45,6 +45,30 @@ pub enum MeasurementMode {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+pub enum ColorantFamily {
+    GrayK,
+    Rgb,
+    Cmy,
+    Cmyk,
+    ExtendedN,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+pub enum PaperWeightUnit {
+    Unspecified,
+    Gsm,
+    Lb,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+pub enum PaperThicknessUnit {
+    Unspecified,
+    Mil,
+    Mm,
+    Micron,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
 pub enum CommandRunState {
     Running,
     Succeeded,
@@ -150,9 +174,14 @@ pub struct DeleteJobResult {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct PrinterRecord {
     pub id: String,
-    pub make_model: String,
+    pub manufacturer: String,
+    pub model: String,
     pub nickname: String,
     pub transport_style: String,
+    pub colorant_family: ColorantFamily,
+    pub channel_count: u32,
+    pub channel_labels: Vec<String>,
+    pub supported_media_settings: Vec<String>,
     pub supported_quality_modes: Vec<String>,
     pub monochrome_path_notes: String,
     pub notes: String,
@@ -164,10 +193,37 @@ pub struct PrinterRecord {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct PaperRecord {
     pub id: String,
-    pub vendor_product_name: String,
+    pub manufacturer: String,
+    pub paper_line: String,
     pub surface_class: String,
-    pub weight_thickness: String,
-    pub oba_fluorescence_notes: String,
+    pub basis_weight_value: String,
+    pub basis_weight_unit: PaperWeightUnit,
+    pub thickness_value: String,
+    pub thickness_unit: PaperThicknessUnit,
+    pub surface_texture: String,
+    pub base_material: String,
+    pub media_color: String,
+    pub opacity: String,
+    pub whiteness: String,
+    pub oba_content: String,
+    pub ink_compatibility: String,
+    pub notes: String,
+    pub display_name: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct PrinterPaperPresetRecord {
+    pub id: String,
+    pub printer_id: String,
+    pub paper_id: String,
+    pub label: String,
+    pub print_path: String,
+    pub media_setting: String,
+    pub quality_mode: String,
+    pub total_ink_limit_percent: Option<u32>,
+    pub black_ink_limit_percent: Option<u32>,
     pub notes: String,
     pub display_name: String,
     pub created_at: String,
@@ -236,8 +292,15 @@ pub struct JobCommandRecord {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct NewProfileContextRecord {
+    pub printer_paper_preset_id: Option<String>,
+    pub print_path: String,
     pub media_setting: String,
     pub quality_mode: String,
+    pub colorant_family: ColorantFamily,
+    pub channel_count: u32,
+    pub channel_labels: Vec<String>,
+    pub total_ink_limit_percent: Option<u32>,
+    pub black_ink_limit_percent: Option<u32>,
     pub print_path_notes: String,
     pub measurement_notes: String,
     pub measurement_observer: String,
@@ -308,9 +371,14 @@ pub struct NewProfileJobDetail {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct CreatePrinterInput {
-    pub make_model: String,
+    pub manufacturer: String,
+    pub model: String,
     pub nickname: String,
     pub transport_style: String,
+    pub colorant_family: ColorantFamily,
+    pub channel_count: u32,
+    pub channel_labels: Vec<String>,
+    pub supported_media_settings: Vec<String>,
     pub supported_quality_modes: Vec<String>,
     pub monochrome_path_notes: String,
     pub notes: String,
@@ -319,9 +387,14 @@ pub struct CreatePrinterInput {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct UpdatePrinterInput {
     pub id: String,
-    pub make_model: String,
+    pub manufacturer: String,
+    pub model: String,
     pub nickname: String,
     pub transport_style: String,
+    pub colorant_family: ColorantFamily,
+    pub channel_count: u32,
+    pub channel_labels: Vec<String>,
+    pub supported_media_settings: Vec<String>,
     pub supported_quality_modes: Vec<String>,
     pub monochrome_path_notes: String,
     pub notes: String,
@@ -329,20 +402,67 @@ pub struct UpdatePrinterInput {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct CreatePaperInput {
-    pub vendor_product_name: String,
+    pub manufacturer: String,
+    pub paper_line: String,
     pub surface_class: String,
-    pub weight_thickness: String,
-    pub oba_fluorescence_notes: String,
+    pub basis_weight_value: String,
+    pub basis_weight_unit: PaperWeightUnit,
+    pub thickness_value: String,
+    pub thickness_unit: PaperThicknessUnit,
+    pub surface_texture: String,
+    pub base_material: String,
+    pub media_color: String,
+    pub opacity: String,
+    pub whiteness: String,
+    pub oba_content: String,
+    pub ink_compatibility: String,
     pub notes: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
 pub struct UpdatePaperInput {
     pub id: String,
-    pub vendor_product_name: String,
+    pub manufacturer: String,
+    pub paper_line: String,
     pub surface_class: String,
-    pub weight_thickness: String,
-    pub oba_fluorescence_notes: String,
+    pub basis_weight_value: String,
+    pub basis_weight_unit: PaperWeightUnit,
+    pub thickness_value: String,
+    pub thickness_unit: PaperThicknessUnit,
+    pub surface_texture: String,
+    pub base_material: String,
+    pub media_color: String,
+    pub opacity: String,
+    pub whiteness: String,
+    pub oba_content: String,
+    pub ink_compatibility: String,
+    pub notes: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct CreatePrinterPaperPresetInput {
+    pub printer_id: String,
+    pub paper_id: String,
+    pub label: String,
+    pub print_path: String,
+    pub media_setting: String,
+    pub quality_mode: String,
+    pub total_ink_limit_percent: Option<u32>,
+    pub black_ink_limit_percent: Option<u32>,
+    pub notes: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct UpdatePrinterPaperPresetInput {
+    pub id: String,
+    pub printer_id: String,
+    pub paper_id: String,
+    pub label: String,
+    pub print_path: String,
+    pub media_setting: String,
+    pub quality_mode: String,
+    pub total_ink_limit_percent: Option<u32>,
+    pub black_ink_limit_percent: Option<u32>,
     pub notes: String,
 }
 
@@ -359,6 +479,8 @@ pub struct SaveNewProfileContextInput {
     pub profile_name: String,
     pub printer_id: Option<String>,
     pub paper_id: Option<String>,
+    pub printer_paper_preset_id: Option<String>,
+    pub print_path: String,
     pub media_setting: String,
     pub quality_mode: String,
     pub print_path_notes: String,

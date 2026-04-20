@@ -48,7 +48,7 @@ struct NewProfileWorkflowView: View {
                     stageBadge(title: stageTitle(model.effectiveWorkflowStage), tone: stageTone(for: detail))
 
                     Text(detail.status)
-                        .font(.footnote)
+                        .font(AppTypography.shellUtility)
                         .foregroundStyle(.secondary)
 
                     if detail.isCommandRunning {
@@ -114,7 +114,7 @@ struct NewProfileWorkflowView: View {
                         Text(item.title)
                             .font(.headline)
                         Text(stageSummarySubtitle(item.state))
-                            .font(.caption)
+                            .font(AppTypography.trustSummarySupporting)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -186,7 +186,7 @@ struct NewProfileWorkflowView: View {
 
                     if let selectedPrinter = model.workflowSelectedPrinter {
                         Text(selectedPrinter.displayName)
-                            .font(.footnote)
+                            .font(AppTypography.trustSummarySupporting)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -229,7 +229,7 @@ struct NewProfileWorkflowView: View {
 
                     if let selectedPaper = model.workflowSelectedPaper {
                         Text(selectedPaper.displayName)
-                            .font(.footnote)
+                            .font(AppTypography.trustSummarySupporting)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -252,18 +252,104 @@ struct NewProfileWorkflowView: View {
             }
 
             workspaceSection("Printer and paper settings") {
-                TextField("Media setting / preset", text: $model.workflowMediaSetting)
-                    .textFieldStyle(.roundedBorder)
-
-                if model.workflowAvailableQualityModes.isEmpty {
-                    TextField("Quality mode / resolution", text: $model.workflowQualityMode)
-                        .textFieldStyle(.roundedBorder)
+                if model.workflowSelectedPrinterID == nil || model.workflowSelectedPaperID == nil {
+                    Text("Select a printer and paper before choosing saved print-path settings.")
+                        .foregroundStyle(.secondary)
                 } else {
-                    Picker("Quality mode / resolution", selection: $model.workflowQualityMode) {
-                        ForEach(model.workflowAvailableQualityModes, id: \.self) { mode in
-                            Text(mode).tag(mode)
+                    Picker(
+                        "Saved settings",
+                        selection: Binding(
+                            get: { model.workflowSelectedPrinterPaperPresetID ?? "" },
+                            set: { model.selectWorkflowPrinterPaperPreset($0.isEmpty ? nil : $0) }
+                        )
+                    ) {
+                        Text(model.workflowHasLegacyContextWithoutPreset ? "Keep Legacy Job Settings" : "Select Saved Settings").tag("")
+                        ForEach(model.workflowAvailablePrinterPaperPresets, id: \.id) { preset in
+                            Text(preset.displayName).tag(preset.id)
                         }
                     }
+
+                    HStack(spacing: 10) {
+                        Button(model.workflowHasLegacyContextWithoutPreset ? "Save Legacy Settings as Preset" : "New Printer and Paper Settings") {
+                            model.beginWorkflowPresetCreation()
+                        }
+                        .disabled(model.workflowSelectedPrinterID == nil || model.workflowSelectedPaperID == nil)
+
+                        if let preset = model.workflowSelectedPrinterPaperPreset {
+                            Text(preset.displayName)
+                                .font(AppTypography.trustSummarySupporting)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    if let preset = model.workflowSelectedPrinterPaperPreset {
+                        VStack(alignment: .leading, spacing: 8) {
+                            if !preset.printPath.isEmpty {
+                                Text(preset.printPath)
+                                    .font(.subheadline)
+                            }
+                            Text("\(preset.mediaSetting) / \(preset.qualityMode)")
+                                .font(.subheadline)
+                            Text(currentWorkflowChannelSummary(detail))
+                                .font(AppTypography.trustSummarySupporting)
+                                .foregroundStyle(.secondary)
+                            if let limits = workflowPresetLimitsSummary(preset) {
+                                Text(limits)
+                                    .font(AppTypography.trustSummarySupporting)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if !preset.notes.isEmpty {
+                                Text(preset.notes)
+                                    .font(AppTypography.trustSummarySupporting)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    } else if model.workflowHasLegacyContextWithoutPreset {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("This job still uses legacy saved values.")
+                                .font(.headline)
+                            if !model.workflowPrintPath.isEmpty {
+                                Text(model.workflowPrintPath)
+                                    .font(.subheadline)
+                            }
+                            Text("\(model.workflowMediaSetting) / \(model.workflowQualityMode)")
+                                .font(.subheadline)
+                            Text(currentWorkflowChannelSummary(detail))
+                                .font(AppTypography.trustSummarySupporting)
+                                .foregroundStyle(.secondary)
+                            Text("Create Printer and Paper Settings to keep using structured command defaults for this print path.")
+                                .font(AppTypography.trustSummarySupporting)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if model.workflowAvailablePrinterPaperPresets.isEmpty {
+                        Text("No saved printer and paper settings match this printer and paper yet.")
+                            .font(AppTypography.trustSummarySupporting)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if model.showWorkflowPresetForm {
+                        PrinterPaperPresetEditorForm(
+                            title: model.workflowPresetDraft.title,
+                            draft: $model.workflowPresetDraft,
+                            printers: model.printers,
+                            papers: model.papers,
+                            lockPrinterAndPaperSelection: true,
+                            saveTitle: "Save Settings",
+                            secondaryTitle: "Cancel",
+                            isSaveDisabled: !model.isWorkflowPresetDraftValid,
+                            onSave: {
+                                Task { await model.createWorkflowPreset() }
+                            },
+                            onSecondary: {
+                                model.cancelWorkflowPresetCreation()
+                            }
+                        )
+                    }
+                }
+
+                if model.showsWorkflowStandalonePrintPathEditor {
+                    TextField("Print path", text: $model.workflowPrintPath)
+                        .textFieldStyle(.roundedBorder)
                 }
 
                 TextField("Optional print-path notes", text: $model.workflowPrintPathNotes, axis: .vertical)
@@ -361,10 +447,10 @@ struct NewProfileWorkflowView: View {
 
     private func dryingWorkspace(_ detail: NewProfileJobDetail) -> some View {
         workspaceSection("Drying") {
-            detailRow(title: "Drying Time", value: "\(detail.printSettings.dryingTimeMinutes) minutes")
-            detailRow(title: "Printed at", value: detail.printSettings.printedAt ?? "Waiting")
-            detailRow(title: "Ready at", value: detail.printSettings.dryingReadyAt ?? "Waiting")
-            detailRow(title: "Countdown", value: dryingCountdown(detail))
+            OperationalDetailRow(title: "Drying Time", value: "\(detail.printSettings.dryingTimeMinutes) minutes")
+            OperationalDetailRow(title: "Printed at", value: detail.printSettings.printedAt ?? "Waiting")
+            OperationalDetailRow(title: "Ready at", value: detail.printSettings.dryingReadyAt ?? "Waiting")
+            OperationalDetailRow(title: "Countdown", value: dryingCountdown(detail))
 
             Button("Mark Ready to Measure") {
                 Task { await model.markReadyToMeasure() }
@@ -398,11 +484,14 @@ struct NewProfileWorkflowView: View {
                     }
                 }
 
-                detailRow(title: "Measurement source", value: detail.measurement.measurementSourcePath ?? "Not measured yet")
+                OperationalDetailRow(
+                    title: "Measurement source",
+                    value: detail.measurement.measurementSourcePath ?? "Not measured yet"
+                )
 
                 if detail.measurement.hasMeasurementCheckpoint {
                     Text("Resume Measurement is available.")
-                        .font(.footnote)
+                        .font(AppTypography.trustSummarySupporting)
                         .foregroundStyle(.secondary)
                 }
 
@@ -428,7 +517,10 @@ struct NewProfileWorkflowView: View {
         VStack(alignment: .leading, spacing: 18) {
             if detail.stage == .build || model.effectiveWorkflowStage == .build {
                 workspaceSection("Build") {
-                    detailRow(title: "Measurement source", value: detail.measurement.measurementSourcePath ?? "Not available")
+                    OperationalDetailRow(
+                        title: "Measurement source",
+                        value: detail.measurement.measurementSourcePath ?? "Not available"
+                    )
 
                     Button("Build Profile") {
                         Task { await model.buildProfile() }
@@ -439,21 +531,24 @@ struct NewProfileWorkflowView: View {
 
             workspaceSection("Review") {
                 if let review = detail.review {
-                    detailRow(title: "Result", value: review.result)
-                    detailRow(title: "Verified against file", value: review.verifiedAgainstFile)
-                    detailRow(title: "Print settings", value: review.printSettings)
-                    detailRow(title: "Last verification date", value: review.lastVerificationDate ?? "Not yet published")
+                    OperationalDetailRow(title: "Result", value: review.result)
+                    OperationalDetailRow(title: "Verified against file", value: review.verifiedAgainstFile)
+                    OperationalDetailRow(title: "Print settings", value: review.printSettings)
+                    OperationalDetailRow(
+                        title: "Last verification date",
+                        value: review.lastVerificationDate ?? "Not yet published"
+                    )
 
                     if let average = review.averageDe00 {
-                        detailRow(title: "Average dE00", value: String(format: "%.2f", average))
+                        OperationalDetailRow(title: "Average dE00", value: String(format: "%.2f", average))
                     }
 
                     if let maximum = review.maximumDe00 {
-                        detailRow(title: "Maximum dE00", value: String(format: "%.2f", maximum))
+                        OperationalDetailRow(title: "Maximum dE00", value: String(format: "%.2f", maximum))
                     }
 
                     if !review.notes.isEmpty {
-                        detailRow(title: "Notes", value: review.notes)
+                        OperationalDetailRow(title: "Notes", value: review.notes)
                     }
                 } else {
                     Text("Build the profile to populate the first review summary.")
@@ -462,10 +557,13 @@ struct NewProfileWorkflowView: View {
             }
 
             workspaceSection("Profile artifacts") {
-                detailRow(title: "Measurement source", value: detail.measurement.measurementSourcePath ?? "Not available")
+                OperationalDetailRow(
+                    title: "Measurement source",
+                    value: detail.measurement.measurementSourcePath ?? "Not available"
+                )
 
                 if let publishedProfileId = detail.publishedProfileId {
-                    detailRow(title: "Published profile", value: publishedProfileId)
+                    OperationalDetailRow(title: "Published profile", value: publishedProfileId)
                 }
 
                 artifactsList(detail.artifacts)
@@ -496,18 +594,21 @@ struct NewProfileWorkflowView: View {
                 Text("Technical")
                     .font(.headline)
 
-                detailRow(title: "Stage", value: stageTitle(detail.stage))
-                detailRow(title: "Workspace", value: detail.workspacePath)
-                detailRow(title: "Toolchain", value: model.argyllStatusLabel)
-                detailRow(title: "Measurement Mode", value: measurementModeLabel(model.workflowMeasurementMode))
-                detailRow(title: "Command state", value: detail.isCommandRunning ? "Running" : "Idle")
+                OperationalDetailRow(title: "Stage", value: stageTitle(detail.stage))
+                OperationalDetailRow(title: "Workspace", value: detail.workspacePath)
+                OperationalDetailRow(title: "Toolchain", value: model.argyllStatusLabel)
+                OperationalDetailRow(
+                    title: "Measurement Mode",
+                    value: measurementModeLabel(model.workflowMeasurementMode)
+                )
+                OperationalDetailRow(title: "Command state", value: detail.isCommandRunning ? "Running" : "Idle")
 
                 if detail.measurement.hasMeasurementCheckpoint {
-                    detailRow(title: "Measurement checkpoint", value: "Available")
+                    OperationalDetailRow(title: "Measurement checkpoint", value: "Available")
                 }
 
                 if let latestError = detail.latestError {
-                    detailRow(title: "Latest error", value: latestError)
+                    OperationalDetailRow(title: "Latest error", value: latestError)
                 }
             }
         }
@@ -527,7 +628,7 @@ struct NewProfileWorkflowView: View {
                             Text(artifact.label)
                                 .font(.headline)
                             Text(artifactSummary(artifact))
-                                .font(.footnote)
+                                .font(AppTypography.trustSummarySupporting)
                                 .foregroundStyle(.secondary)
                             if let path = artifact.path {
                                 Text(path)
@@ -569,17 +670,6 @@ struct NewProfileWorkflowView: View {
             Text(body)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-        }
-    }
-
-    private func detailRow(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.subheadline)
-                .textSelection(.enabled)
         }
     }
 
@@ -734,5 +824,28 @@ struct NewProfileWorkflowView: View {
         let minutes = remaining / 60
         let seconds = remaining % 60
         return String(format: "%02d:%02d remaining", minutes, seconds)
+    }
+
+    private func currentWorkflowChannelSummary(_ detail: NewProfileJobDetail) -> String {
+        if let printer = model.workflowSelectedPrinter {
+            return channelSetupSummary(printer.colorantFamily, printer.channelCount, printer.channelLabels)
+        }
+
+        return channelSetupSummary(
+            detail.context.colorantFamily,
+            detail.context.channelCount,
+            detail.context.channelLabels
+        )
+    }
+
+    private func workflowPresetLimitsSummary(_ preset: PrinterPaperPresetRecord) -> String? {
+        var parts: [String] = []
+        if let totalInkLimitPercent = preset.totalInkLimitPercent {
+            parts.append("TAC \(totalInkLimitPercent)%")
+        }
+        if let blackInkLimitPercent = preset.blackInkLimitPercent {
+            parts.append("Black \(blackInkLimitPercent)%")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " • ")
     }
 }

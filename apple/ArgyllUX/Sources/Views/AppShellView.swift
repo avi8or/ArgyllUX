@@ -116,7 +116,11 @@ struct AppShellView: View {
                 } label: {
                     Label(route.title, systemImage: route.symbolName)
                         .labelStyle(.titleAndIcon)
-                        .font(.subheadline.weight(isRouteHighlighted(route) ? .semibold : .regular))
+                        .font(
+                            isRouteHighlighted(route)
+                                ? AppTypography.shellNavigation.weight(.semibold)
+                                : AppTypography.shellNavigation
+                        )
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
                         .background(
@@ -160,9 +164,9 @@ struct AppShellView: View {
 
     private func utilityPill(title: String) -> some View {
         Text(title)
-            .font(.caption)
+            .font(AppTypography.shellUtility)
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 8)
             .padding(.vertical, 8)
             .background(Color.secondary.opacity(0.08), in: Capsule())
     }
@@ -203,7 +207,7 @@ struct PrinterProfilesView: View {
                                             .font(.subheadline)
                                             .foregroundStyle(.secondary)
                                         Text(profile.result)
-                                            .font(.footnote)
+                                            .font(AppTypography.trustSummarySupporting)
                                             .foregroundStyle(.secondary)
                                     }
                                     .padding(14)
@@ -232,16 +236,19 @@ struct PrinterProfilesView: View {
                         Text(profile.name)
                             .font(.title.weight(.semibold))
 
-                        profileDetailRow(title: "Printer", value: profile.printerName)
-                        profileDetailRow(title: "Paper", value: profile.paperName)
-                        profileDetailRow(title: "Result", value: profile.result)
-                        profileDetailRow(title: "Print settings", value: profile.printSettings)
-                        profileDetailRow(title: "Verified against file", value: profile.verifiedAgainstFile)
-                        profileDetailRow(title: "Last verification date", value: profile.lastVerificationDate ?? "Not yet verified")
-                        profileDetailRow(title: "ICC path", value: profile.profilePath)
-                        profileDetailRow(title: "Measurement path", value: profile.measurementPath)
-                        profileDetailRow(title: "Context", value: profile.contextStatus)
-                        profileDetailRow(title: "Created from job", value: profile.createdFromJobId)
+                        OperationalDetailRow(title: "Printer", value: profile.printerName)
+                        OperationalDetailRow(title: "Paper", value: profile.paperName)
+                        OperationalDetailRow(title: "Result", value: profile.result)
+                        OperationalDetailRow(title: "Print settings", value: profile.printSettings)
+                        OperationalDetailRow(title: "Verified against file", value: profile.verifiedAgainstFile)
+                        OperationalDetailRow(
+                            title: "Last verification date",
+                            value: profile.lastVerificationDate ?? "Not yet verified"
+                        )
+                        OperationalDetailRow(title: "ICC path", value: profile.profilePath)
+                        OperationalDetailRow(title: "Measurement path", value: profile.measurementPath)
+                        OperationalDetailRow(title: "Context", value: profile.contextStatus)
+                        OperationalDetailRow(title: "Created from job", value: profile.createdFromJobId)
 
                         HStack(spacing: 10) {
                             Button("Reveal ICC") {
@@ -264,17 +271,6 @@ struct PrinterProfilesView: View {
                 .padding(24)
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
-    }
-
-    private func profileDetailRow(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.subheadline)
-                .textSelection(.enabled)
         }
     }
 }

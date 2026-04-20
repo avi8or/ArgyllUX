@@ -297,8 +297,9 @@ struct AppModelTests {
         let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
         let printer = makePrinter()
         let paper = makePaper()
-        let draftDetail = makeJobDetail(stage: .context, nextAction: "Save Context", printer: printer, paper: paper)
-        let savedDetail = makeJobDetail(stage: .target, nextAction: "Generate Target", printer: printer, paper: paper)
+        let preset = makePreset(printerId: printer.id, paperId: paper.id)
+        let draftDetail = makeJobDetail(stage: .context, nextAction: "Save Context", printer: printer, paper: paper, preset: preset)
+        let savedDetail = makeJobDetail(stage: .target, nextAction: "Generate Target", printer: printer, paper: paper, preset: preset)
 
         let fakeEngine = FakeEngine()
         fakeEngine.toolchainStatusValue = makeToolchainStatus(state: .ready, path: "/opt/homebrew/bin")
@@ -306,6 +307,7 @@ struct AppModelTests {
         fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [makeActiveWorkItem(id: draftDetail.id)])
         fakeEngine.printersCurrent = [printer]
         fakeEngine.papersCurrent = [paper]
+        fakeEngine.printerPaperPresetsCurrent = [preset]
         fakeEngine.createNewProfileDraftResult = draftDetail
         fakeEngine.saveNewProfileContextResult = savedDetail
 
@@ -313,10 +315,7 @@ struct AppModelTests {
         await model.openNewProfileWorkflow()
 
         model.workflowProfileName = "P900 Rag v1"
-        model.workflowSelectedPrinterID = printer.id
-        model.workflowSelectedPaperID = paper.id
-        model.workflowMediaSetting = "Premium Luster"
-        model.workflowQualityMode = "1440 dpi"
+        model.workflowPrintPath = preset.printPath
         model.workflowPrintPathNotes = "Rear tray"
         model.workflowMeasurementNotes = "Warm up the instrument."
         model.workflowMeasurementObserver = "2"
@@ -328,9 +327,292 @@ struct AppModelTests {
         #expect(fakeEngine.lastSaveContextInput?.jobId == draftDetail.id)
         #expect(fakeEngine.lastSaveContextInput?.printerId == printer.id)
         #expect(fakeEngine.lastSaveContextInput?.paperId == paper.id)
+        #expect(fakeEngine.lastSaveContextInput?.printerPaperPresetId == preset.id)
+        #expect(fakeEngine.lastSaveContextInput?.printPath == preset.printPath)
         #expect(fakeEngine.lastSaveContextInput?.measurementMode == .patch)
         #expect(model.activeNewProfileDetail?.stage == .target)
         #expect(model.workflowPatchCount == "928")
+    }
+
+    @Test
+    func createWorkflowPresetSelectsNewPresetInline() async {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        let printer = makePrinter()
+        let paper = makePaper()
+        let draftDetail = makeJobDetail(stage: .context, nextAction: "Save Context", printer: printer, paper: paper)
+
+        let fakeEngine = FakeEngine()
+        fakeEngine.toolchainStatusValue = makeToolchainStatus(state: .ready, path: "/opt/homebrew/bin")
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [makeActiveWorkItem(id: draftDetail.id)])
+        fakeEngine.printersCurrent = [printer]
+        fakeEngine.papersCurrent = [paper]
+        fakeEngine.createNewProfileDraftResult = draftDetail
+
+        let model = AppModel(storagePaths: .fixture(root: root), engine: fakeEngine)
+        await model.openNewProfileWorkflow()
+
+        model.beginWorkflowPresetCreation()
+        model.workflowPresetDraft.label = "Studio Matte"
+        model.workflowPresetDraft.printPath = "Mirage"
+        model.workflowPresetDraft.mediaSetting = "Premium Luster"
+        model.workflowPresetDraft.qualityMode = "1440 dpi"
+        model.workflowPresetDraft.totalInkLimitPercentText = "280"
+        model.workflowPresetDraft.blackInkLimitPercentText = "90"
+
+        await model.createWorkflowPreset()
+
+        #expect(fakeEngine.lastCreatedPresetInput?.printerId == printer.id)
+        #expect(fakeEngine.lastCreatedPresetInput?.paperId == paper.id)
+        #expect(fakeEngine.lastCreatedPresetInput?.printPath == "Mirage")
+        #expect(model.workflowSelectedPrinterPaperPreset?.label == "Studio Matte")
+        #expect(model.workflowSelectedPrinterPaperPreset?.printPath == "Mirage")
+        #expect(model.workflowSelectedPrinterPaperPreset?.mediaSetting == "Premium Luster")
+        #expect(model.workflowSelectedPrinterPaperPreset?.qualityMode == "1440 dpi")
+    }
+
+    @Test
+    func beginWorkflowPresetCreationSeedsLegacyWorkflowValues() async {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        let printer = makePrinter()
+        let paper = makePaper()
+        let draftDetail = makeJobDetail(
+            stage: .context,
+            nextAction: "Save Context",
+            printer: printer,
+            paper: paper,
+            printPath: "Photoshop -> Canon driver"
+        )
+
+        let fakeEngine = FakeEngine()
+        fakeEngine.toolchainStatusValue = makeToolchainStatus(state: .ready, path: "/opt/homebrew/bin")
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [makeActiveWorkItem(id: draftDetail.id)])
+        fakeEngine.printersCurrent = [printer]
+        fakeEngine.papersCurrent = [paper]
+        fakeEngine.createNewProfileDraftResult = draftDetail
+
+        let model = AppModel(storagePaths: .fixture(root: root), engine: fakeEngine)
+        await model.openNewProfileWorkflow()
+
+        #expect(model.showsWorkflowStandalonePrintPathEditor)
+
+        model.beginWorkflowPresetCreation()
+
+        #expect(model.showWorkflowPresetForm)
+        #expect(!model.showsWorkflowStandalonePrintPathEditor)
+        #expect(model.workflowPresetDraft.printerId == printer.id)
+        #expect(model.workflowPresetDraft.paperId == paper.id)
+        #expect(model.workflowPresetDraft.printPath == "Photoshop -> Canon driver")
+        #expect(model.workflowPresetDraft.mediaSetting == "Premium Luster")
+        #expect(model.workflowPresetDraft.qualityMode == "1440 dpi")
+    }
+
+    @Test
+    func changingWorkflowPairWhileCreatingPresetSyncsDraftAndSanitizesPrinterFields() async {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        let printer = makePrinter()
+        let alternatePrinter = makeAlternatePrinter()
+        let paper = makePaper()
+        let alternatePaper = makeAlternatePaper()
+        let draftDetail = makeJobDetail(stage: .context, nextAction: "Save Context", printer: printer, paper: paper)
+
+        let fakeEngine = FakeEngine()
+        fakeEngine.toolchainStatusValue = makeToolchainStatus(state: .ready, path: "/opt/homebrew/bin")
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [makeActiveWorkItem(id: draftDetail.id)])
+        fakeEngine.printersCurrent = [printer, alternatePrinter]
+        fakeEngine.papersCurrent = [paper, alternatePaper]
+        fakeEngine.createNewProfileDraftResult = draftDetail
+
+        let model = AppModel(storagePaths: .fixture(root: root), engine: fakeEngine)
+        await model.openNewProfileWorkflow()
+
+        model.beginWorkflowPresetCreation()
+        model.workflowPresetDraft.label = "Studio Matte"
+        model.workflowPresetDraft.printPath = "Mirage"
+        model.workflowPresetDraft.notes = "Keep this note."
+        model.workflowPresetDraft.mediaSetting = "Premium Luster"
+        model.workflowPresetDraft.qualityMode = "1440 dpi"
+        model.workflowPresetDraft.blackInkLimitPercentText = "90"
+
+        model.selectWorkflowPrinter(alternatePrinter.id)
+
+        #expect(model.showWorkflowPresetForm)
+        #expect(model.workflowPresetDraft.printerId == alternatePrinter.id)
+        #expect(model.workflowPresetDraft.paperId == paper.id)
+        #expect(model.workflowPresetDraft.label == "Studio Matte")
+        #expect(model.workflowPresetDraft.printPath == "Mirage")
+        #expect(model.workflowPresetDraft.notes == "Keep this note.")
+        #expect(model.workflowPresetDraft.mediaSetting.isEmpty)
+        #expect(model.workflowPresetDraft.qualityMode.isEmpty)
+        #expect(model.workflowPresetDraft.blackInkLimitPercentText.isEmpty)
+
+        model.selectWorkflowPaper(alternatePaper.id)
+
+        #expect(model.workflowPresetDraft.paperId == alternatePaper.id)
+    }
+
+    @Test
+    func clearingWorkflowPrinterWhileCreatingPresetCancelsInlinePresetDraft() async {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        let printer = makePrinter()
+        let paper = makePaper()
+        let draftDetail = makeJobDetail(stage: .context, nextAction: "Save Context", printer: printer, paper: paper)
+
+        let fakeEngine = FakeEngine()
+        fakeEngine.toolchainStatusValue = makeToolchainStatus(state: .ready, path: "/opt/homebrew/bin")
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [makeActiveWorkItem(id: draftDetail.id)])
+        fakeEngine.printersCurrent = [printer]
+        fakeEngine.papersCurrent = [paper]
+        fakeEngine.createNewProfileDraftResult = draftDetail
+
+        let model = AppModel(storagePaths: .fixture(root: root), engine: fakeEngine)
+        await model.openNewProfileWorkflow()
+
+        model.beginWorkflowPresetCreation()
+        model.workflowPresetDraft.label = "Temporary"
+
+        model.selectWorkflowPrinter(nil)
+
+        #expect(!model.showWorkflowPresetForm)
+        #expect(model.workflowPresetDraft == PrinterPaperPresetDraft())
+    }
+
+    @Test
+    func createWorkflowPresetPersistsCurrentPairAfterSelectionChanges() async {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        let printer = makePrinter()
+        let alternatePrinter = makeAlternatePrinter()
+        let paper = makePaper()
+        let alternatePaper = makeAlternatePaper()
+        let draftDetail = makeJobDetail(stage: .context, nextAction: "Save Context", printer: printer, paper: paper)
+
+        let fakeEngine = FakeEngine()
+        fakeEngine.toolchainStatusValue = makeToolchainStatus(state: .ready, path: "/opt/homebrew/bin")
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [makeActiveWorkItem(id: draftDetail.id)])
+        fakeEngine.printersCurrent = [printer, alternatePrinter]
+        fakeEngine.papersCurrent = [paper, alternatePaper]
+        fakeEngine.createNewProfileDraftResult = draftDetail
+
+        let model = AppModel(storagePaths: .fixture(root: root), engine: fakeEngine)
+        await model.openNewProfileWorkflow()
+
+        model.beginWorkflowPresetCreation()
+        model.workflowPresetDraft.label = "Alternate path"
+        model.workflowPresetDraft.printPath = "Mirage"
+
+        model.selectWorkflowPrinter(alternatePrinter.id)
+        model.selectWorkflowPaper(alternatePaper.id)
+
+        model.workflowPresetDraft.mediaSetting = "Fine Art Smooth"
+        model.workflowPresetDraft.qualityMode = "High"
+
+        await model.createWorkflowPreset()
+
+        #expect(fakeEngine.lastCreatedPresetInput?.printerId == alternatePrinter.id)
+        #expect(fakeEngine.lastCreatedPresetInput?.paperId == alternatePaper.id)
+        #expect(fakeEngine.lastCreatedPresetInput?.printPath == "Mirage")
+        #expect(model.workflowSelectedPrinterPaperPreset?.printerId == alternatePrinter.id)
+        #expect(model.workflowSelectedPrinterPaperPreset?.paperId == alternatePaper.id)
+    }
+
+    @Test
+    func legacyWorkflowContextKeepsSnapshottedMediaAndQualityWithoutPreset() async {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        let printer = makePrinter()
+        let paper = makePaper()
+        let draftDetail = makeJobDetail(stage: .context, nextAction: "Save Context", printer: printer, paper: paper)
+
+        let fakeEngine = FakeEngine()
+        fakeEngine.toolchainStatusValue = makeToolchainStatus(state: .ready, path: "/opt/homebrew/bin")
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [makeActiveWorkItem(id: draftDetail.id)])
+        fakeEngine.printersCurrent = [printer]
+        fakeEngine.papersCurrent = [paper]
+        fakeEngine.createNewProfileDraftResult = draftDetail
+
+        let model = AppModel(storagePaths: .fixture(root: root), engine: fakeEngine)
+        await model.openNewProfileWorkflow()
+
+        #expect(model.workflowHasLegacyContextWithoutPreset)
+        #expect(model.workflowSelectedPrinterPaperPresetID == nil)
+        #expect(model.workflowPrintPath.isEmpty)
+        #expect(model.workflowMediaSetting == "Premium Luster")
+        #expect(model.workflowQualityMode == "1440 dpi")
+    }
+
+    @Test
+    func catalogEntryDraftIgnoresWhitespaceOnlyValues() {
+        var draft = CatalogEntryDraft(pendingValue: "   ")
+        var values = ["Existing"]
+
+        let committed = draft.commit(into: &values)
+
+        #expect(!committed)
+        #expect(values == ["Existing"])
+        #expect(draft.pendingValue == "   ")
+    }
+
+    @Test
+    func catalogEntryDraftAppendsTrimmedValueAndClearsPendingText() {
+        var draft = CatalogEntryDraft(pendingValue: "  Premium Luster  ")
+        var values: [String] = []
+
+        let committed = draft.commit(into: &values)
+
+        #expect(committed)
+        #expect(values == ["Premium Luster"])
+        #expect(draft.pendingValue.isEmpty)
+    }
+
+    @Test
+    func editPaperLoadsStructuredPaperFields() {
+        let model = AppModel(engine: FakeEngine())
+
+        model.editPaper(makePaper())
+
+        #expect(model.settingsPaperDraft.manufacturer == "Canson")
+        #expect(model.settingsPaperDraft.paperLine == "Rag Photographique")
+        #expect(model.settingsPaperDraft.surfaceClassSelection == "Matte")
+        #expect(model.settingsPaperDraft.basisWeightValue == "310")
+        #expect(model.settingsPaperDraft.basisWeightUnit == .gsm)
+        #expect(model.settingsPaperDraft.thicknessValue == "15.7")
+        #expect(model.settingsPaperDraft.thicknessUnit == .mil)
+        #expect(model.settingsPaperDraft.surfaceTexture == "Smooth")
+        #expect(model.settingsPaperDraft.baseMaterial == "Cotton rag")
+        #expect(model.settingsPaperDraft.mediaColor == "White")
+        #expect(model.settingsPaperDraft.obaContent == "Low OBA")
+        #expect(model.settingsPaperDraft.inkCompatibility == "Pigment")
+    }
+
+    @Test
+    func saveSettingsPaperUsesStructuredPaperInput() async {
+        let fakeEngine = FakeEngine()
+        let model = AppModel(engine: fakeEngine)
+
+        model.settingsPaperDraft.manufacturer = "Hahnemuhle"
+        model.settingsPaperDraft.paperLine = "Photo Rag"
+        model.settingsPaperDraft.surfaceClassSelection = "Matte"
+        model.settingsPaperDraft.basisWeightValue = "308"
+        model.settingsPaperDraft.basisWeightUnit = .gsm
+        model.settingsPaperDraft.thicknessValue = "18.9"
+        model.settingsPaperDraft.thicknessUnit = .mil
+        model.settingsPaperDraft.surfaceTexture = "Smooth"
+        model.settingsPaperDraft.baseMaterial = "Cotton"
+        model.settingsPaperDraft.mediaColor = "White"
+        model.settingsPaperDraft.opacity = "99"
+        model.settingsPaperDraft.whiteness = "91"
+        model.settingsPaperDraft.obaContent = "None"
+        model.settingsPaperDraft.inkCompatibility = "Pigment and dye"
+        model.settingsPaperDraft.notes = "Test paper."
+
+        await model.saveSettingsPaper()
+
+        #expect(fakeEngine.lastCreatedPaperInput?.manufacturer == "Hahnemuhle")
+        #expect(fakeEngine.lastCreatedPaperInput?.paperLine == "Photo Rag")
+        #expect(fakeEngine.lastCreatedPaperInput?.basisWeightValue == "308")
+        #expect(fakeEngine.lastCreatedPaperInput?.basisWeightUnit == .gsm)
+        #expect(fakeEngine.lastCreatedPaperInput?.thicknessValue == "18.9")
+        #expect(fakeEngine.lastCreatedPaperInput?.thicknessUnit == .mil)
+        #expect(fakeEngine.lastCreatedPaperInput?.obaContent == "None")
+        #expect(fakeEngine.lastCreatedPaperInput?.inkCompatibility == "Pigment and dye")
     }
 
     @Test
@@ -414,9 +696,13 @@ private final class FakeEngine: EngineProtocol, @unchecked Sendable {
     private(set) var createDraftCallCount = 0
     private(set) var lastSetToolchainPath: String?
     private(set) var lastCreateDraftInput: CreateNewProfileDraftInput?
+    private(set) var lastCreatedPaperInput: CreatePaperInput?
+    private(set) var lastUpdatedPaperInput: UpdatePaperInput?
+    private(set) var lastCreatedPresetInput: CreatePrinterPaperPresetInput?
     private(set) var lastSaveContextInput: SaveNewProfileContextInput?
     private(set) var lastPublishedJobId: String?
     private(set) var lastDeletedJobId: String?
+    private(set) var lastUpdatedPresetInput: UpdatePrinterPaperPresetInput?
 
     var bootstrapStatusValue = BootstrapStatus(
         appSupportDirReady: true,
@@ -431,6 +717,7 @@ private final class FakeEngine: EngineProtocol, @unchecked Sendable {
     var logsValue: [LogEntry] = []
     var printersCurrent: [PrinterRecord] = []
     var papersCurrent: [PaperRecord] = []
+    var printerPaperPresetsCurrent: [PrinterPaperPresetRecord] = []
     var printerProfilesCurrent: [PrinterProfileRecord] = []
     var printerProfilesAfterPublish: [PrinterProfileRecord]?
     var createNewProfileDraftResult = makeJobDetail(stage: .context, nextAction: "Save Context")
@@ -469,14 +756,25 @@ private final class FakeEngine: EngineProtocol, @unchecked Sendable {
     }
 
     func createPaper(input: CreatePaperInput) -> PaperRecord {
+        lastCreatedPaperInput = input
         let record = PaperRecord(
             id: UUID().uuidString,
-            vendorProductName: input.vendorProductName,
+            manufacturer: input.manufacturer,
+            paperLine: input.paperLine,
             surfaceClass: input.surfaceClass,
-            weightThickness: input.weightThickness,
-            obaFluorescenceNotes: input.obaFluorescenceNotes,
+            basisWeightValue: input.basisWeightValue,
+            basisWeightUnit: input.basisWeightUnit,
+            thicknessValue: input.thicknessValue,
+            thicknessUnit: input.thicknessUnit,
+            surfaceTexture: input.surfaceTexture,
+            baseMaterial: input.baseMaterial,
+            mediaColor: input.mediaColor,
+            opacity: input.opacity,
+            whiteness: input.whiteness,
+            obaContent: input.obaContent,
+            inkCompatibility: input.inkCompatibility,
             notes: input.notes,
-            displayName: input.vendorProductName,
+            displayName: makePaperDisplayName(manufacturer: input.manufacturer, paperLine: input.paperLine),
             createdAt: "2026-04-19T18:30:00Z",
             updatedAt: "2026-04-19T18:30:00Z"
         )
@@ -487,17 +785,52 @@ private final class FakeEngine: EngineProtocol, @unchecked Sendable {
     func createPrinter(input: CreatePrinterInput) -> PrinterRecord {
         let record = PrinterRecord(
             id: UUID().uuidString,
-            makeModel: input.makeModel,
+            manufacturer: input.manufacturer,
+            model: input.model,
             nickname: input.nickname,
             transportStyle: input.transportStyle,
+            colorantFamily: input.colorantFamily,
+            channelCount: input.channelCount,
+            channelLabels: input.channelLabels,
+            supportedMediaSettings: input.supportedMediaSettings,
             supportedQualityModes: input.supportedQualityModes,
             monochromePathNotes: input.monochromePathNotes,
             notes: input.notes,
-            displayName: input.nickname.isEmpty ? input.makeModel : "\(input.nickname) (\(input.makeModel))",
+            displayName: makePrinterDisplayName(
+                manufacturer: input.manufacturer,
+                model: input.model,
+                nickname: input.nickname
+            ),
             createdAt: "2026-04-19T18:30:00Z",
             updatedAt: "2026-04-19T18:30:00Z"
         )
         printersCurrent.append(record)
+        return record
+    }
+
+    func createPrinterPaperPreset(input: CreatePrinterPaperPresetInput) -> PrinterPaperPresetRecord {
+        lastCreatedPresetInput = input
+        let record = PrinterPaperPresetRecord(
+            id: UUID().uuidString,
+            printerId: input.printerId,
+            paperId: input.paperId,
+            label: input.label,
+            printPath: input.printPath,
+            mediaSetting: input.mediaSetting,
+            qualityMode: input.qualityMode,
+            totalInkLimitPercent: input.totalInkLimitPercent,
+            blackInkLimitPercent: input.blackInkLimitPercent,
+            notes: input.notes,
+            displayName: makePresetDisplayName(
+                label: input.label,
+                printPath: input.printPath,
+                mediaSetting: input.mediaSetting,
+                qualityMode: input.qualityMode
+            ),
+            createdAt: "2026-04-19T18:30:00Z",
+            updatedAt: "2026-04-19T18:30:00Z"
+        )
+        printerPaperPresetsCurrent.append(record)
         return record
     }
 
@@ -523,6 +856,10 @@ private final class FakeEngine: EngineProtocol, @unchecked Sendable {
 
     func listPapers() -> [PaperRecord] {
         papersCurrent
+    }
+
+    func listPrinterPaperPresets() -> [PrinterPaperPresetRecord] {
+        printerPaperPresetsCurrent
     }
 
     func listPrinterProfiles() -> [PrinterProfileRecord] {
@@ -590,14 +927,25 @@ private final class FakeEngine: EngineProtocol, @unchecked Sendable {
     }
 
     func updatePaper(input: UpdatePaperInput) -> PaperRecord {
+        lastUpdatedPaperInput = input
         let record = PaperRecord(
             id: input.id,
-            vendorProductName: input.vendorProductName,
+            manufacturer: input.manufacturer,
+            paperLine: input.paperLine,
             surfaceClass: input.surfaceClass,
-            weightThickness: input.weightThickness,
-            obaFluorescenceNotes: input.obaFluorescenceNotes,
+            basisWeightValue: input.basisWeightValue,
+            basisWeightUnit: input.basisWeightUnit,
+            thicknessValue: input.thicknessValue,
+            thicknessUnit: input.thicknessUnit,
+            surfaceTexture: input.surfaceTexture,
+            baseMaterial: input.baseMaterial,
+            mediaColor: input.mediaColor,
+            opacity: input.opacity,
+            whiteness: input.whiteness,
+            obaContent: input.obaContent,
+            inkCompatibility: input.inkCompatibility,
             notes: input.notes,
-            displayName: input.vendorProductName,
+            displayName: makePaperDisplayName(manufacturer: input.manufacturer, paperLine: input.paperLine),
             createdAt: "2026-04-19T18:30:00Z",
             updatedAt: "2026-04-19T18:35:00Z"
         )
@@ -609,18 +957,54 @@ private final class FakeEngine: EngineProtocol, @unchecked Sendable {
     func updatePrinter(input: UpdatePrinterInput) -> PrinterRecord {
         let record = PrinterRecord(
             id: input.id,
-            makeModel: input.makeModel,
+            manufacturer: input.manufacturer,
+            model: input.model,
             nickname: input.nickname,
             transportStyle: input.transportStyle,
+            colorantFamily: input.colorantFamily,
+            channelCount: input.channelCount,
+            channelLabels: input.channelLabels,
+            supportedMediaSettings: input.supportedMediaSettings,
             supportedQualityModes: input.supportedQualityModes,
             monochromePathNotes: input.monochromePathNotes,
             notes: input.notes,
-            displayName: input.nickname.isEmpty ? input.makeModel : "\(input.nickname) (\(input.makeModel))",
+            displayName: makePrinterDisplayName(
+                manufacturer: input.manufacturer,
+                model: input.model,
+                nickname: input.nickname
+            ),
             createdAt: "2026-04-19T18:30:00Z",
             updatedAt: "2026-04-19T18:35:00Z"
         )
         printersCurrent.removeAll { $0.id == input.id }
         printersCurrent.append(record)
+        return record
+    }
+
+    func updatePrinterPaperPreset(input: UpdatePrinterPaperPresetInput) -> PrinterPaperPresetRecord {
+        lastUpdatedPresetInput = input
+        let record = PrinterPaperPresetRecord(
+            id: input.id,
+            printerId: input.printerId,
+            paperId: input.paperId,
+            label: input.label,
+            printPath: input.printPath,
+            mediaSetting: input.mediaSetting,
+            qualityMode: input.qualityMode,
+            totalInkLimitPercent: input.totalInkLimitPercent,
+            blackInkLimitPercent: input.blackInkLimitPercent,
+            notes: input.notes,
+            displayName: makePresetDisplayName(
+                label: input.label,
+                printPath: input.printPath,
+                mediaSetting: input.mediaSetting,
+                qualityMode: input.qualityMode
+            ),
+            createdAt: "2026-04-19T18:30:00Z",
+            updatedAt: "2026-04-19T18:35:00Z"
+        )
+        printerPaperPresetsCurrent.removeAll { $0.id == input.id }
+        printerPaperPresetsCurrent.append(record)
         return record
     }
 }
@@ -673,9 +1057,14 @@ private func makeActiveWorkItem(
 private func makePrinter() -> PrinterRecord {
     PrinterRecord(
         id: "printer-1",
-        makeModel: "Epson SureColor P900",
+        manufacturer: "Epson",
+        model: "SureColor P900",
         nickname: "Studio P900",
         transportStyle: "Rear tray",
+        colorantFamily: .cmyk,
+        channelCount: 4,
+        channelLabels: [],
+        supportedMediaSettings: ["Premium Luster", "Ultra Premium Presentation Matte"],
         supportedQualityModes: ["1440 dpi", "2880 dpi"],
         monochromePathNotes: "Use the neutral path for black-and-white work.",
         notes: "Main studio printer.",
@@ -685,15 +1074,91 @@ private func makePrinter() -> PrinterRecord {
     )
 }
 
+private func makeAlternatePrinter() -> PrinterRecord {
+    PrinterRecord(
+        id: "printer-2",
+        manufacturer: "Canon",
+        model: "imagePROGRAF PRO-1000",
+        nickname: "Studio PRO-1000",
+        transportStyle: "Manual feed",
+        colorantFamily: .rgb,
+        channelCount: 3,
+        channelLabels: [],
+        supportedMediaSettings: ["Fine Art Smooth"],
+        supportedQualityModes: ["High"],
+        monochromePathNotes: "",
+        notes: "Alternate print path.",
+        displayName: "Studio PRO-1000 (Canon imagePROGRAF PRO-1000)",
+        createdAt: "2026-04-19T18:30:00Z",
+        updatedAt: "2026-04-19T18:30:00Z"
+    )
+}
+
 private func makePaper() -> PaperRecord {
     PaperRecord(
         id: "paper-1",
-        vendorProductName: "Canson Rag Photographique",
+        manufacturer: "Canson",
+        paperLine: "Rag Photographique",
         surfaceClass: "Matte",
-        weightThickness: "310 gsm",
-        obaFluorescenceNotes: "Low OBA",
+        basisWeightValue: "310",
+        basisWeightUnit: .gsm,
+        thicknessValue: "15.7",
+        thicknessUnit: .mil,
+        surfaceTexture: "Smooth",
+        baseMaterial: "Cotton rag",
+        mediaColor: "White",
+        opacity: "98",
+        whiteness: "89",
+        obaContent: "Low OBA",
+        inkCompatibility: "Pigment",
         notes: "Preferred for gallery proofs.",
         displayName: "Canson Rag Photographique",
+        createdAt: "2026-04-19T18:30:00Z",
+        updatedAt: "2026-04-19T18:30:00Z"
+    )
+}
+
+private func makeAlternatePaper() -> PaperRecord {
+    PaperRecord(
+        id: "paper-2",
+        manufacturer: "Hahnemuhle",
+        paperLine: "Photo Rag",
+        surfaceClass: "Matte",
+        basisWeightValue: "308",
+        basisWeightUnit: .gsm,
+        thicknessValue: "18.9",
+        thicknessUnit: .mil,
+        surfaceTexture: "Smooth",
+        baseMaterial: "Cotton",
+        mediaColor: "White",
+        opacity: "99",
+        whiteness: "91",
+        obaContent: "None",
+        inkCompatibility: "Pigment",
+        notes: "Alternate paper path.",
+        displayName: "Hahnemuhle Photo Rag",
+        createdAt: "2026-04-19T18:30:00Z",
+        updatedAt: "2026-04-19T18:30:00Z"
+    )
+}
+
+private func makePreset(
+    id: String = "preset-1",
+    printerId: String = "printer-1",
+    paperId: String = "paper-1"
+) -> PrinterPaperPresetRecord {
+    PrinterPaperPresetRecord(
+        id: id,
+        printerId: printerId,
+        paperId: paperId,
+        label: "Studio Matte",
+        printPath: "Mirage",
+        mediaSetting: "Premium Luster",
+        qualityMode: "1440 dpi",
+        totalInkLimitPercent: 280,
+        blackInkLimitPercent: 90,
+        notes: "Matches the standard studio print path.",
+        displayName: "Studio Matte",
         createdAt: "2026-04-19T18:30:00Z",
         updatedAt: "2026-04-19T18:30:00Z"
     )
@@ -725,6 +1190,8 @@ private func makeJobDetail(
     nextAction: String,
     printer: PrinterRecord? = nil,
     paper: PaperRecord? = nil,
+    preset: PrinterPaperPresetRecord? = nil,
+    printPath: String = "",
     review: ReviewSummaryRecord? = nil,
     publishedProfileId: String? = nil
 ) -> NewProfileJobDetail {
@@ -741,8 +1208,15 @@ private func makeJobDetail(
         printer: printer,
         paper: paper,
         context: NewProfileContextRecord(
-            mediaSetting: "Premium Luster",
-            qualityMode: "1440 dpi",
+            printerPaperPresetId: preset?.id,
+            printPath: preset?.printPath ?? printPath,
+            mediaSetting: preset?.mediaSetting ?? "Premium Luster",
+            qualityMode: preset?.qualityMode ?? "1440 dpi",
+            colorantFamily: printer?.colorantFamily ?? .cmyk,
+            channelCount: printer?.channelCount ?? 4,
+            channelLabels: printer?.channelLabels ?? [],
+            totalInkLimitPercent: preset?.totalInkLimitPercent,
+            blackInkLimitPercent: preset?.blackInkLimitPercent,
             printPathNotes: "Rear tray",
             measurementNotes: "Warm up the instrument.",
             measurementObserver: "2",
@@ -781,4 +1255,26 @@ private func makeJobDetail(
         commands: [],
         isCommandRunning: false
     )
+}
+
+private func makePrinterDisplayName(manufacturer: String, model: String, nickname: String) -> String {
+    let makeModel = [manufacturer, model]
+        .filter { !$0.isEmpty }
+        .joined(separator: " ")
+    return nickname.isEmpty ? makeModel : "\(nickname) (\(makeModel))"
+}
+
+private func makePaperDisplayName(manufacturer: String, paperLine: String) -> String {
+    [manufacturer, paperLine]
+        .filter { !$0.isEmpty }
+        .joined(separator: " ")
+}
+
+private func makePresetDisplayName(label: String, printPath: String, mediaSetting: String, qualityMode: String) -> String {
+    guard label.isEmpty else { return label }
+
+    let parts = [printPath, mediaSetting, qualityMode]
+        .filter { !$0.isEmpty }
+
+    return parts.joined(separator: " / ")
 }
