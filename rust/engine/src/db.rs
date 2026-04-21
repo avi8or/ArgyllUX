@@ -51,6 +51,12 @@ pub(crate) struct NewProfileRunnerContext {
     pub has_measurement_checkpoint: bool,
 }
 
+#[derive(Debug, Clone)]
+struct UntouchedBlankDraftCandidate {
+    id: String,
+    workspace_path: String,
+}
+
 pub fn initialize_database(config: &EngineConfig) -> EngineResult<DatabaseStatus> {
     let database_exists = Path::new(&config.database_path).exists();
     let connection = open_connection(&config.database_path)?;
@@ -126,7 +132,8 @@ pub fn persist_toolchain_status(database_path: &str, status: &ToolchainStatus) -
 }
 
 pub fn load_dashboard_snapshot(database_path: &str) -> EngineResult<DashboardSnapshot> {
-    let connection = open_connection(database_path)?;
+    let mut connection = open_connection(database_path)?;
+    collapse_untouched_blank_new_profile_drafts(&mut connection)?;
     let active_work_items = load_active_work_items_from_connection(&connection)?;
 
     Ok(DashboardSnapshot {
@@ -561,8 +568,42 @@ pub fn delete_printer_profile(database_path: &str, profile_id: &str) -> EngineRe
             });
         }
     };
-    let source_job =
-        load_new_profile_job_detail_from_connection(&connection, &profile.created_from_job_id)?;
+    let source_job = connection
+        .query_row(
+            r#"
+            SELECT id
+            FROM new_profile_jobs
+            WHERE published_profile_id = ?1
+            ORDER BY updated_at DESC, created_at DESC, id DESC
+            LIMIT 1
+            "#,
+            params![profile_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?
+        .map(|job_id| {
+            load_new_profile_job_detail_from_connection(&connection, &job_id)
+                .map(|detail| (job_id, detail))
+        })
+        .transpose()?
+        .or({
+            if connection.query_row(
+                "SELECT EXISTS(SELECT 1 FROM jobs WHERE id = ?1)",
+                params![&profile.created_from_job_id],
+                |row| row.get::<_, i64>(0),
+            )? == 1
+            {
+                Some((
+                    profile.created_from_job_id.clone(),
+                    load_new_profile_job_detail_from_connection(
+                        &connection,
+                        &profile.created_from_job_id,
+                    )?,
+                ))
+            } else {
+                None
+            }
+        });
     let now = iso_timestamp();
 
     connection.execute(
@@ -598,18 +639,20 @@ pub fn delete_printer_profile(database_path: &str, profile_id: &str) -> EngineRe
         });
     }
 
-    // Keep the source job resumable after the library record is removed so the
-    // user can publish again or delete the work entirely.
-    update_job_summary(
-        &connection,
-        &profile.created_from_job_id,
-        WorkflowStage::Review,
-        "review",
-        "Publish the profile or return later",
-        &source_job.profile_name,
-        &source_job.printer_name,
-        &source_job.paper_name,
-    )?;
+    // Reopen the source job only when it still exists. Corrupted or migrated
+    // databases can retain a profile row after the originating job is gone.
+    if let Some((source_job_id, source_job)) = source_job {
+        update_job_summary(
+            &connection,
+            &source_job_id,
+            WorkflowStage::Review,
+            "review",
+            "Publish the profile or return later",
+            &source_job.profile_name,
+            &source_job.printer_name,
+            &source_job.paper_name,
+        )?;
+    }
 
     Ok(DeleteResult {
         success: true,
@@ -623,6 +666,14 @@ pub fn create_new_profile_draft(
     input: &CreateNewProfileDraftInput,
 ) -> EngineResult<NewProfileJobDetail> {
     let connection = open_connection(database_path)?;
+    create_new_profile_draft_with_connection(&connection, app_support_path, input)
+}
+
+fn create_new_profile_draft_with_connection(
+    connection: &Connection,
+    app_support_path: &str,
+    input: &CreateNewProfileDraftInput,
+) -> EngineResult<NewProfileJobDetail> {
     let id = format!("job-{}", job_timestamp_seed());
     let now = iso_timestamp();
     let workspace_path = workspace_path(app_support_path, &id);
@@ -636,13 +687,13 @@ pub fn create_new_profile_draft(
     let printer = input
         .printer_id
         .as_deref()
-        .map(|printer_id| load_printer(&connection, printer_id))
+        .map(|printer_id| load_printer(connection, printer_id))
         .transpose()?
         .flatten();
     let paper = input
         .paper_id
         .as_deref()
-        .map(|paper_id| load_paper(&connection, paper_id))
+        .map(|paper_id| load_paper(connection, paper_id))
         .transpose()?
         .flatten();
     let printer_name = printer
@@ -750,7 +801,40 @@ pub fn create_new_profile_draft(
         ],
     )?;
 
-    load_new_profile_job_detail_from_connection(&connection, &id)
+    load_new_profile_job_detail_from_connection(connection, &id)
+}
+
+pub fn resolve_new_profile_launch(
+    database_path: &str,
+    app_support_path: &str,
+    input: &CreateNewProfileDraftInput,
+) -> EngineResult<NewProfileJobDetail> {
+    let mut connection = open_connection(database_path)?;
+    let mut deleted_workspace_paths = Vec::new();
+
+    let detail = {
+        let transaction = connection.transaction()?;
+        let duplicates = list_untouched_blank_new_profile_draft_candidates(&transaction)?;
+        for candidate in duplicates.into_iter().skip(1) {
+            delete_new_profile_job_records(&transaction, &candidate.id)?;
+            deleted_workspace_paths.push(candidate.workspace_path);
+        }
+
+        let detail = if let Some(job_id) = load_latest_resumable_new_profile_job_id(&transaction)? {
+            load_new_profile_job_detail_from_connection(&transaction, &job_id)?
+        } else {
+            create_new_profile_draft_with_connection(&transaction, app_support_path, input)?
+        };
+
+        transaction.commit()?;
+        detail
+    };
+
+    for workspace_path in deleted_workspace_paths {
+        remove_workspace_directory(&workspace_path);
+    }
+
+    Ok(detail)
 }
 
 pub fn load_new_profile_job_detail(
@@ -762,7 +846,7 @@ pub fn load_new_profile_job_detail(
 }
 
 pub fn delete_new_profile_job(database_path: &str, job_id: &str) -> EngineResult<DeleteResult> {
-    let connection = open_connection(database_path)?;
+    let mut connection = open_connection(database_path)?;
     let detail = load_new_profile_job_detail_from_connection(&connection, job_id)?;
 
     if detail.is_command_running {
@@ -773,23 +857,13 @@ pub fn delete_new_profile_job(database_path: &str, job_id: &str) -> EngineResult
         });
     }
 
-    connection.execute(
-        "DELETE FROM app_settings WHERE key = ?1",
-        params![format!("new_profile.review.{job_id}")],
-    )?;
-    let deleted = connection.execute("DELETE FROM jobs WHERE id = ?1", params![job_id])?;
-
-    if deleted == 0 {
-        return Ok(DeleteResult {
-            success: false,
-            message: "Active work was not found.".to_string(),
-        });
+    {
+        let transaction = connection.transaction()?;
+        delete_new_profile_job_records(&transaction, job_id)?;
+        transaction.commit()?;
     }
 
-    let workspace_path = Path::new(&detail.workspace_path);
-    if workspace_path.exists() {
-        let _ = std::fs::remove_dir_all(workspace_path);
-    }
+    remove_workspace_directory(&detail.workspace_path);
 
     Ok(DeleteResult {
         success: true,
@@ -1933,7 +2007,7 @@ fn load_active_work_items_from_connection(
             status
         FROM jobs
         WHERE status IN ('draft', 'ready', 'active', 'review', 'blocked', 'failed')
-        ORDER BY updated_at DESC
+        ORDER BY updated_at DESC, created_at DESC, id DESC
         "#,
     )?;
 
@@ -1952,6 +2026,123 @@ fn load_active_work_items_from_connection(
     })?;
 
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+fn list_untouched_blank_new_profile_draft_candidates(
+    connection: &Connection,
+) -> EngineResult<Vec<UntouchedBlankDraftCandidate>> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT
+            jobs.id,
+            new_profile_jobs.workspace_path
+        FROM jobs
+        INNER JOIN new_profile_jobs ON new_profile_jobs.id = jobs.id
+        WHERE jobs.kind = 'new_profile'
+          AND jobs.status IN ('draft', 'ready', 'active', 'review', 'blocked', 'failed')
+          AND TRIM(new_profile_jobs.profile_name) = ''
+          AND new_profile_jobs.printer_id IS NULL
+          AND new_profile_jobs.paper_id IS NULL
+          AND new_profile_jobs.printer_paper_preset_id IS NULL
+          AND TRIM(new_profile_jobs.print_path) = ''
+          AND TRIM(new_profile_jobs.media_setting) = ''
+          AND TRIM(new_profile_jobs.quality_mode) = ''
+          AND TRIM(new_profile_jobs.print_path_notes) = ''
+          AND TRIM(new_profile_jobs.measurement_notes) = ''
+          AND new_profile_jobs.measurement_source_path IS NULL
+          AND new_profile_jobs.scan_file_path IS NULL
+          AND new_profile_jobs.has_measurement_checkpoint = 0
+          AND new_profile_jobs.printed_at IS NULL
+          AND new_profile_jobs.drying_ready_at IS NULL
+          AND new_profile_jobs.planning_profile_id IS NULL
+          AND new_profile_jobs.published_profile_id IS NULL
+          AND (new_profile_jobs.latest_error IS NULL OR TRIM(new_profile_jobs.latest_error) = '')
+          AND NOT EXISTS (
+              SELECT 1
+              FROM artifacts
+              WHERE artifacts.job_id = jobs.id
+          )
+          AND NOT EXISTS (
+              SELECT 1
+              FROM job_commands
+              WHERE job_commands.job_id = jobs.id
+          )
+          AND NOT EXISTS (
+              SELECT 1
+              FROM app_settings
+              WHERE app_settings.key IN (
+                  'new_profile.review.' || jobs.id,
+                  'new_profile.review_notes.' || jobs.id
+              )
+          )
+        ORDER BY jobs.updated_at DESC, jobs.created_at DESC, jobs.id DESC
+        "#,
+    )?;
+
+    let rows = statement.query_map([], |row| {
+        Ok(UntouchedBlankDraftCandidate {
+            id: row.get(0)?,
+            workspace_path: row.get(1)?,
+        })
+    })?;
+
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+fn load_latest_resumable_new_profile_job_id(
+    connection: &Connection,
+) -> EngineResult<Option<String>> {
+    connection
+        .query_row(
+            r#"
+            SELECT id
+            FROM jobs
+            WHERE kind = 'new_profile'
+              AND status IN ('draft', 'ready', 'active', 'review', 'blocked', 'failed')
+            ORDER BY updated_at DESC, created_at DESC, id DESC
+            LIMIT 1
+            "#,
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(Into::into)
+}
+
+fn collapse_untouched_blank_new_profile_drafts(connection: &mut Connection) -> EngineResult<()> {
+    let mut deleted_workspace_paths = Vec::new();
+
+    {
+        let transaction = connection.transaction()?;
+        let duplicates = list_untouched_blank_new_profile_draft_candidates(&transaction)?;
+        for candidate in duplicates.into_iter().skip(1) {
+            delete_new_profile_job_records(&transaction, &candidate.id)?;
+            deleted_workspace_paths.push(candidate.workspace_path);
+        }
+        transaction.commit()?;
+    }
+
+    for workspace_path in deleted_workspace_paths {
+        remove_workspace_directory(&workspace_path);
+    }
+
+    Ok(())
+}
+
+fn delete_new_profile_job_records(connection: &Connection, job_id: &str) -> EngineResult<()> {
+    let review_key = format!("new_profile.review.{job_id}");
+    let review_notes_key = format!("new_profile.review_notes.{job_id}");
+    connection.execute(
+        "DELETE FROM app_settings WHERE key IN (?1, ?2)",
+        params![review_key, review_notes_key],
+    )?;
+
+    let deleted = connection.execute("DELETE FROM jobs WHERE id = ?1", params![job_id])?;
+    if deleted == 0 {
+        return Err(format!("New Profile job {job_id} was not found.").into());
+    }
+
+    Ok(())
 }
 
 fn load_printers(connection: &Connection) -> EngineResult<Vec<PrinterRecord>> {
@@ -2571,6 +2762,13 @@ fn workspace_path(app_support_path: &str, job_id: &str) -> String {
         .join(job_id)
         .to_string_lossy()
         .to_string()
+}
+
+fn remove_workspace_directory(workspace_path: &str) {
+    let workspace_path = Path::new(workspace_path);
+    if workspace_path.exists() {
+        let _ = std::fs::remove_dir_all(workspace_path);
+    }
 }
 
 fn open_connection(database_path: &str) -> EngineResult<Connection> {
@@ -3802,6 +4000,22 @@ mod tests {
         }
     }
 
+    fn sample_printer_input() -> CreatePrinterInput {
+        CreatePrinterInput {
+            manufacturer: "Epson".to_string(),
+            model: "P900".to_string(),
+            nickname: "P900".to_string(),
+            transport_style: "Sheet-fed".to_string(),
+            colorant_family: ColorantFamily::Cmyk,
+            channel_count: 4,
+            channel_labels: Vec::new(),
+            supported_media_settings: vec!["Premium Luster".to_string()],
+            supported_quality_modes: vec!["1440 dpi".to_string()],
+            monochrome_path_notes: "".to_string(),
+            notes: "".to_string(),
+        }
+    }
+
     #[test]
     fn dashboard_snapshot_returns_persisted_jobs() {
         let temp = tempdir().unwrap();
@@ -3903,6 +4117,71 @@ mod tests {
         let workspace_path = Path::new(&job.workspace_path);
         assert!(workspace_path.exists());
 
+        let review_json = encode_json(&ReviewSummaryRecord {
+            result: "Pass".to_string(),
+            verified_against_file: "/tmp/review.ti3".to_string(),
+            print_settings: "Premium Luster / 1440 dpi".to_string(),
+            last_verification_date: Some("2026-04-20T12:00:00Z".to_string()),
+            average_de00: Some(1.2),
+            maximum_de00: Some(2.8),
+            notes: "Good first build.".to_string(),
+        })
+        .unwrap();
+        let connection = open_connection(&config.database_path).unwrap();
+        connection
+            .execute(
+                r#"
+                INSERT INTO app_settings (key, value, updated_at)
+                VALUES (?1, ?2, ?3)
+                "#,
+                params![
+                    format!("new_profile.review.{}", job.id),
+                    &review_json,
+                    iso_timestamp()
+                ],
+            )
+            .unwrap();
+        connection
+            .execute(
+                r#"
+                INSERT INTO app_settings (key, value, updated_at)
+                VALUES (?1, ?2, ?3)
+                "#,
+                params![
+                    format!("new_profile.review_notes.{}", job.id),
+                    "Warm up the instrument.",
+                    iso_timestamp()
+                ],
+            )
+            .unwrap();
+        upsert_job_artifact(
+            &config.database_path,
+            &job.id,
+            WorkflowStage::Context,
+            ArtifactKind::Working,
+            "Context Notes",
+            Some("/tmp/context.txt"),
+            "ready",
+        )
+        .unwrap();
+        let command_id = insert_job_command(
+            &config.database_path,
+            &job.id,
+            WorkflowStage::Context,
+            "Generate Target",
+            &["targen".to_string(), "-v".to_string()],
+        )
+        .unwrap();
+        append_job_command_event(
+            &config.database_path,
+            &command_id,
+            CommandStream::System,
+            1,
+            "Command queued.",
+        )
+        .unwrap();
+        finish_job_command(&config.database_path, &command_id, true, Some(0)).unwrap();
+
         let result = delete_new_profile_job(&config.database_path, &job.id).unwrap();
         assert!(result.success);
 
@@ -3919,8 +4198,190 @@ mod tests {
                 row.get(0)
             })
             .unwrap();
+        let artifacts_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM artifacts", [], |row| row.get(0))
+            .unwrap();
+        let commands_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM job_commands", [], |row| row.get(0))
+            .unwrap();
+        let command_events_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM job_command_events", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        let review_settings_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM app_settings WHERE key IN (?1, ?2)",
+                params![
+                    format!("new_profile.review.{}", job.id),
+                    format!("new_profile.review_notes.{}", job.id)
+                ],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(jobs_count, 0);
         assert_eq!(new_profile_jobs_count, 0);
+        assert_eq!(artifacts_count, 0);
+        assert_eq!(commands_count, 0);
+        assert_eq!(command_events_count, 0);
+        assert_eq!(review_settings_count, 0);
+    }
+
+    #[test]
+    fn resolve_new_profile_launch_collapses_duplicate_blank_drafts() {
+        let temp = tempdir().unwrap();
+        let config = build_config(temp.path());
+        std::fs::create_dir_all(temp.path().join("app-support")).unwrap();
+
+        initialize_database(&config).unwrap();
+
+        let first = create_new_profile_draft(
+            &config.database_path,
+            &config.app_support_path,
+            &CreateNewProfileDraftInput {
+                profile_name: None,
+                printer_id: None,
+                paper_id: None,
+            },
+        )
+        .unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        let second = create_new_profile_draft(
+            &config.database_path,
+            &config.app_support_path,
+            &CreateNewProfileDraftInput {
+                profile_name: None,
+                printer_id: None,
+                paper_id: None,
+            },
+        )
+        .unwrap();
+
+        let resolved = resolve_new_profile_launch(
+            &config.database_path,
+            &config.app_support_path,
+            &CreateNewProfileDraftInput {
+                profile_name: None,
+                printer_id: None,
+                paper_id: None,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(resolved.id, second.id);
+        assert!(!Path::new(&first.workspace_path).exists());
+        assert!(Path::new(&second.workspace_path).exists());
+
+        let snapshot = load_dashboard_snapshot(&config.database_path).unwrap();
+        assert_eq!(snapshot.active_work_items.len(), 1);
+        assert_eq!(snapshot.active_work_items[0].id, second.id);
+
+        let connection = open_connection(&config.database_path).unwrap();
+        let jobs_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM jobs", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(jobs_count, 1);
+    }
+
+    #[test]
+    fn resolve_new_profile_launch_preserves_non_blank_resumable_jobs() {
+        let temp = tempdir().unwrap();
+        let config = build_config(temp.path());
+        std::fs::create_dir_all(temp.path().join("app-support")).unwrap();
+
+        initialize_database(&config).unwrap();
+        let printer = create_printer(&config.database_path, &sample_printer_input()).unwrap();
+        let paper = create_paper(&config.database_path, &sample_paper_input()).unwrap();
+
+        let first = create_new_profile_draft(
+            &config.database_path,
+            &config.app_support_path,
+            &CreateNewProfileDraftInput {
+                profile_name: Some("P900 Rag v1".to_string()),
+                printer_id: Some(printer.id.clone()),
+                paper_id: Some(paper.id.clone()),
+            },
+        )
+        .unwrap();
+        save_new_profile_context(
+            &config.database_path,
+            &SaveNewProfileContextInput {
+                job_id: first.id.clone(),
+                profile_name: "P900 Rag v1".to_string(),
+                printer_id: Some(printer.id.clone()),
+                paper_id: Some(paper.id.clone()),
+                printer_paper_preset_id: None,
+                print_path: "Canon driver".to_string(),
+                media_setting: "Premium Luster".to_string(),
+                quality_mode: "1440 dpi".to_string(),
+                print_path_notes: "".to_string(),
+                measurement_notes: "".to_string(),
+                measurement_observer: "1931_2".to_string(),
+                measurement_illuminant: "D50".to_string(),
+                measurement_mode: MeasurementMode::Strip,
+            },
+        )
+        .unwrap();
+
+        std::thread::sleep(std::time::Duration::from_millis(2));
+
+        let second = create_new_profile_draft(
+            &config.database_path,
+            &config.app_support_path,
+            &CreateNewProfileDraftInput {
+                profile_name: Some("P900 Rag v2".to_string()),
+                printer_id: Some(printer.id.clone()),
+                paper_id: Some(paper.id.clone()),
+            },
+        )
+        .unwrap();
+        save_new_profile_context(
+            &config.database_path,
+            &SaveNewProfileContextInput {
+                job_id: second.id.clone(),
+                profile_name: "P900 Rag v2".to_string(),
+                printer_id: Some(printer.id.clone()),
+                paper_id: Some(paper.id.clone()),
+                printer_paper_preset_id: None,
+                print_path: "Canon driver".to_string(),
+                media_setting: "Premium Luster".to_string(),
+                quality_mode: "1440 dpi".to_string(),
+                print_path_notes: "".to_string(),
+                measurement_notes: "".to_string(),
+                measurement_observer: "1931_2".to_string(),
+                measurement_illuminant: "D50".to_string(),
+                measurement_mode: MeasurementMode::Strip,
+            },
+        )
+        .unwrap();
+
+        let resolved = resolve_new_profile_launch(
+            &config.database_path,
+            &config.app_support_path,
+            &CreateNewProfileDraftInput {
+                profile_name: None,
+                printer_id: None,
+                paper_id: None,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(resolved.id, second.id);
+
+        let snapshot = load_dashboard_snapshot(&config.database_path).unwrap();
+        assert_eq!(snapshot.active_work_items.len(), 2);
+        assert!(
+            snapshot
+                .active_work_items
+                .iter()
+                .any(|item| item.id == first.id)
+        );
+        assert!(
+            snapshot
+                .active_work_items
+                .iter()
+                .any(|item| item.id == second.id)
+        );
     }
 
     #[test]
@@ -3930,23 +4391,7 @@ mod tests {
         std::fs::create_dir_all(temp.path().join("app-support")).unwrap();
 
         initialize_database(&config).unwrap();
-        let printer = create_printer(
-            &config.database_path,
-            &CreatePrinterInput {
-                manufacturer: "Epson".to_string(),
-                model: "P900".to_string(),
-                nickname: "P900".to_string(),
-                transport_style: "Sheet-fed".to_string(),
-                colorant_family: ColorantFamily::Cmyk,
-                channel_count: 4,
-                channel_labels: Vec::new(),
-                supported_media_settings: vec!["Premium Luster".to_string()],
-                supported_quality_modes: vec!["1440 dpi".to_string()],
-                monochrome_path_notes: "".to_string(),
-                notes: "".to_string(),
-            },
-        )
-        .unwrap();
+        let printer = create_printer(&config.database_path, &sample_printer_input()).unwrap();
         let paper = create_paper(
             &config.database_path,
             &CreatePaperInput {
@@ -4055,6 +4500,143 @@ mod tests {
                 && item.stage == WorkflowStage::Review
                 && item.status == "review"
         }));
+    }
+
+    #[test]
+    fn delete_printer_profile_succeeds_when_source_job_link_is_missing() {
+        let temp = tempdir().unwrap();
+        let config = build_config(temp.path());
+        std::fs::create_dir_all(temp.path().join("app-support")).unwrap();
+
+        initialize_database(&config).unwrap();
+        let printer = create_printer(&config.database_path, &sample_printer_input()).unwrap();
+        let paper = create_paper(
+            &config.database_path,
+            &CreatePaperInput {
+                notes: "".to_string(),
+                ..sample_paper_input()
+            },
+        )
+        .unwrap();
+
+        let source_job = create_new_profile_draft(
+            &config.database_path,
+            &config.app_support_path,
+            &CreateNewProfileDraftInput {
+                profile_name: Some("P900 Rag v1".to_string()),
+                printer_id: Some(printer.id.clone()),
+                paper_id: Some(paper.id.clone()),
+            },
+        )
+        .unwrap();
+        save_new_profile_context(
+            &config.database_path,
+            &SaveNewProfileContextInput {
+                job_id: source_job.id.clone(),
+                profile_name: "P900 Rag v1".to_string(),
+                printer_id: Some(printer.id.clone()),
+                paper_id: Some(paper.id.clone()),
+                printer_paper_preset_id: None,
+                print_path: "Canon driver".to_string(),
+                media_setting: "Premium Luster".to_string(),
+                quality_mode: "1440 dpi".to_string(),
+                print_path_notes: "".to_string(),
+                measurement_notes: "".to_string(),
+                measurement_observer: "1931_2".to_string(),
+                measurement_illuminant: "D50".to_string(),
+                measurement_mode: MeasurementMode::Strip,
+            },
+        )
+        .unwrap();
+        complete_measurement(
+            &config.database_path,
+            &source_job.id,
+            &temp.path().join("source.ti3").to_string_lossy(),
+            false,
+        )
+        .unwrap();
+        complete_build_profile(
+            &config.database_path,
+            &source_job.id,
+            &temp.path().join("source.icc").to_string_lossy(),
+            &ReviewSummaryRecord {
+                result: "Pass".to_string(),
+                verified_against_file: "source.ti3".to_string(),
+                print_settings: "Premium Luster / 1440 dpi".to_string(),
+                last_verification_date: Some("2026-04-20T12:00:00Z".to_string()),
+                average_de00: Some(1.2),
+                maximum_de00: Some(2.8),
+                notes: "Good first build.".to_string(),
+            },
+        )
+        .unwrap();
+        let published = publish_new_profile(&config.database_path, &source_job.id).unwrap();
+        let profile_id = published.published_profile_id.clone().unwrap();
+
+        let dependent_job = create_new_profile_draft(
+            &config.database_path,
+            &config.app_support_path,
+            &CreateNewProfileDraftInput {
+                profile_name: Some("Planning Job".to_string()),
+                printer_id: Some(printer.id.clone()),
+                paper_id: Some(paper.id.clone()),
+            },
+        )
+        .unwrap();
+        save_target_settings(
+            &config.database_path,
+            &SaveTargetSettingsInput {
+                job_id: dependent_job.id.clone(),
+                patch_count: 928,
+                improve_neutrals: false,
+                use_existing_profile_to_help_target_planning: true,
+                planning_profile_id: Some(profile_id.clone()),
+            },
+        )
+        .unwrap();
+
+        let corruption = Connection::open(&config.database_path).unwrap();
+        corruption
+            .pragma_update(None, "foreign_keys", "OFF")
+            .unwrap();
+        corruption
+            .execute(
+                "UPDATE printer_profiles SET created_from_job_id = ?2 WHERE id = ?1",
+                params![&profile_id, "job-missing"],
+            )
+            .unwrap();
+        corruption
+            .execute(
+                "DELETE FROM new_profile_jobs WHERE id = ?1",
+                params![&source_job.id],
+            )
+            .unwrap();
+        corruption
+            .execute("DELETE FROM jobs WHERE id = ?1", params![&source_job.id])
+            .unwrap();
+        corruption
+            .pragma_update(None, "foreign_keys", "ON")
+            .unwrap();
+
+        let result = delete_printer_profile(&config.database_path, &profile_id).unwrap();
+        assert!(result.success);
+
+        let profiles = list_printer_profiles(&config.database_path).unwrap();
+        assert!(profiles.is_empty());
+
+        let dependent =
+            load_new_profile_job_detail(&config.database_path, &dependent_job.id).unwrap();
+        assert_eq!(dependent.target_settings.planning_profile_id, None);
+
+        let connection = open_connection(&config.database_path).unwrap();
+        let source_job_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM jobs WHERE id = ?1",
+                params![&source_job.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(source_job_count, 0);
     }
 
     #[test]

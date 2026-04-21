@@ -418,6 +418,30 @@ impl Engine {
         }
     }
 
+    #[uniffi::method(name = "resolveNewProfileLaunch")]
+    pub fn resolve_new_profile_launch(
+        &self,
+        input: CreateNewProfileDraftInput,
+    ) -> NewProfileJobDetail {
+        let result = with_config(&self.state, |config| {
+            db::resolve_new_profile_launch(&config.database_path, &config.app_support_path, &input)
+        });
+        match result {
+            Ok(detail) => {
+                refresh_dashboard(&self.state);
+                detail
+            }
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.jobs",
+                    &format!("Resolve new profile launch failed: {error}"),
+                );
+                fallback_job_detail("new-profile", Some(error.to_string()))
+            }
+        }
+    }
+
     #[uniffi::method(name = "getNewProfileJobDetail")]
     pub fn get_new_profile_job_detail(&self, job_id: String) -> NewProfileJobDetail {
         match with_config(&self.state, |config| {

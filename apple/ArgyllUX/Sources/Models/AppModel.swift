@@ -22,8 +22,8 @@ private enum PendingDeletion: Equatable {
 
     var confirmationMessage: String {
         switch self {
-        case let .activeWork(_, title):
-            return ActiveWorkCopy.deletionConfirmationMessage(jobTitle: title)
+        case let .activeWork(jobId, title):
+            return ActiveWorkCopy.deletionConfirmationMessage(jobTitle: title, jobId: jobId)
         case let .printerProfile(_, profileName, _):
             return PrinterProfileCopy.deletionConfirmationMessage(profileName: profileName)
         }

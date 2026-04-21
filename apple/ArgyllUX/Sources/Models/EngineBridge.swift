@@ -75,6 +75,10 @@ actor EngineBridge {
         engine.createNewProfileDraft(input: input)
     }
 
+    func resolveNewProfileLaunch(input: CreateNewProfileDraftInput) -> NewProfileJobDetail {
+        engine.resolveNewProfileLaunch(input: input)
+    }
+
     func getNewProfileJobDetail(jobId: String) -> NewProfileJobDetail {
         engine.getNewProfileJobDetail(jobId: jobId)
     }

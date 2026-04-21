@@ -107,7 +107,7 @@ struct HomeView: View {
                                     .frame(width: 28, height: 28)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel(ActiveWorkCopy.deleteAccessibilityLabel(for: item.title))
+                            .accessibilityLabel(ActiveWorkCopy.deleteAccessibilityLabel(for: item.title, jobId: item.id))
                             .help(ActiveWorkCopy.deleteActionTitle)
                         }
                         .padding(12)

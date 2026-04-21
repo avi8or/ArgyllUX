@@ -130,4 +130,50 @@ struct AppModelShellTests {
         #expect(model.activeWorkItems.map(\.id) == [draftDetail.id])
         #expect(model.deletionErrorMessage == "Database is locked.")
     }
+
+    @Test
+    func genericNewProfileDeletionConfirmationIncludesJobId() {
+        let model = makeAppModel()
+
+        model.requestActiveWorkDeletion(jobId: "job-blank-1", title: "New Profile")
+
+        #expect(model.deletionConfirmationMessage == "This removes New Profile (job-blank-1) and its unpublished working files.")
+    }
+
+    @Test
+    func confirmCurrentWorkflowDeletionUsesActiveWorkPathForGenericDraft() async {
+        let draftDetail = makeJobDetail(
+            id: "job-blank-1",
+            title: "New Profile",
+            stage: .context,
+            nextAction: "Save Context"
+        )
+        let fakeEngine = FakeEngine()
+        fakeEngine.toolchainStatusValue = makeToolchainStatus(state: .ready, path: "/opt/homebrew/bin")
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(
+            activeWorkItems: [
+                makeActiveWorkItem(
+                    id: draftDetail.id,
+                    title: draftDetail.title,
+                    nextAction: draftDetail.nextAction,
+                    stage: draftDetail.stage
+                )
+            ]
+        )
+        fakeEngine.loadedJobDetails[draftDetail.id] = draftDetail
+        fakeEngine.deleteNewProfileJobResult = DeleteResult(success: true, message: "")
+
+        let model = makeAppModel(fakeEngine: fakeEngine)
+        await model.openNewProfileWorkflow()
+        model.requestCurrentWorkflowDeletion()
+
+        #expect(model.deletionConfirmationMessage == "This removes New Profile (job-blank-1) and its unpublished working files.")
+
+        await model.confirmPendingDeletion()
+
+        #expect(fakeEngine.lastDeletedJobId == draftDetail.id)
+        #expect(model.activeNewProfileDetail == nil)
+        #expect(model.activeWorkflow == nil)
+        #expect(model.activeWorkItems.isEmpty)
+    }
 }

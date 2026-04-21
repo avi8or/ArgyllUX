@@ -18,17 +18,36 @@ enum ActiveWorkCopy {
     static let deleteErrorTitle = "Couldn't Delete Active Work"
     static let deleteHint = "Removes this unpublished work and its working files."
 
-    static func deleteAccessibilityLabel(for jobTitle: String) -> String {
-        "Delete Active Work: \(jobTitle)"
+    static func deleteAccessibilityLabel(for jobTitle: String, jobId: String) -> String {
+        "Delete Active Work: \(deleteTargetLabel(jobTitle: jobTitle, jobId: jobId))"
     }
 
-    static func deletionConfirmationMessage(jobTitle: String) -> String {
+    static func deletionConfirmationMessage(jobTitle: String, jobId: String) -> String {
+        if let genericTarget = genericDraftDeleteTarget(jobTitle: jobTitle, jobId: jobId) {
+            return "This removes \(genericTarget) and its unpublished working files."
+        }
+
         let trimmedTitle = jobTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else {
-            return "This removes the unpublished job and its working files."
+            return "This removes job \(jobId) and its unpublished working files."
         }
 
         return "This removes \"\(trimmedTitle)\" and its unpublished working files."
+    }
+
+    private static func deleteTargetLabel(jobTitle: String, jobId: String) -> String {
+        genericDraftDeleteTarget(jobTitle: jobTitle, jobId: jobId)
+            ?? jobTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func genericDraftDeleteTarget(jobTitle: String, jobId: String) -> String? {
+        let trimmedTitle = jobTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedTitle.isEmpty || trimmedTitle.caseInsensitiveCompare("New Profile") == .orderedSame else {
+            return nil
+        }
+
+        let label = trimmedTitle.isEmpty ? "New Profile" : trimmedTitle
+        return "\(label) (\(jobId))"
     }
 }
 

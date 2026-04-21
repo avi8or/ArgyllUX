@@ -592,25 +592,15 @@ final class NewProfileWorkflowModel: ObservableObject {
         return value ?? activeNewProfileDetail?.printSettings.dryingTimeMinutes ?? 30
     }
 
-    // Every shell-level New Profile launcher follows the same rule: resume the
-    // latest resumable job first, or create a new draft if none exists. Settings
-    // seeds are only applied on draft creation so a handoff cannot silently
-    // rewrite another in-progress job.
+    // Rust owns New Profile launch resolution so every shell entrypoint lands on
+    // the same canonical blank draft and seeded launches only affect brand-new
+    // drafts.
     private func openNewProfile(_ target: NewProfileOpenTarget) async {
-        let snapshot = await bridge.getDashboardSnapshot()
-        dashboardDidChange?(snapshot)
-        applyActiveWorkItems(snapshot.activeWorkItems)
-
         switch target {
         case let .job(jobId):
             await loadNewProfileDetail(jobId: jobId, forceEditorSync: true)
         case let .resumableOrCreate(seed):
-            if let existingJobId = latestResumableNewProfileJobID(from: snapshot) {
-                await loadNewProfileDetail(jobId: existingJobId, forceEditorSync: true)
-                return
-            }
-
-            let detail = await bridge.createNewProfileDraft(
+            let detail = await bridge.resolveNewProfileLaunch(
                 input: CreateNewProfileDraftInput(
                     profileName: nil,
                     printerId: seed?.printerId,
@@ -769,10 +759,6 @@ final class NewProfileWorkflowModel: ObservableObject {
         if !workflowHasLegacyContextWithoutPreset && workflowSelectedPrinterPaperPresetID == nil {
             workflowPrintPath = ""
         }
-    }
-
-    private func latestResumableNewProfileJobID(from snapshot: DashboardSnapshot) -> String? {
-        snapshot.activeWorkItems.first { $0.kind == "new_profile" }?.id
     }
 
     private func workflowStageIdentifier(_ stage: WorkflowStage) -> String {

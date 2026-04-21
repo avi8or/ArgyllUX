@@ -26,7 +26,10 @@ struct NewProfileWorkflowModelTests {
 
         await model.openNewProfileWorkflow(printerId: printer.id, paperId: paper.id)
 
+        #expect(fakeEngine.resolveNewProfileLaunchCallCount == 1)
         #expect(fakeEngine.createDraftCallCount == 0)
+        #expect(fakeEngine.lastResolveNewProfileLaunchInput?.printerId == printer.id)
+        #expect(fakeEngine.lastResolveNewProfileLaunchInput?.paperId == paper.id)
         #expect(fakeEngine.lastCreateDraftInput?.printerId == nil)
         #expect(fakeEngine.lastCreateDraftInput?.paperId == nil)
         #expect(model.activeNewProfileDetail?.id == draftDetail.id)
@@ -54,7 +57,10 @@ struct NewProfileWorkflowModelTests {
 
         await model.openNewProfileWorkflow(printerId: printer.id, paperId: paper.id)
 
+        #expect(fakeEngine.resolveNewProfileLaunchCallCount == 1)
         #expect(fakeEngine.createDraftCallCount == 1)
+        #expect(fakeEngine.lastResolveNewProfileLaunchInput?.printerId == printer.id)
+        #expect(fakeEngine.lastResolveNewProfileLaunchInput?.paperId == paper.id)
         #expect(fakeEngine.lastCreateDraftInput?.printerId == printer.id)
         #expect(fakeEngine.lastCreateDraftInput?.paperId == paper.id)
         #expect(model.activeNewProfileDetail?.id == draftDetail.id)

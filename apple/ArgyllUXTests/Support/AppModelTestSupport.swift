@@ -58,8 +58,10 @@ func makeReferenceData(
 final class FakeEngine: EngineProtocol, @unchecked Sendable {
     private(set) var bootstrapCallCount = 0
     private(set) var createDraftCallCount = 0
+    private(set) var resolveNewProfileLaunchCallCount = 0
     private(set) var lastSetToolchainPath: String?
     private(set) var lastCreateDraftInput: CreateNewProfileDraftInput?
+    private(set) var lastResolveNewProfileLaunchInput: CreateNewProfileDraftInput?
     private(set) var lastCreatedPaperInput: CreatePaperInput?
     private(set) var lastUpdatedPaperInput: UpdatePaperInput?
     private(set) var lastCreatedPresetInput: CreatePrinterPaperPresetInput?
@@ -86,6 +88,7 @@ final class FakeEngine: EngineProtocol, @unchecked Sendable {
     var printerProfilesCurrent: [PrinterProfileRecord] = []
     var printerProfilesAfterPublish: [PrinterProfileRecord]?
     var createNewProfileDraftResult = makeJobDetail(stage: .context, nextAction: "Save Context")
+    var resolveNewProfileLaunchResult: NewProfileJobDetail?
     var saveNewProfileContextResult = makeJobDetail(stage: .target, nextAction: "Generate Target")
     var saveTargetSettingsResult = makeJobDetail(stage: .target, nextAction: "Generate Target")
     var savePrintSettingsResult = makeJobDetail(stage: .print, nextAction: "Mark Chart as Printed")
@@ -110,10 +113,50 @@ final class FakeEngine: EngineProtocol, @unchecked Sendable {
     }
 
     func createNewProfileDraft(input: CreateNewProfileDraftInput) -> NewProfileJobDetail {
+        createDraft(input: input)
+    }
+
+    func resolveNewProfileLaunch(input: CreateNewProfileDraftInput) -> NewProfileJobDetail {
+        resolveNewProfileLaunchCallCount += 1
+        lastResolveNewProfileLaunchInput = input
+
+        if let resolveNewProfileLaunchResult {
+            loadedJobDetails[resolveNewProfileLaunchResult.id] = resolveNewProfileLaunchResult
+            upsertActiveWorkItem(for: resolveNewProfileLaunchResult)
+            return resolveNewProfileLaunchResult
+        }
+
+        if let existingJobId = dashboardSnapshotCurrent.activeWorkItems.first(where: { $0.kind == "new_profile" })?.id {
+            let detail = loadedJobDetails[existingJobId] ?? createNewProfileDraftResult
+            loadedJobDetails[detail.id] = detail
+            upsertActiveWorkItem(for: detail)
+            return detail
+        }
+
+        return createDraft(input: input)
+    }
+
+    private func createDraft(input: CreateNewProfileDraftInput) -> NewProfileJobDetail {
         createDraftCallCount += 1
         lastCreateDraftInput = input
         loadedJobDetails[createNewProfileDraftResult.id] = createNewProfileDraftResult
+        upsertActiveWorkItem(for: createNewProfileDraftResult)
         return createNewProfileDraftResult
+    }
+
+    private func upsertActiveWorkItem(for detail: NewProfileJobDetail) {
+        let item = makeActiveWorkItem(
+            id: detail.id,
+            title: detail.title,
+            nextAction: detail.nextAction,
+            stage: detail.stage,
+            printerName: detail.printerName,
+            paperName: detail.paperName,
+            status: detail.status
+        )
+        dashboardSnapshotCurrent = makeDashboard(
+            activeWorkItems: [item] + dashboardSnapshotCurrent.activeWorkItems.filter { $0.id != detail.id }
+        )
     }
 
     func deleteNewProfileJob(jobId: String) -> DeleteResult {
@@ -428,7 +471,8 @@ func makeActiveWorkItem(
     nextAction: String = "Save Context",
     stage: WorkflowStage = .context,
     printerName: String = "Studio P900",
-    paperName: String = "Canson Rag"
+    paperName: String = "Canson Rag",
+    status: String = "context"
 ) -> ActiveWorkItem {
     ActiveWorkItem(
         id: id,
@@ -439,7 +483,7 @@ func makeActiveWorkItem(
         profileName: title,
         printerName: printerName,
         paperName: paperName,
-        status: "context"
+        status: status
     )
 }
 

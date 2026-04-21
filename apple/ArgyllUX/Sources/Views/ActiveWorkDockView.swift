@@ -50,7 +50,7 @@ struct ActiveWorkDockView: View {
                                         .frame(width: 30, height: 30)
                                 }
                                 .buttonStyle(.plain)
-                                .accessibilityLabel(ActiveWorkCopy.deleteAccessibilityLabel(for: item.title))
+                                .accessibilityLabel(ActiveWorkCopy.deleteAccessibilityLabel(for: item.title, jobId: item.id))
                                 .accessibilityHint(ActiveWorkCopy.deleteHint)
                                 .help(ActiveWorkCopy.deleteActionTitle)
                             }
