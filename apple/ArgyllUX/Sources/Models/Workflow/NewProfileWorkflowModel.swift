@@ -10,8 +10,41 @@ private enum NewProfileOpenTarget: Equatable {
     case job(id: String)
 }
 
-/// Owns New Profile editor state, inline catalog creation, and workflow polling
-/// while leaving shell routing and destructive confirmation UI to AppModel.
+enum WorkflowContextSheet: Identifiable, Equatable {
+    case choosePrinter
+    case newPrinter
+    case editPrinter(String)
+    case choosePaper
+    case newPaper
+    case editPaper(String)
+    case newPreset
+    case editPreset(String)
+
+    var id: String {
+        switch self {
+        case .choosePrinter:
+            "choose-printer"
+        case .newPrinter:
+            "new-printer"
+        case let .editPrinter(id):
+            "edit-printer-\(id)"
+        case .choosePaper:
+            "choose-paper"
+        case .newPaper:
+            "new-paper"
+        case let .editPaper(id):
+            "edit-paper-\(id)"
+        case .newPreset:
+            "new-preset"
+        case let .editPreset(id):
+            "edit-preset-\(id)"
+        }
+    }
+}
+
+/// Owns New Profile editor state, modal context selection/editing, and
+/// workflow polling while leaving shell routing and destructive confirmation UI
+/// to AppModel.
 @MainActor
 final class NewProfileWorkflowModel: ObservableObject {
     @Published var activeNewProfileDetail: NewProfileJobDetail?
@@ -38,12 +71,10 @@ final class NewProfileWorkflowModel: ObservableObject {
     @Published var workflowPrintWithoutColorManagement = true
     @Published var workflowDryingTimeMinutes = "30"
     @Published var workflowScanFilePath = ""
-    @Published var showWorkflowPrinterForm = false
-    @Published var showWorkflowPaperForm = false
-    @Published var showWorkflowPresetForm = false
     @Published var workflowPrinterDraft = PrinterDraft()
     @Published var workflowPaperDraft = PaperDraft()
     @Published var workflowPresetDraft = PrinterPaperPresetDraft()
+    @Published var workflowContextSheet: WorkflowContextSheet?
 
     private let bridge: EngineBridge
     private let fileOpener: FileOpening
@@ -173,7 +204,7 @@ final class NewProfileWorkflowModel: ObservableObject {
     }
 
     var showsWorkflowStandalonePrintPathEditor: Bool {
-        workflowSelectedPrinterPaperPreset == nil && !showWorkflowPresetForm
+        workflowSelectedPrinterPaperPreset == nil
     }
 
     var canDeleteCurrentWorkflow: Bool {
@@ -254,14 +285,20 @@ final class NewProfileWorkflowModel: ObservableObject {
 
     func selectWorkflowPrinter(_ printerId: String?) {
         workflowSelectedPrinterID = printerId
-        syncWorkflowPresetDraftToCurrentSelection()
         syncWorkflowPresetSelectionAfterContextChange(autoSelect: true)
+
+        if case .choosePrinter = workflowContextSheet {
+            workflowContextSheet = nil
+        }
     }
 
     func selectWorkflowPaper(_ paperId: String?) {
         workflowSelectedPaperID = paperId
-        syncWorkflowPresetDraftToCurrentSelection()
         syncWorkflowPresetSelectionAfterContextChange(autoSelect: true)
+
+        if case .choosePaper = workflowContextSheet {
+            workflowContextSheet = nil
+        }
     }
 
     func selectWorkflowPrinterPaperPreset(_ presetId: String?) {
@@ -275,17 +312,38 @@ final class NewProfileWorkflowModel: ObservableObject {
         }
     }
 
+    func presentWorkflowPrinterChooser() {
+        workflowContextSheet = .choosePrinter
+    }
+
     func beginWorkflowPrinterCreation() {
         workflowPrinterDraft = PrinterDraft()
-        showWorkflowPrinterForm = true
+        workflowContextSheet = .newPrinter
+    }
+
+    func presentWorkflowPrinterEditor() {
+        guard let printer = workflowSelectedPrinter else { return }
+        workflowPrinterDraft = PrinterDraft(record: printer)
+        workflowContextSheet = .editPrinter(printer.id)
+    }
+
+    func presentWorkflowPaperChooser() {
+        workflowContextSheet = .choosePaper
     }
 
     func beginWorkflowPaperCreation() {
         workflowPaperDraft = PaperDraft()
-        showWorkflowPaperForm = true
+        workflowContextSheet = .newPaper
+    }
+
+    func presentWorkflowPaperEditor() {
+        guard let paper = workflowSelectedPaper else { return }
+        workflowPaperDraft = PaperDraft(record: paper)
+        workflowContextSheet = .editPaper(paper.id)
     }
 
     func beginWorkflowPresetCreation() {
+        guard workflowSelectedPrinterID != nil, workflowSelectedPaperID != nil else { return }
         workflowPresetDraft = PrinterPaperPresetDraft()
         workflowPresetDraft.printerId = workflowSelectedPrinterID
         workflowPresetDraft.paperId = workflowSelectedPaperID
@@ -293,22 +351,32 @@ final class NewProfileWorkflowModel: ObservableObject {
         workflowPresetDraft.mediaSetting = workflowMediaSetting
         workflowPresetDraft.qualityMode = workflowQualityMode
         sanitizePrinterPaperPresetDraft(&workflowPresetDraft, printers: printers)
-        showWorkflowPresetForm = true
+        workflowContextSheet = .newPreset
+    }
+
+    func presentWorkflowPresetEditor() {
+        guard let preset = workflowSelectedPrinterPaperPreset else { return }
+        workflowPresetDraft = PrinterPaperPresetDraft(record: preset)
+        workflowContextSheet = .editPreset(preset.id)
+    }
+
+    func dismissWorkflowContextSheet() {
+        workflowContextSheet = nil
+        workflowPrinterDraft = PrinterDraft()
+        workflowPaperDraft = PaperDraft()
+        workflowPresetDraft = PrinterPaperPresetDraft()
     }
 
     func cancelWorkflowPrinterCreation() {
-        workflowPrinterDraft = PrinterDraft()
-        showWorkflowPrinterForm = false
+        dismissWorkflowContextSheet()
     }
 
     func cancelWorkflowPaperCreation() {
-        workflowPaperDraft = PaperDraft()
-        showWorkflowPaperForm = false
+        dismissWorkflowContextSheet()
     }
 
     func cancelWorkflowPresetCreation() {
-        workflowPresetDraft = PrinterPaperPresetDraft()
-        showWorkflowPresetForm = false
+        dismissWorkflowContextSheet()
     }
 
     func createWorkflowPrinter() async {
@@ -335,7 +403,7 @@ final class NewProfileWorkflowModel: ObservableObject {
         referenceDataDidChange?(data)
         selectWorkflowPrinter(printer.id)
         workflowPrinterDraft = PrinterDraft()
-        showWorkflowPrinterForm = false
+        workflowContextSheet = nil
     }
 
     func createWorkflowPaper() async {
@@ -366,7 +434,7 @@ final class NewProfileWorkflowModel: ObservableObject {
         referenceDataDidChange?(data)
         selectWorkflowPaper(paper.id)
         workflowPaperDraft = PaperDraft()
-        showWorkflowPaperForm = false
+        workflowContextSheet = nil
     }
 
     func createWorkflowPreset() async {
@@ -391,7 +459,7 @@ final class NewProfileWorkflowModel: ObservableObject {
         referenceDataDidChange?(data)
         selectWorkflowPrinterPaperPreset(preset.id)
         workflowPresetDraft = PrinterPaperPresetDraft()
-        showWorkflowPresetForm = false
+        workflowContextSheet = nil
     }
 
     func saveWorkflowContext() async {
@@ -661,20 +729,6 @@ final class NewProfileWorkflowModel: ObservableObject {
         }
 
         return true
-    }
-
-    // While inline preset creation is open, the workflow's outer printer and
-    // paper pickers remain the authoritative pair selection.
-    private func syncWorkflowPresetDraftToCurrentSelection() {
-        guard showWorkflowPresetForm else { return }
-        guard let printerId = workflowSelectedPrinterID, let paperId = workflowSelectedPaperID else {
-            cancelWorkflowPresetCreation()
-            return
-        }
-
-        workflowPresetDraft.printerId = printerId
-        workflowPresetDraft.paperId = paperId
-        sanitizePrinterPaperPresetDraft(&workflowPresetDraft, printers: printers)
     }
 
     private func populateWorkflowContext(from preset: PrinterPaperPresetRecord) {

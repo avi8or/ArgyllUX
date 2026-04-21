@@ -27,32 +27,89 @@ struct NewProfileWorkflowView: View {
     var body: some View {
         Group {
             if let detail = workflow.activeNewProfileDetail {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        NewProfileWorkflowHeaderView(workflow: workflow, detail: detail, actions: actions)
+                VStack(spacing: 0) {
+                    NewProfileWorkflowHeaderView(workflow: workflow, detail: detail, actions: actions)
 
-                        HStack(alignment: .top, spacing: 18) {
-                            NewProfileWorkflowTimelineView(detail: detail)
-                                .frame(width: 220)
+                    Divider()
 
+                    HStack(spacing: 0) {
+                        ScrollView {
                             NewProfileWorkflowWorkspaceView(
                                 workflow: workflow,
                                 detail: detail,
                                 actions: actions
                             )
+                            .padding(24)
                             .frame(maxWidth: .infinity, alignment: .topLeading)
-
-                            NewProfileWorkflowInspectorView(workflow: workflow, detail: detail)
-                                .frame(width: 280)
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                        Divider()
+
+                        ScrollView {
+                            NewProfileWorkflowSidebarView(workflow: workflow, detail: detail)
+                                .frame(maxWidth: .infinity, alignment: .topLeading)
+                        }
+                        .frame(minWidth: 320, maxWidth: 320, maxHeight: .infinity, alignment: .topLeading)
+                        .background(Color.secondary.opacity(0.04))
                     }
-                    .padding(24)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .sheet(item: $workflow.workflowContextSheet) { sheet in
+                    contextSheetView(for: sheet)
+                }
             } else {
                 ProgressView("Opening New Profile")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func contextSheetView(for sheet: WorkflowContextSheet) -> some View {
+        switch sheet {
+        case .choosePrinter:
+            WorkflowPrinterChooserSheet(workflow: workflow)
+        case .newPrinter, .editPrinter:
+            PrinterEditorForm(
+                title: workflow.workflowPrinterDraft.title,
+                draft: $workflow.workflowPrinterDraft,
+                saveTitle: workflow.workflowPrinterDraft.id == nil ? "Save Printer" : "Save Changes",
+                secondaryTitle: "Cancel",
+                isSaveDisabled: !workflow.isWorkflowPrinterDraftValid,
+                onSave: actions.createWorkflowPrinter,
+                onSecondary: {
+                    workflow.dismissWorkflowContextSheet()
+                }
+            )
+        case .choosePaper:
+            WorkflowPaperChooserSheet(workflow: workflow)
+        case .newPaper, .editPaper:
+            PaperEditorForm(
+                title: workflow.workflowPaperDraft.title,
+                draft: $workflow.workflowPaperDraft,
+                saveTitle: workflow.workflowPaperDraft.id == nil ? "Save Paper" : "Save Changes",
+                secondaryTitle: "Cancel",
+                isSaveDisabled: !workflow.isWorkflowPaperDraftValid,
+                onSave: actions.createWorkflowPaper,
+                onSecondary: {
+                    workflow.dismissWorkflowContextSheet()
+                }
+            )
+        case .newPreset, .editPreset:
+            PrinterPaperPresetEditorForm(
+                title: workflow.workflowPresetDraft.title,
+                draft: $workflow.workflowPresetDraft,
+                printers: workflow.printers,
+                papers: workflow.papers,
+                lockPrinterAndPaperSelection: true,
+                saveTitle: workflow.workflowPresetDraft.id == nil ? "Save Settings" : "Save Changes",
+                secondaryTitle: "Cancel",
+                isSaveDisabled: !workflow.isWorkflowPresetDraftValid,
+                onSave: actions.createWorkflowPreset,
+                onSecondary: {
+                    workflow.dismissWorkflowContextSheet()
+                }
+            )
         }
     }
 }

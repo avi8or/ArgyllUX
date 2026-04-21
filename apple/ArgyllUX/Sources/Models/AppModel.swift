@@ -53,6 +53,29 @@ private struct DeletionErrorState: Equatable {
     let message: String
 }
 
+enum ShellRouteAccessory: Equatable {
+    case none
+    case workflowManaged
+}
+
+struct ShellChromeConfiguration: Equatable {
+    let routeAccessory: ShellRouteAccessory
+    let showsActiveWorkDock: Bool
+    let showsFooterStatusBar: Bool
+
+    static let standard = ShellChromeConfiguration(
+        routeAccessory: .none,
+        showsActiveWorkDock: true,
+        showsFooterStatusBar: true
+    )
+
+    static let workflow = ShellChromeConfiguration(
+        routeAccessory: .workflowManaged,
+        showsActiveWorkDock: true,
+        showsFooterStatusBar: true
+    )
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     @Published var selectedRoute: AppRoute = .home
@@ -186,12 +209,44 @@ final class AppModel: ObservableObject {
         }
     }
 
+    var readinessTone: StatusBadgeView.Tone {
+        switch appHealth?.readiness {
+        case "ready":
+            .ready
+        case "attention":
+            .attention
+        case "blocked", .none:
+            .blocked
+        default:
+            .blocked
+        }
+    }
+
+    var toolchainTone: StatusBadgeView.Tone {
+        switch toolchainStatus?.state {
+        case .ready:
+            .ready
+        case .partial:
+            .attention
+        case .notFound, .none:
+            .blocked
+        }
+    }
+
     var lastValidationLabel: String {
         settings.lastValidationLabel
     }
 
     var isShowingNewProfileWorkflow: Bool {
         activeWorkflow == .newProfile
+    }
+
+    var shellChromeConfiguration: ShellChromeConfiguration {
+        if isShowingNewProfileWorkflow {
+            return .workflow
+        }
+
+        return .standard
     }
 
     var printers: [PrinterRecord] {
@@ -335,18 +390,6 @@ final class AppModel: ObservableObject {
     var workflowScanFilePath: String {
         get { workflow.workflowScanFilePath }
         set { workflow.workflowScanFilePath = newValue }
-    }
-
-    var showWorkflowPrinterForm: Bool {
-        workflow.showWorkflowPrinterForm
-    }
-
-    var showWorkflowPaperForm: Bool {
-        workflow.showWorkflowPaperForm
-    }
-
-    var showWorkflowPresetForm: Bool {
-        workflow.showWorkflowPresetForm
     }
 
     var workflowPrinterDraft: PrinterDraft {

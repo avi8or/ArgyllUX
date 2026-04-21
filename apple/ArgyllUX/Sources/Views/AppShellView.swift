@@ -6,52 +6,52 @@ struct AppShellView: View {
     @State private var isShowingErrorLogViewer = false
 
     var body: some View {
+        let chrome = model.shellChromeConfiguration
+
         VStack(spacing: 0) {
             topStrip
             Divider()
 
-            HStack(spacing: 0) {
-                currentRouteView
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            currentRouteSurface(for: chrome)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-                if !model.isShowingNewProfileWorkflow {
-                    Divider()
+            if chrome.showsActiveWorkDock {
+                Divider()
 
-                    InspectorView(
-                        route: model.selectedRoute,
-                        appHealth: model.appHealth,
-                        toolchainStatus: model.toolchainStatus
-                    )
-                    .frame(width: 300)
-                }
+                ActiveWorkDockView(
+                    items: model.activeWorkItems,
+                    onSelect: { item in
+                        model.openActiveWorkItem(item)
+                    },
+                    onDelete: { item in
+                        model.requestActiveWorkDeletion(item)
+                    }
+                )
             }
 
-            Divider()
+            if chrome.showsFooterStatusBar {
+                Divider()
 
-            ActiveWorkDockView(
-                items: model.activeWorkItems,
-                onSelect: { item in
-                    model.openActiveWorkItem(item)
-                },
-                onDelete: { item in
-                    model.requestActiveWorkDeletion(item)
-                }
-            )
-
-            Divider()
-
-            FooterStatusBarView(
-                argylluxVersion: model.argylluxVersionLabel,
-                argyllVersion: model.argyllVersionLabel,
-                instrumentStatusLabel: model.instrumentStatusLabel,
-                onOpenCliTranscript: {
-                    openWindow(id: CliTranscriptWindowView.windowID)
-                    Task { await model.openLatestCliTranscript() }
-                },
-                onOpenErrorLogs: {
-                    isShowingErrorLogViewer = true
-                }
-            )
+                FooterStatusBarView(
+                    argylluxVersion: model.argylluxVersionLabel,
+                    argyllVersion: model.argyllVersionLabel,
+                    toolchainStatusLabel: model.argyllStatusLabel,
+                    toolchainTone: model.toolchainTone,
+                    appReadinessLabel: model.readinessLabel,
+                    appReadinessTone: model.readinessTone,
+                    instrumentStatusLabel: model.instrumentStatusLabel,
+                    instrumentTone: model.instrumentStatusTone,
+                    lastValidationLabel: model.lastValidationLabel,
+                    isRefreshing: model.isRefreshing,
+                    onOpenCliTranscript: {
+                        openWindow(id: CliTranscriptWindowView.windowID)
+                        Task { await model.openLatestCliTranscript() }
+                    },
+                    onOpenErrorLogs: {
+                        isShowingErrorLogViewer = true
+                    }
+                )
+            }
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .task {
@@ -138,6 +138,14 @@ struct AppShellView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
+    }
+
+    @ViewBuilder
+    private func currentRouteSurface(for chrome: ShellChromeConfiguration) -> some View {
+        switch chrome.routeAccessory {
+        case .none, .workflowManaged:
+            currentRouteView
+        }
     }
 
     @ViewBuilder

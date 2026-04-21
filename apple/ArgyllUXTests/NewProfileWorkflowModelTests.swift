@@ -144,7 +144,7 @@ struct NewProfileWorkflowModelTests {
     }
 
     @Test
-    func beginWorkflowPresetCreationSeedsLegacyWorkflowValues() async {
+    func beginWorkflowPresetCreationOpensModalAndSeedsLegacyWorkflowValues() async {
         let printer = makePrinter()
         let paper = makePaper()
         let draftDetail = makeJobDetail(
@@ -170,8 +170,8 @@ struct NewProfileWorkflowModelTests {
 
         model.beginWorkflowPresetCreation()
 
-        #expect(model.showWorkflowPresetForm)
-        #expect(!model.showsWorkflowStandalonePrintPathEditor)
+        #expect(model.workflowContextSheet == .newPreset)
+        #expect(model.showsWorkflowStandalonePrintPathEditor)
         #expect(model.workflowPresetDraft.printerId == printer.id)
         #expect(model.workflowPresetDraft.paperId == paper.id)
         #expect(model.workflowPresetDraft.printPath == "Photoshop -> Canon driver")
@@ -180,51 +180,33 @@ struct NewProfileWorkflowModelTests {
     }
 
     @Test
-    func changingWorkflowPairWhileCreatingPresetSyncsDraftAndSanitizesPrinterFields() async {
+    func choosingWorkflowPrinterDismissesChooserSheet() async {
         let printer = makePrinter()
         let alternatePrinter = makeAlternatePrinter()
         let paper = makePaper()
-        let alternatePaper = makeAlternatePaper()
         let draftDetail = makeJobDetail(stage: .context, nextAction: "Save Context", printer: printer, paper: paper)
 
         let fakeEngine = FakeEngine()
         fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [makeActiveWorkItem(id: draftDetail.id)])
         fakeEngine.printersCurrent = [printer, alternatePrinter]
-        fakeEngine.papersCurrent = [paper, alternatePaper]
+        fakeEngine.papersCurrent = [paper]
         fakeEngine.createNewProfileDraftResult = draftDetail
 
         let model = makeWorkflowModel(fakeEngine: fakeEngine)
-        model.applyReferenceData(makeReferenceData(printers: [printer, alternatePrinter], papers: [paper, alternatePaper]))
+        model.applyReferenceData(makeReferenceData(printers: [printer, alternatePrinter], papers: [paper]))
 
         await model.openNewProfileWorkflow()
 
-        model.beginWorkflowPresetCreation()
-        model.workflowPresetDraft.label = "Studio Matte"
-        model.workflowPresetDraft.printPath = "Mirage"
-        model.workflowPresetDraft.notes = "Keep this note."
-        model.workflowPresetDraft.mediaSetting = "Premium Luster"
-        model.workflowPresetDraft.qualityMode = "1440 dpi"
-        model.workflowPresetDraft.blackInkLimitPercentText = "90"
-
+        model.presentWorkflowPrinterChooser()
+        #expect(model.workflowContextSheet == .choosePrinter)
         model.selectWorkflowPrinter(alternatePrinter.id)
 
-        #expect(model.showWorkflowPresetForm)
-        #expect(model.workflowPresetDraft.printerId == alternatePrinter.id)
-        #expect(model.workflowPresetDraft.paperId == paper.id)
-        #expect(model.workflowPresetDraft.label == "Studio Matte")
-        #expect(model.workflowPresetDraft.printPath == "Mirage")
-        #expect(model.workflowPresetDraft.notes == "Keep this note.")
-        #expect(model.workflowPresetDraft.mediaSetting.isEmpty)
-        #expect(model.workflowPresetDraft.qualityMode.isEmpty)
-        #expect(model.workflowPresetDraft.blackInkLimitPercentText.isEmpty)
-
-        model.selectWorkflowPaper(alternatePaper.id)
-
-        #expect(model.workflowPresetDraft.paperId == alternatePaper.id)
+        #expect(model.workflowContextSheet == nil)
+        #expect(model.workflowSelectedPrinterID == alternatePrinter.id)
     }
 
     @Test
-    func clearingWorkflowPrinterWhileCreatingPresetCancelsInlinePresetDraft() async {
+    func dismissWorkflowContextSheetResetsPresetDraft() async {
         let printer = makePrinter()
         let paper = makePaper()
         let draftDetail = makeJobDetail(stage: .context, nextAction: "Save Context", printer: printer, paper: paper)
@@ -242,10 +224,11 @@ struct NewProfileWorkflowModelTests {
 
         model.beginWorkflowPresetCreation()
         model.workflowPresetDraft.label = "Temporary"
+        model.workflowPresetDraft.printPath = "Mirage"
 
-        model.selectWorkflowPrinter(nil)
+        model.dismissWorkflowContextSheet()
 
-        #expect(!model.showWorkflowPresetForm)
+        #expect(model.workflowContextSheet == nil)
         #expect(model.workflowPresetDraft == PrinterPaperPresetDraft())
     }
 
@@ -268,13 +251,12 @@ struct NewProfileWorkflowModelTests {
 
         await model.openNewProfileWorkflow()
 
-        model.beginWorkflowPresetCreation()
-        model.workflowPresetDraft.label = "Alternate path"
-        model.workflowPresetDraft.printPath = "Mirage"
-
         model.selectWorkflowPrinter(alternatePrinter.id)
         model.selectWorkflowPaper(alternatePaper.id)
 
+        model.beginWorkflowPresetCreation()
+        model.workflowPresetDraft.label = "Alternate path"
+        model.workflowPresetDraft.printPath = "Mirage"
         model.workflowPresetDraft.mediaSetting = "Fine Art Smooth"
         model.workflowPresetDraft.qualityMode = "High"
 

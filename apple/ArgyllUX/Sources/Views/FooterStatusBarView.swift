@@ -3,30 +3,52 @@ import SwiftUI
 struct FooterStatusBarView: View {
     let argylluxVersion: String
     let argyllVersion: String
+    let toolchainStatusLabel: String
+    let toolchainTone: StatusBadgeView.Tone
+    let appReadinessLabel: String
+    let appReadinessTone: StatusBadgeView.Tone
     let instrumentStatusLabel: String
+    let instrumentTone: StatusBadgeView.Tone
+    let lastValidationLabel: String
+    let isRefreshing: Bool
     let onOpenCliTranscript: () -> Void
     let onOpenErrorLogs: () -> Void
 
     var body: some View {
-        HStack(spacing: 16) {
-            footerGroup(title: "ArgyllUX", value: argylluxVersion)
-            footerGroup(title: "ArgyllCMS", value: argyllVersion)
-            footerGroup(title: "Instrument", value: instrumentStatusLabel)
+        HStack(spacing: 14) {
+            HStack(spacing: 8) {
+                StatusBadgeView(title: "Argyll \(toolchainStatusLabel)", tone: toolchainTone)
+                StatusBadgeView(title: "App \(appReadinessLabel)", tone: appReadinessTone)
+                StatusBadgeView(title: instrumentStatusLabel, tone: instrumentTone)
+
+                if isRefreshing {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+
+            HStack(spacing: 14) {
+                footerDetail(title: "Last validation", value: lastValidationLabel)
+                footerDetail(title: "ArgyllCMS", value: argyllVersion)
+                footerDetail(title: "ArgyllUX", value: argylluxVersion)
+            }
 
             Spacer()
 
-            Button("CLI Transcript", action: onOpenCliTranscript)
-                .buttonStyle(.link)
+            HStack(spacing: 12) {
+                Button("CLI Transcript", action: onOpenCliTranscript)
+                    .buttonStyle(.link)
 
-            Button("Error Log Viewer", action: onOpenErrorLogs)
-                .buttonStyle(.link)
+                Button("Error Log Viewer", action: onOpenErrorLogs)
+                    .buttonStyle(.link)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
         .font(.caption)
     }
 
-    private func footerGroup(title: String, value: String) -> some View {
+    private func footerDetail(title: String, value: String) -> some View {
         HStack(spacing: 6) {
             Text(title)
                 .foregroundStyle(.secondary)

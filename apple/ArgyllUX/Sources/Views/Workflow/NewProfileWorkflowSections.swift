@@ -41,7 +41,7 @@ struct NewProfileWorkflowHeaderView: View {
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 8) {
+            HStack(spacing: 10) {
                 Button(workflow.workflowPrimaryActionTitle, action: actions.performPrimaryAction)
                     .disabled(!workflow.canRunWorkflowPrimaryAction)
 
@@ -52,18 +52,13 @@ struct NewProfileWorkflowHeaderView: View {
                 Button("Open Output Folder") {
                     workflow.revealPathInFinder(detail.workspacePath)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
 
                 Button("Open CLI Transcript") {
                     actions.openCliTranscript(detail.id)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
             }
         }
-        .padding(18)
-        .background(workflowSectionBackground)
+        .padding(24)
     }
 
     private func stageTone(for detail: NewProfileJobDetail) -> StatusBadgeView.Tone {
@@ -78,14 +73,73 @@ struct NewProfileWorkflowHeaderView: View {
     }
 }
 
+struct NewProfileWorkflowSidebarView: View {
+    @ObservedObject var workflow: NewProfileWorkflowModel
+    let detail: NewProfileJobDetail
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            NewProfileWorkflowTimelineView(detail: detail)
+
+            workflowSection("Recommended") {
+                Text(detail.nextAction)
+                    .foregroundStyle(.secondary)
+            }
+
+            workflowSection("Advanced") {
+                Text(advancedInspectorCopy)
+                    .foregroundStyle(.secondary)
+            }
+
+            workflowSection("Technical") {
+                OperationalDetailRow(title: "Stage", value: workflowStageTitle(detail.stage))
+                OperationalDetailRow(title: "Workspace", value: detail.workspacePath)
+                OperationalDetailRow(title: "Measurement Mode", value: workflowMeasurementModeLabel(workflow.workflowMeasurementMode))
+                OperationalDetailRow(title: "Command state", value: detail.isCommandRunning ? "Running" : "Idle")
+
+                if detail.measurement.hasMeasurementCheckpoint {
+                    OperationalDetailRow(title: "Measurement checkpoint", value: "Available")
+                }
+
+                if let latestError = detail.latestError {
+                    OperationalDetailRow(title: "Latest error", value: latestError)
+                }
+            }
+        }
+        .padding(20)
+    }
+
+    private var advancedInspectorCopy: String {
+        switch workflow.effectiveWorkflowStage {
+        case .context:
+            return "Save the printer, paper, and print-path assumptions before moving into target planning. Context stays attached to this job instead of turning into a separate workflow."
+        case .target:
+            return "Target planning persists in Rust, including Patch Count and whether an existing profile should help target planning."
+        case .print:
+            return "Print keeps unmanaged output explicit and holds the generated target artifacts with the job."
+        case .drying:
+            return "Drying Time is durable. The countdown is a shell convenience, while the printed and ready timestamps live in the engine."
+        case .measure:
+            return detail.measurement.hasMeasurementCheckpoint
+                ? "Measurement can resume because checkpoint artifacts were found in the job workspace."
+                : "Argyll command output appears in the CLI Transcript window while commands run."
+        case .build:
+            return "Build runs colprof and profcheck in sequence, then stores the first result summary back onto the job."
+        case .review, .publish:
+            return "Review stays explicit. Publishing creates the library record only after you inspect the result."
+        case .completed:
+            return "Completed jobs stay resumable through their linked printer profile, artifacts, and command transcript."
+        case .blocked, .failed:
+            return "A command failed on this job. Argyll command output appears in the CLI Transcript window."
+        }
+    }
+}
+
 struct NewProfileWorkflowTimelineView: View {
     let detail: NewProfileJobDetail
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Timeline")
-                .font(.title3.weight(.semibold))
-
+        workflowSection("Timeline") {
             ForEach(detail.stageTimeline, id: \.stage) { item in
                 HStack(alignment: .top, spacing: 10) {
                     Circle()
@@ -103,8 +157,6 @@ struct NewProfileWorkflowTimelineView: View {
                 }
             }
         }
-        .padding(18)
-        .background(workflowSectionBackground)
     }
 }
 
@@ -126,7 +178,7 @@ struct NewProfileWorkflowWorkspaceView: View {
                         .textSelection(.enabled)
                 }
                 .padding(18)
-                .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
             }
 
             switch workflow.effectiveWorkflowStage {
@@ -158,82 +210,42 @@ struct NewProfileContextWorkspaceView: View {
                 TextField("Profile name", text: $workflow.workflowProfileName)
                     .textFieldStyle(.roundedBorder)
 
-                Picker(
-                    "Printer",
-                    selection: Binding(
-                        get: { workflow.workflowSelectedPrinterID ?? "" },
-                        set: { workflow.selectWorkflowPrinter($0.isEmpty ? nil : $0) }
-                    )
-                ) {
-                    Text("Select Printer").tag("")
-                    ForEach(workflow.printers, id: \.id) { printer in
-                        Text(printer.displayName).tag(printer.id)
-                    }
-                }
-
-                HStack(spacing: 10) {
-                    Button("New Printer") {
-                        workflow.beginWorkflowPrinterCreation()
-                    }
-
-                    if let selectedPrinter = workflow.workflowSelectedPrinter {
-                        Text(selectedPrinter.displayName)
-                            .font(AppTypography.trustSummarySupporting)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                if workflow.showWorkflowPrinterForm {
-                    PrinterEditorForm(
-                        title: workflow.workflowPrinterDraft.title,
-                        draft: $workflow.workflowPrinterDraft,
-                        saveTitle: "Create Printer",
-                        secondaryTitle: "Cancel",
-                        isSaveDisabled: !workflow.isWorkflowPrinterDraftValid,
-                        onSave: actions.createWorkflowPrinter,
-                        onSecondary: {
-                            workflow.cancelWorkflowPrinterCreation()
+                WorkflowColumns {
+                    WorkflowContextSelectionCard(
+                        title: "Printer",
+                        primary: workflow.workflowSelectedPrinter?.displayName ?? "Choose Printer",
+                        secondary: workflow.workflowSelectedPrinter.map(structuredPrinterIdentity)
+                            ?? "Select the printer for this profile.",
+                        chooseTitle: workflow.workflowSelectedPrinter == nil ? "Choose Printer" : "Change",
+                        onChoose: {
+                            workflow.presentWorkflowPrinterChooser()
+                        },
+                        createTitle: "New Printer",
+                        onCreate: {
+                            workflow.beginWorkflowPrinterCreation()
+                        },
+                        editTitle: workflow.workflowSelectedPrinter == nil ? nil : "Edit",
+                        onEdit: {
+                            workflow.presentWorkflowPrinterEditor()
                         }
                     )
-                }
 
-                Divider()
-
-                Picker(
-                    "Paper",
-                    selection: Binding(
-                        get: { workflow.workflowSelectedPaperID ?? "" },
-                        set: { workflow.selectWorkflowPaper($0.isEmpty ? nil : $0) }
-                    )
-                ) {
-                    Text("Select Paper").tag("")
-                    ForEach(workflow.papers, id: \.id) { paper in
-                        Text(paper.displayName).tag(paper.id)
-                    }
-                }
-
-                HStack(spacing: 10) {
-                    Button("New Paper") {
-                        workflow.beginWorkflowPaperCreation()
-                    }
-
-                    if let selectedPaper = workflow.workflowSelectedPaper {
-                        Text(selectedPaper.displayName)
-                            .font(AppTypography.trustSummarySupporting)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                if workflow.showWorkflowPaperForm {
-                    PaperEditorForm(
-                        title: workflow.workflowPaperDraft.title,
-                        draft: $workflow.workflowPaperDraft,
-                        saveTitle: "Create Paper",
-                        secondaryTitle: "Cancel",
-                        isSaveDisabled: !workflow.isWorkflowPaperDraftValid,
-                        onSave: actions.createWorkflowPaper,
-                        onSecondary: {
-                            workflow.cancelWorkflowPaperCreation()
+                    WorkflowContextSelectionCard(
+                        title: "Paper",
+                        primary: workflow.workflowSelectedPaper?.displayName ?? "Choose Paper",
+                        secondary: workflow.workflowSelectedPaper.map(structuredPaperIdentity)
+                            ?? "Select the paper stock for this profile.",
+                        chooseTitle: workflow.workflowSelectedPaper == nil ? "Choose Paper" : "Change",
+                        onChoose: {
+                            workflow.presentWorkflowPaperChooser()
+                        },
+                        createTitle: "New Paper",
+                        onCreate: {
+                            workflow.beginWorkflowPaperCreation()
+                        },
+                        editTitle: workflow.workflowSelectedPaper == nil ? nil : "Edit",
+                        onEdit: {
+                            workflow.presentWorkflowPaperEditor()
                         }
                     )
                 }
@@ -244,69 +256,63 @@ struct NewProfileContextWorkspaceView: View {
                     Text("Select a printer and paper before choosing saved print-path settings.")
                         .foregroundStyle(.secondary)
                 } else {
-                    Picker(
-                        "Saved settings",
-                        selection: Binding(
-                            get: { workflow.workflowSelectedPrinterPaperPresetID ?? "" },
-                            set: { workflow.selectWorkflowPrinterPaperPreset($0.isEmpty ? nil : $0) }
-                        )
-                    ) {
-                        Text(workflow.workflowHasLegacyContextWithoutPreset ? "Keep Legacy Job Settings" : "Select Saved Settings").tag("")
-                        ForEach(workflow.workflowAvailablePrinterPaperPresets, id: \.id) { preset in
-                            Text(preset.displayName).tag(preset.id)
-                        }
-                    }
-
                     HStack(spacing: 10) {
-                        Button(workflow.workflowHasLegacyContextWithoutPreset ? "Save Legacy Settings as Preset" : "New Printer and Paper Settings") {
+                        if !workflow.workflowAvailablePrinterPaperPresets.isEmpty || workflow.workflowHasLegacyContextWithoutPreset {
+                            Menu {
+                                if workflow.workflowHasLegacyContextWithoutPreset {
+                                    Button("Keep current job settings") {
+                                        workflow.selectWorkflowPrinterPaperPreset(nil)
+                                    }
+                                }
+
+                                ForEach(workflow.workflowAvailablePrinterPaperPresets, id: \.id) { preset in
+                                    Button(preset.displayName) {
+                                        workflow.selectWorkflowPrinterPaperPreset(preset.id)
+                                    }
+                                }
+                            } label: {
+                                Label(savedSettingsTitle, systemImage: "list.bullet")
+                            }
+                        }
+
+                        Button(
+                            workflow.workflowHasLegacyContextWithoutPreset
+                                ? "Save As New Settings"
+                                : "New Settings"
+                        ) {
                             workflow.beginWorkflowPresetCreation()
                         }
-                        .disabled(workflow.workflowSelectedPrinterID == nil || workflow.workflowSelectedPaperID == nil)
 
-                        if let preset = workflow.workflowSelectedPrinterPaperPreset {
-                            Text(preset.displayName)
-                                .font(AppTypography.trustSummarySupporting)
-                                .foregroundStyle(.secondary)
+                        if workflow.workflowSelectedPrinterPaperPreset != nil {
+                            Button("Edit Settings") {
+                                workflow.presentWorkflowPresetEditor()
+                            }
                         }
                     }
 
                     if let preset = workflow.workflowSelectedPrinterPaperPreset {
-                        VStack(alignment: .leading, spacing: 8) {
+                        WorkflowSummaryCard(title: preset.displayName) {
                             if !preset.printPath.isEmpty {
-                                Text(preset.printPath)
-                                    .font(.subheadline)
+                                detailLine(title: "Print path", value: preset.printPath)
                             }
-                            Text("\(preset.mediaSetting) / \(preset.qualityMode)")
-                                .font(.subheadline)
-                            Text(currentWorkflowChannelSummary(workflow: workflow, detail: detail))
-                                .font(AppTypography.trustSummarySupporting)
-                                .foregroundStyle(.secondary)
+                            detailLine(title: "Media / quality", value: "\(preset.mediaSetting) / \(preset.qualityMode)")
+                            detailLine(title: "Channels", value: currentWorkflowChannelSummary(workflow: workflow, detail: detail))
                             if let limits = presetLimitsSummary(preset) {
-                                Text(limits)
-                                    .font(AppTypography.trustSummarySupporting)
-                                    .foregroundStyle(.secondary)
+                                detailLine(title: "Limits", value: limits)
                             }
                             if !preset.notes.isEmpty {
-                                Text(preset.notes)
-                                    .font(AppTypography.trustSummarySupporting)
-                                    .foregroundStyle(.secondary)
+                                detailLine(title: "Notes", value: preset.notes)
                             }
                         }
                     } else if workflow.workflowHasLegacyContextWithoutPreset {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("This job still uses legacy saved values.")
-                                .font(.headline)
+                        WorkflowSummaryCard(title: "Current job settings") {
                             if !workflow.workflowPrintPath.isEmpty {
-                                Text(workflow.workflowPrintPath)
-                                    .font(.subheadline)
+                                detailLine(title: "Print path", value: workflow.workflowPrintPath)
                             }
-                            Text("\(workflow.workflowMediaSetting) / \(workflow.workflowQualityMode)")
-                                .font(.subheadline)
-                            Text(currentWorkflowChannelSummary(workflow: workflow, detail: detail))
-                                .font(AppTypography.trustSummarySupporting)
-                                .foregroundStyle(.secondary)
+                            detailLine(title: "Media / quality", value: "\(workflow.workflowMediaSetting) / \(workflow.workflowQualityMode)")
+                            detailLine(title: "Channels", value: currentWorkflowChannelSummary(workflow: workflow, detail: detail))
                             Text("Create Printer and Paper Settings to keep using structured command defaults for this print path.")
-                                .font(AppTypography.trustSummarySupporting)
+                                .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
                     } else if workflow.workflowAvailablePrinterPaperPresets.isEmpty {
@@ -315,44 +321,53 @@ struct NewProfileContextWorkspaceView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    if workflow.showWorkflowPresetForm {
-                        PrinterPaperPresetEditorForm(
-                            title: workflow.workflowPresetDraft.title,
-                            draft: $workflow.workflowPresetDraft,
-                            printers: workflow.printers,
-                            papers: workflow.papers,
-                            lockPrinterAndPaperSelection: true,
-                            saveTitle: "Save Settings",
-                            secondaryTitle: "Cancel",
-                            isSaveDisabled: !workflow.isWorkflowPresetDraftValid,
-                            onSave: actions.createWorkflowPreset,
-                            onSecondary: {
-                                workflow.cancelWorkflowPresetCreation()
+                    if workflow.showsWorkflowStandalonePrintPathEditor {
+                        WorkflowColumns {
+                            TextField("Print path", text: $workflow.workflowPrintPath)
+                                .textFieldStyle(.roundedBorder)
+
+                            Picker("Media setting", selection: $workflow.workflowMediaSetting) {
+                                Text("Select Media Setting").tag("")
+                                ForEach(workflow.workflowAvailableMediaSettings, id: \.self) { mediaSetting in
+                                    Text(mediaSetting).tag(mediaSetting)
+                                }
                             }
-                        )
+                            .pickerStyle(.menu)
+                        }
+
+                        WorkflowColumns {
+                            Picker("Quality mode", selection: $workflow.workflowQualityMode) {
+                                Text("Select Quality Mode").tag("")
+                                ForEach(workflow.workflowAvailableQualityModes, id: \.self) { qualityMode in
+                                    Text(qualityMode).tag(qualityMode)
+                                }
+                            }
+                            .pickerStyle(.menu)
+
+                            TextField("Optional print-path notes", text: $workflow.workflowPrintPathNotes, axis: .vertical)
+                                .textFieldStyle(.roundedBorder)
+                                .lineLimit(2 ... 4)
+                        }
+                    } else {
+                        TextField("Optional print-path notes", text: $workflow.workflowPrintPathNotes, axis: .vertical)
+                            .textFieldStyle(.roundedBorder)
+                            .lineLimit(2 ... 4)
                     }
                 }
-
-                if workflow.showsWorkflowStandalonePrintPathEditor {
-                    TextField("Print path", text: $workflow.workflowPrintPath)
-                        .textFieldStyle(.roundedBorder)
-                }
-
-                TextField("Optional print-path notes", text: $workflow.workflowPrintPathNotes, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
-                    .lineLimit(3 ... 5)
             }
 
             workflowSection("Measurement assumptions") {
-                Picker("Measurement Mode", selection: $workflow.workflowMeasurementMode) {
-                    ForEach(measurementModes, id: \.self) { mode in
-                        Text(workflowMeasurementModeLabel(mode)).tag(mode)
+                WorkflowColumns {
+                    Picker("Measurement Mode", selection: $workflow.workflowMeasurementMode) {
+                        ForEach(measurementModes, id: \.self) { mode in
+                            Text(workflowMeasurementModeLabel(mode)).tag(mode)
+                        }
                     }
-                }
+                    .pickerStyle(.menu)
 
-                HStack(spacing: 12) {
                     TextField("Observer", text: $workflow.workflowMeasurementObserver)
                         .textFieldStyle(.roundedBorder)
+
                     TextField("Illuminant", text: $workflow.workflowMeasurementIlluminant)
                         .textFieldStyle(.roundedBorder)
                 }
@@ -366,6 +381,18 @@ struct NewProfileContextWorkspaceView: View {
             }
         }
     }
+
+    private var savedSettingsTitle: String {
+        if let preset = workflow.workflowSelectedPrinterPaperPreset {
+            return preset.displayName
+        }
+
+        if workflow.workflowHasLegacyContextWithoutPreset {
+            return "Current job settings"
+        }
+
+        return "Select Saved Settings"
+    }
 }
 
 struct NewProfileTargetWorkspaceView: View {
@@ -375,10 +402,13 @@ struct NewProfileTargetWorkspaceView: View {
 
     var body: some View {
         workflowSection("Target") {
-            TextField("Patch Count", text: $workflow.workflowPatchCount)
-                .textFieldStyle(.roundedBorder)
+            WorkflowColumns {
+                TextField("Patch Count", text: $workflow.workflowPatchCount)
+                    .textFieldStyle(.roundedBorder)
 
-            Toggle("Improve Neutrals", isOn: $workflow.workflowImproveNeutrals)
+                Toggle("Improve Neutrals", isOn: $workflow.workflowImproveNeutrals)
+            }
+
             Toggle("Use Existing Profile to Help Target Planning", isOn: $workflow.workflowUsePlanningProfile)
 
             if workflow.workflowUsePlanningProfile {
@@ -394,6 +424,7 @@ struct NewProfileTargetWorkspaceView: View {
                         Text(profile.name).tag(profile.id)
                     }
                 }
+                .pickerStyle(.menu)
             }
 
             HStack(spacing: 10) {
@@ -414,10 +445,12 @@ struct NewProfilePrintWorkspaceView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             workflowSection("Print") {
-                Toggle("Print Without Color Management", isOn: $workflow.workflowPrintWithoutColorManagement)
+                WorkflowColumns {
+                    Toggle("Print Without Color Management", isOn: $workflow.workflowPrintWithoutColorManagement)
 
-                TextField("Drying Time", text: $workflow.workflowDryingTimeMinutes)
-                    .textFieldStyle(.roundedBorder)
+                    TextField("Drying Time", text: $workflow.workflowDryingTimeMinutes)
+                        .textFieldStyle(.roundedBorder)
+                }
 
                 HStack(spacing: 10) {
                     Button("Save Print Settings", action: actions.savePrintSettings)
@@ -441,10 +474,15 @@ struct NewProfileDryingWorkspaceView: View {
 
     var body: some View {
         workflowSection("Drying") {
-            OperationalDetailRow(title: "Drying Time", value: "\(detail.printSettings.dryingTimeMinutes) minutes")
-            OperationalDetailRow(title: "Printed at", value: detail.printSettings.printedAt ?? "Waiting")
-            OperationalDetailRow(title: "Ready at", value: detail.printSettings.dryingReadyAt ?? "Waiting")
-            OperationalDetailRow(title: "Countdown", value: dryingCountdown(detail))
+            WorkflowColumns {
+                OperationalDetailRow(title: "Drying Time", value: "\(detail.printSettings.dryingTimeMinutes) minutes")
+                OperationalDetailRow(title: "Printed at", value: detail.printSettings.printedAt ?? "Waiting")
+            }
+
+            WorkflowColumns {
+                OperationalDetailRow(title: "Ready at", value: detail.printSettings.dryingReadyAt ?? "Waiting")
+                OperationalDetailRow(title: "Countdown", value: dryingCountdown(detail))
+            }
 
             Button("Mark Ready to Measure", action: actions.markReadyToMeasure)
                 .disabled(detail.isCommandRunning)
@@ -460,23 +498,26 @@ struct NewProfileMeasurementWorkspaceView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             workflowSection("Measure") {
-                Picker("Measurement Mode", selection: $workflow.workflowMeasurementMode) {
-                    ForEach(measurementModes, id: \.self) { mode in
-                        Text(workflowMeasurementModeLabel(mode)).tag(mode)
+                WorkflowColumns {
+                    Picker("Measurement Mode", selection: $workflow.workflowMeasurementMode) {
+                        ForEach(measurementModes, id: \.self) { mode in
+                            Text(workflowMeasurementModeLabel(mode)).tag(mode)
+                        }
                     }
-                }
+                    .pickerStyle(.menu)
 
-                if workflow.workflowMeasurementMode == .scanFile {
-                    HStack(spacing: 10) {
-                        TextField("Scan file", text: $workflow.workflowScanFilePath)
-                            .textFieldStyle(.roundedBorder)
+                    if workflow.workflowMeasurementMode == .scanFile {
+                        HStack(spacing: 10) {
+                            TextField("Scan file", text: $workflow.workflowScanFilePath)
+                                .textFieldStyle(.roundedBorder)
 
-                        Button("Choose File") {
-                            if let file = PathSelection.chooseFile(
-                                initialPath: workflow.workflowScanFilePath,
-                                allowedExtensions: ["tif", "tiff"]
-                            ) {
-                                workflow.workflowScanFilePath = file
+                            Button("Choose File") {
+                                if let file = PathSelection.chooseFile(
+                                    initialPath: workflow.workflowScanFilePath,
+                                    allowedExtensions: ["tif", "tiff"]
+                                ) {
+                                    workflow.workflowScanFilePath = file
+                                }
                             }
                         }
                     }
@@ -529,24 +570,29 @@ struct NewProfileReviewWorkspaceView: View {
 
             workflowSection("Review") {
                 if let review = detail.review {
-                    OperationalDetailRow(title: "Result", value: review.result)
-                    OperationalDetailRow(title: "Verified against file", value: review.verifiedAgainstFile)
-                    OperationalDetailRow(title: "Print settings", value: review.printSettings)
-                    OperationalDetailRow(
-                        title: "Last verification date",
-                        value: review.lastVerificationDate ?? "Not yet published"
-                    )
+                    WorkflowColumns {
+                        OperationalDetailRow(title: "Result", value: review.result)
+                        OperationalDetailRow(title: "Verified against file", value: review.verifiedAgainstFile)
+                    }
+
+                    WorkflowColumns {
+                        OperationalDetailRow(title: "Print settings", value: review.printSettings)
+                        OperationalDetailRow(
+                            title: "Last verification date",
+                            value: review.lastVerificationDate ?? "Not yet published"
+                        )
+                    }
 
                     if let average = review.averageDe00 {
-                        OperationalDetailRow(title: "Average dE00", value: String(format: "%.2f", average))
+                        detailLine(title: "Average dE00", value: String(format: "%.2f", average))
                     }
 
                     if let maximum = review.maximumDe00 {
-                        OperationalDetailRow(title: "Maximum dE00", value: String(format: "%.2f", maximum))
+                        detailLine(title: "Maximum dE00", value: String(format: "%.2f", maximum))
                     }
 
                     if !review.notes.isEmpty {
-                        OperationalDetailRow(title: "Notes", value: review.notes)
+                        detailLine(title: "Notes", value: review.notes)
                     }
                 } else {
                     Text("Build the profile to populate the first review summary.")
@@ -579,59 +625,184 @@ struct NewProfileReviewWorkspaceView: View {
     }
 }
 
-struct NewProfileWorkflowInspectorView: View {
+struct WorkflowPrinterChooserSheet: View {
     @ObservedObject var workflow: NewProfileWorkflowModel
-    let detail: NewProfileJobDetail
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            workflowInspectorSection(title: "Recommended", body: detail.nextAction)
-            workflowInspectorSection(title: "Advanced", body: advancedInspectorCopy)
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Technical")
-                    .font(.headline)
-
-                OperationalDetailRow(title: "Stage", value: workflowStageTitle(detail.stage))
-                OperationalDetailRow(title: "Workspace", value: detail.workspacePath)
-                OperationalDetailRow(title: "Measurement Mode", value: workflowMeasurementModeLabel(workflow.workflowMeasurementMode))
-                OperationalDetailRow(title: "Command state", value: detail.isCommandRunning ? "Running" : "Idle")
-
-                if detail.measurement.hasMeasurementCheckpoint {
-                    OperationalDetailRow(title: "Measurement checkpoint", value: "Available")
+        WorkflowCatalogChooserSheet(
+            title: "Choose Printer",
+            emptyMessage: "No printers exist yet. Create one to keep the workflow moving.",
+            isEmpty: workflow.printers.isEmpty,
+            onCreate: {
+                workflow.beginWorkflowPrinterCreation()
+            },
+            onCancel: {
+                workflow.dismissWorkflowContextSheet()
+            }
+        ) {
+            ForEach(Array(workflow.printers), id: \.id) { printer in
+                Button {
+                    workflow.selectWorkflowPrinter(printer.id)
+                } label: {
+                    WorkflowCatalogChoiceRow(
+                        title: printer.displayName,
+                        subtitle: structuredPrinterIdentity(printer),
+                        isSelected: workflow.workflowSelectedPrinterID == printer.id
+                    )
                 }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
 
-                if let latestError = detail.latestError {
-                    OperationalDetailRow(title: "Latest error", value: latestError)
+struct WorkflowPaperChooserSheet: View {
+    @ObservedObject var workflow: NewProfileWorkflowModel
+
+    var body: some View {
+        WorkflowCatalogChooserSheet(
+            title: "Choose Paper",
+            emptyMessage: "No papers exist yet. Create one to keep the workflow moving.",
+            isEmpty: workflow.papers.isEmpty,
+            onCreate: {
+                workflow.beginWorkflowPaperCreation()
+            },
+            onCancel: {
+                workflow.dismissWorkflowContextSheet()
+            }
+        ) {
+            ForEach(Array(workflow.papers), id: \.id) { paper in
+                Button {
+                    workflow.selectWorkflowPaper(paper.id)
+                } label: {
+                    WorkflowCatalogChoiceRow(
+                        title: paper.displayName,
+                        subtitle: structuredPaperIdentity(paper),
+                        isSelected: workflow.workflowSelectedPaperID == paper.id
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+private struct WorkflowCatalogChoiceRow: View {
+    let title: String
+    let subtitle: String
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Color.accentColor)
+            }
+        }
+        .padding(12)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+private struct WorkflowCatalogChooserSheet<Content: View>: View {
+    let title: String
+    let emptyMessage: String
+    let isEmpty: Bool
+    let onCreate: () -> Void
+    let onCancel: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(title)
+                .font(.title2.weight(.semibold))
+
+            if isEmpty {
+                Text(emptyMessage)
+                    .foregroundStyle(.secondary)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        content()
+                    }
+                }
+            }
+
+            HStack(spacing: 10) {
+                Button("New", action: onCreate)
+                Spacer()
+                Button("Cancel", action: onCancel)
+            }
+        }
+        .padding(24)
+        .frame(minWidth: 520, minHeight: 420)
+    }
+}
+
+private struct WorkflowContextSelectionCard: View {
+    let title: String
+    let primary: String
+    let secondary: String
+    let chooseTitle: String
+    let onChoose: () -> Void
+    let createTitle: String
+    let onCreate: () -> Void
+    let editTitle: String?
+    let onEdit: () -> Void
+
+    var body: some View {
+        WorkflowSummaryCard(title: title) {
+            Text(primary)
+                .font(.headline)
+            Text(secondary)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                Button(chooseTitle, action: onChoose)
+                Button(createTitle, action: onCreate)
+
+                if let editTitle {
+                    Button(editTitle, action: onEdit)
                 }
             }
         }
-        .padding(18)
-        .background(workflowSectionBackground)
     }
+}
 
-    private var advancedInspectorCopy: String {
-        switch workflow.effectiveWorkflowStage {
-        case .context:
-            return "Save the profile context before moving into target planning. Printer and paper settings stay attached to this job rather than becoming a separate workflow."
-        case .target:
-            return "Target planning persists in Rust, including Patch Count and whether an existing profile should help target planning."
-        case .print:
-            return "Print step keeps the unmanaged-printing requirement explicit and holds the generated target artifacts with the job."
-        case .drying:
-            return "Drying Time is durable. The countdown is shell-only, but the printed and ready timestamps live in the engine."
-        case .measure:
-            return detail.measurement.hasMeasurementCheckpoint
-                ? "Measurement can resume because checkpoint artifacts were found in the job workspace."
-                : "Argyll command output appears in the CLI Transcript window while commands run."
-        case .build:
-            return "Build runs colprof and profcheck in sequence, then stores the first result summary back onto the job."
-        case .review, .publish:
-            return "Review is intentionally explicit. Publishing creates the library record only after you inspect the result."
-        case .completed:
-            return "Completed jobs stay resumable through their linked printer profile, artifacts, and command transcript."
-        case .blocked, .failed:
-            return "A command failed on this job. Argyll command output appears in the CLI Transcript window."
+private struct WorkflowSummaryCard<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+
+            content()
+        }
+        .padding(14)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+private struct WorkflowColumns<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            content()
         }
     }
 }
@@ -682,17 +853,6 @@ func workflowArtifactsList(workflow: NewProfileWorkflowModel, artifacts: [JobArt
                 .padding(.vertical, 4)
             }
         }
-    }
-}
-
-@MainActor
-func workflowInspectorSection(title: String, body: String) -> some View {
-    VStack(alignment: .leading, spacing: 8) {
-        Text(title)
-            .font(.headline)
-        Text(body)
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
     }
 }
 
