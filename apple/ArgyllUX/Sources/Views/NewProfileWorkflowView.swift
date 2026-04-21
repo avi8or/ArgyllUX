@@ -74,8 +74,8 @@ struct NewProfileWorkflowView: View {
                 }
                 .disabled(!model.canRunWorkflowPrimaryAction)
 
-                if model.canDeleteCurrentWorkflow {
-                    Button(ActiveWorkCopy.deleteActionTitle, role: .destructive) {
+                if let deletionTitle = model.currentWorkflowDeletionActionTitle {
+                    Button(deletionTitle, role: .destructive) {
                         model.requestCurrentWorkflowDeletion()
                     }
                 }

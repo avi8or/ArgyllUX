@@ -166,7 +166,7 @@ pub struct LogEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
-pub struct DeleteJobResult {
+pub struct DeleteResult {
     pub success: bool,
     pub message: String,
 }

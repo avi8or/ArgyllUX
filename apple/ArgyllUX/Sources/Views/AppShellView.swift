@@ -61,48 +61,44 @@ struct AppShellView: View {
             LogViewerSheetView(model: model, kind: .error)
         }
         .confirmationDialog(
-            ActiveWorkCopy.deleteActionTitle,
+            model.deletionConfirmationTitle,
             isPresented: Binding(
-                get: { model.activeWorkDeletionJobID != nil },
+                get: { model.isShowingDeletionConfirmation },
                 set: { isPresented in
                     if !isPresented {
-                        model.cancelActiveWorkDeletion()
+                        model.cancelPendingDeletion()
                     }
                 }
             ),
             titleVisibility: .visible
         ) {
-            Button(ActiveWorkCopy.deleteActionTitle, role: .destructive) {
-                Task { await model.confirmActiveWorkDeletion() }
+            Button(model.deletionConfirmationTitle, role: .destructive) {
+                Task { await model.confirmPendingDeletion() }
             }
 
             Button("Cancel", role: .cancel) {
-                model.cancelActiveWorkDeletion()
+                model.cancelPendingDeletion()
             }
         } message: {
-            Text(deletionConfirmationMessage)
+            Text(model.deletionConfirmationMessage)
         }
         .alert(
-            ActiveWorkCopy.deleteErrorTitle,
+            model.deletionErrorTitle,
             isPresented: Binding(
-                get: { model.activeWorkDeletionErrorMessage != nil },
+                get: { model.isShowingDeletionError },
                 set: { isPresented in
                     if !isPresented {
-                        model.clearActiveWorkDeletionError()
+                        model.clearDeletionError()
                     }
                 }
             )
         ) {
             Button("OK", role: .cancel) {
-                model.clearActiveWorkDeletionError()
+                model.clearDeletionError()
             }
         } message: {
-            Text(model.activeWorkDeletionErrorMessage ?? "")
+            Text(model.deletionErrorMessage ?? "")
         }
-    }
-
-    private var deletionConfirmationMessage: String {
-        ActiveWorkCopy.deletionConfirmationMessage(jobTitle: model.activeWorkDeletionJobTitle)
     }
 
     private var topStrip: some View {
@@ -261,6 +257,10 @@ struct PrinterProfilesView: View {
 
                             Button("Open Job") {
                                 model.openNewProfileJob(jobId: profile.createdFromJobId)
+                            }
+
+                            Button(PrinterProfileCopy.deleteActionTitle, role: .destructive) {
+                                model.requestSelectedPrinterProfileDeletion()
                             }
                         }
                     } else {

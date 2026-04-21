@@ -8,7 +8,7 @@ mod toolchain;
 pub use model::{
     ActiveWorkItem, AppHealth, ArtifactKind, BootstrapStatus, ColorantFamily, CommandRunState,
     CommandStream, CreateNewProfileDraftInput, CreatePaperInput, CreatePrinterInput,
-    CreatePrinterPaperPresetInput, DashboardSnapshot, DeleteJobResult, EngineConfig,
+    CreatePrinterPaperPresetInput, DashboardSnapshot, DeleteResult, EngineConfig,
     InstrumentConnectionState, InstrumentStatus, JobArtifactRecord, JobCommandEventRecord,
     JobCommandRecord, LogEntry, MeasurementMode, MeasurementStatusRecord, NewProfileContextRecord,
     NewProfileJobDetail, PaperRecord, PrintSettingsRecord, PrinterPaperPresetRecord,
@@ -661,7 +661,7 @@ impl Engine {
     }
 
     #[uniffi::method(name = "deleteNewProfileJob")]
-    pub fn delete_new_profile_job(&self, job_id: String) -> DeleteJobResult {
+    pub fn delete_new_profile_job(&self, job_id: String) -> DeleteResult {
         match with_config(&self.state, |config| {
             db::delete_new_profile_job(&config.database_path, &job_id)
         }) {
@@ -675,7 +675,30 @@ impl Engine {
                     "engine.jobs",
                     &format!("Delete new profile job failed: {error}"),
                 );
-                DeleteJobResult {
+                DeleteResult {
+                    success: false,
+                    message: error.to_string(),
+                }
+            }
+        }
+    }
+
+    #[uniffi::method(name = "deletePrinterProfile")]
+    pub fn delete_printer_profile(&self, profile_id: String) -> DeleteResult {
+        match with_config(&self.state, |config| {
+            db::delete_printer_profile(&config.database_path, &profile_id)
+        }) {
+            Ok(result) => {
+                refresh_dashboard(&self.state);
+                result
+            }
+            Err(error) => {
+                log_config_error(
+                    &self.state,
+                    "engine.profiles",
+                    &format!("Delete printer profile failed: {error}"),
+                );
+                DeleteResult {
                     success: false,
                     message: error.to_string(),
                 }

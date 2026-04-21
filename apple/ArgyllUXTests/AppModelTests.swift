@@ -115,18 +115,18 @@ struct AppModelTests {
         fakeEngine.toolchainStatusValue = makeToolchainStatus(state: .ready, path: "/opt/homebrew/bin")
         fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [makeActiveWorkItem(id: draftDetail.id)])
         fakeEngine.loadedJobDetails[draftDetail.id] = draftDetail
-        fakeEngine.deleteNewProfileJobResult = DeleteJobResult(success: true, message: "")
+        fakeEngine.deleteNewProfileJobResult = DeleteResult(success: true, message: "")
 
         let model = AppModel(storagePaths: .fixture(root: root), engine: fakeEngine)
         await model.openNewProfileWorkflow()
         await model.openCliTranscript(jobId: draftDetail.id)
         model.requestActiveWorkDeletion(makeActiveWorkItem(id: draftDetail.id))
-        await model.confirmActiveWorkDeletion()
+        await model.confirmPendingDeletion()
 
         #expect(fakeEngine.lastDeletedJobId == draftDetail.id)
         #expect(model.activeNewProfileDetail == nil)
         #expect(model.activeWorkItems.isEmpty)
-        #expect(model.activeWorkDeletionErrorMessage == nil)
+        #expect(model.deletionErrorMessage == nil)
 
         guard case let .deleted(jobTitle) = model.cliTranscriptState else {
             Issue.record("Expected the transcript window to move into the deleted-job state.")
@@ -245,7 +245,7 @@ struct AppModelTests {
         let model = AppModel(storagePaths: .fixture(root: root), engine: fakeEngine)
         await model.openLatestCliTranscript()
         model.requestActiveWorkDeletion(makeActiveWorkItem(id: newerDetail.id, title: newerDetail.title, nextAction: newerDetail.nextAction, stage: newerDetail.stage))
-        await model.confirmActiveWorkDeletion()
+        await model.confirmPendingDeletion()
 
         guard case let .deleted(jobTitle) = model.cliTranscriptState else {
             Issue.record("Expected the transcript window to move into the deleted-job state.")
@@ -264,16 +264,16 @@ struct AppModelTests {
         fakeEngine.toolchainStatusValue = makeToolchainStatus(state: .ready, path: "/opt/homebrew/bin")
         fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [makeActiveWorkItem(id: draftDetail.id)])
         fakeEngine.loadedJobDetails[draftDetail.id] = draftDetail
-        fakeEngine.deleteNewProfileJobResult = DeleteJobResult(success: false, message: "Database is locked.")
+        fakeEngine.deleteNewProfileJobResult = DeleteResult(success: false, message: "Database is locked.")
 
         let model = AppModel(storagePaths: .fixture(root: root), engine: fakeEngine)
         await model.openNewProfileWorkflow()
         model.requestActiveWorkDeletion(makeActiveWorkItem(id: draftDetail.id))
-        await model.confirmActiveWorkDeletion()
+        await model.confirmPendingDeletion()
 
         #expect(model.activeNewProfileDetail?.id == draftDetail.id)
         #expect(model.activeWorkItems.map(\.id) == [draftDetail.id])
-        #expect(model.activeWorkDeletionErrorMessage == "Database is locked.")
+        #expect(model.deletionErrorMessage == "Database is locked.")
     }
 
     @Test
@@ -668,6 +668,72 @@ struct AppModelTests {
     }
 
     @Test
+    func confirmPrinterProfileDeletionReopensSourceJobForReview() async {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        let printer = makePrinter()
+        let paper = makePaper()
+        let review = ReviewSummaryRecord(
+            result: "Pass",
+            verifiedAgainstFile: "/tmp/job-1/profile.icc",
+            printSettings: "Premium Luster / 1440 dpi",
+            lastVerificationDate: "2026-04-19T18:50:00Z",
+            averageDe00: 1.2,
+            maximumDe00: 2.8,
+            notes: "Good first build."
+        )
+        let publishedDetail = makeJobDetail(
+            stage: .completed,
+            nextAction: "Open in Printer Profiles",
+            printer: printer,
+            paper: paper,
+            review: review,
+            publishedProfileId: "profile-1"
+        )
+        let reopenedDetail = makeJobDetail(
+            stage: .review,
+            nextAction: "Publish",
+            printer: printer,
+            paper: paper,
+            review: review
+        )
+        let publishedProfile = makePrinterProfile()
+
+        let fakeEngine = FakeEngine()
+        fakeEngine.toolchainStatusValue = makeToolchainStatus(state: .ready, path: "/opt/homebrew/bin")
+        fakeEngine.appHealthValue = AppHealth(readiness: "ready", blockingIssues: [], warnings: [])
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [])
+        fakeEngine.printersCurrent = [printer]
+        fakeEngine.papersCurrent = [paper]
+        fakeEngine.printerProfilesCurrent = [publishedProfile]
+        fakeEngine.createNewProfileDraftResult = publishedDetail
+        fakeEngine.loadedJobDetails[publishedDetail.id] = publishedDetail
+        fakeEngine.deletePrinterProfileResult = DeleteResult(success: true, message: "")
+        fakeEngine.jobDetailAfterDeletePrinterProfile = reopenedDetail
+        fakeEngine.dashboardSnapshotAfterDeletePrinterProfile = makeDashboard(
+            activeWorkItems: [
+                makeActiveWorkItem(
+                    id: reopenedDetail.id,
+                    title: reopenedDetail.title,
+                    nextAction: reopenedDetail.nextAction,
+                    stage: reopenedDetail.stage
+                )
+            ]
+        )
+
+        let model = AppModel(storagePaths: .fixture(root: root), engine: fakeEngine)
+        await model.openNewProfileWorkflow()
+        model.requestCurrentWorkflowDeletion()
+        await model.confirmPendingDeletion()
+
+        #expect(fakeEngine.lastDeletedProfileId == "profile-1")
+        #expect(model.activeNewProfileDetail?.stage == .review)
+        #expect(model.activeNewProfileDetail?.publishedProfileId == nil)
+        #expect(model.printerProfiles.isEmpty)
+        #expect(model.activeWorkItems.map(\.id) == [reopenedDetail.id])
+        #expect(model.deletionErrorMessage == nil)
+    }
+
+    @Test
     func applyToolchainPathPassesTrimmedOverride() async {
         let root = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
         let fakeEngine = FakeEngine()
@@ -702,6 +768,7 @@ private final class FakeEngine: EngineProtocol, @unchecked Sendable {
     private(set) var lastSaveContextInput: SaveNewProfileContextInput?
     private(set) var lastPublishedJobId: String?
     private(set) var lastDeletedJobId: String?
+    private(set) var lastDeletedProfileId: String?
     private(set) var lastUpdatedPresetInput: UpdatePrinterPaperPresetInput?
 
     var bootstrapStatusValue = BootstrapStatus(
@@ -729,7 +796,10 @@ private final class FakeEngine: EngineProtocol, @unchecked Sendable {
     var startMeasurementResult = makeJobDetail(stage: .build, nextAction: "Build Profile")
     var startBuildResult = makeJobDetail(stage: .review, nextAction: "Publish")
     var publishNewProfileResult = makeJobDetail(stage: .completed, nextAction: "Open in Printer Profiles", publishedProfileId: "profile-1")
-    var deleteNewProfileJobResult = DeleteJobResult(success: true, message: "")
+    var deleteNewProfileJobResult = DeleteResult(success: true, message: "")
+    var deletePrinterProfileResult = DeleteResult(success: true, message: "")
+    var dashboardSnapshotAfterDeletePrinterProfile: DashboardSnapshot?
+    var jobDetailAfterDeletePrinterProfile: NewProfileJobDetail?
     var loadedJobDetails: [String: NewProfileJobDetail] = [:]
 
     func bootstrap(config: EngineConfig) -> BootstrapStatus {
@@ -744,7 +814,7 @@ private final class FakeEngine: EngineProtocol, @unchecked Sendable {
         return createNewProfileDraftResult
     }
 
-    func deleteNewProfileJob(jobId: String) -> DeleteJobResult {
+    func deleteNewProfileJob(jobId: String) -> DeleteResult {
         lastDeletedJobId = jobId
         if deleteNewProfileJobResult.success {
             loadedJobDetails.removeValue(forKey: jobId)
@@ -753,6 +823,23 @@ private final class FakeEngine: EngineProtocol, @unchecked Sendable {
             )
         }
         return deleteNewProfileJobResult
+    }
+
+    func deletePrinterProfile(profileId: String) -> DeleteResult {
+        lastDeletedProfileId = profileId
+        if deletePrinterProfileResult.success {
+            let deletedProfile = printerProfilesCurrent.first { $0.id == profileId }
+            printerProfilesCurrent.removeAll { $0.id == profileId }
+            if let dashboardSnapshotAfterDeletePrinterProfile {
+                dashboardSnapshotCurrent = dashboardSnapshotAfterDeletePrinterProfile
+            }
+            if let sourceJobId = deletedProfile?.createdFromJobId,
+               let jobDetailAfterDeletePrinterProfile
+            {
+                loadedJobDetails[sourceJobId] = jobDetailAfterDeletePrinterProfile
+            }
+        }
+        return deletePrinterProfileResult
     }
 
     func createPaper(input: CreatePaperInput) -> PaperRecord {

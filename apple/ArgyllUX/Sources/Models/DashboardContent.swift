@@ -32,6 +32,20 @@ enum ActiveWorkCopy {
     }
 }
 
+enum PrinterProfileCopy {
+    static let deleteActionTitle = "Delete Printer Profile"
+    static let deleteErrorTitle = "Couldn't Delete Printer Profile"
+
+    static func deletionConfirmationMessage(profileName: String) -> String {
+        let trimmedName = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            return "This removes the Printer Profile from the library and returns the source job to review."
+        }
+
+        return "This removes \"\(trimmedName)\" from Printer Profiles and returns the source job to review."
+    }
+}
+
 struct ProfileHealthItem: Identifiable, Hashable {
     let id = UUID()
     let title: String

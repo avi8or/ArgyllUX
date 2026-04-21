@@ -115,7 +115,11 @@ actor EngineBridge {
         engine.publishNewProfile(jobId: jobId)
     }
 
-    func deleteNewProfileJob(jobId: String) -> DeleteJobResult {
+    func deleteNewProfileJob(jobId: String) -> DeleteResult {
         engine.deleteNewProfileJob(jobId: jobId)
+    }
+
+    func deletePrinterProfile(profileId: String) -> DeleteResult {
+        engine.deletePrinterProfile(profileId: profileId)
     }
 }

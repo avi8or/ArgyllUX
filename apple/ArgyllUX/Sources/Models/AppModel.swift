@@ -43,6 +43,54 @@ enum CliTranscriptState {
     }
 }
 
+// Keep destructive flows in one model so workflow and library surfaces use the
+// same confirmation, error handling, and refresh rules.
+private enum PendingDeletion: Equatable {
+    case activeWork(jobId: String, title: String)
+    case printerProfile(profileId: String, profileName: String, sourceJobId: String)
+
+    var actionTitle: String {
+        switch self {
+        case .activeWork:
+            return ActiveWorkCopy.deleteActionTitle
+        case .printerProfile:
+            return PrinterProfileCopy.deleteActionTitle
+        }
+    }
+
+    var confirmationMessage: String {
+        switch self {
+        case let .activeWork(_, title):
+            return ActiveWorkCopy.deletionConfirmationMessage(jobTitle: title)
+        case let .printerProfile(_, profileName, _):
+            return PrinterProfileCopy.deletionConfirmationMessage(profileName: profileName)
+        }
+    }
+
+    var errorTitle: String {
+        switch self {
+        case .activeWork:
+            return ActiveWorkCopy.deleteErrorTitle
+        case .printerProfile:
+            return PrinterProfileCopy.deleteErrorTitle
+        }
+    }
+
+    var fallbackErrorMessage: String {
+        switch self {
+        case .activeWork:
+            return "ArgyllUX couldn't delete this unpublished work."
+        case .printerProfile:
+            return "ArgyllUX couldn't delete this Printer Profile."
+        }
+    }
+}
+
+private struct DeletionErrorState: Equatable {
+    let title: String
+    let message: String
+}
+
 let curatedPaperSurfaceClasses = [
     "Matte",
     "Luster",
@@ -298,9 +346,8 @@ final class AppModel: ObservableObject {
     @Published var dashboardSnapshot: DashboardSnapshot?
     @Published var appHealth: AppHealth?
     @Published var recentLogs: [LogEntry] = []
-    @Published var activeWorkDeletionJobID: String?
-    @Published var activeWorkDeletionJobTitle = ""
-    @Published var activeWorkDeletionErrorMessage: String?
+    @Published private var pendingDeletion: PendingDeletion?
+    @Published private var deletionError: DeletionErrorState?
     @Published var printers: [PrinterRecord] = []
     @Published var papers: [PaperRecord] = []
     @Published var printerPaperPresets: [PrinterPaperPresetRecord] = []
@@ -458,6 +505,30 @@ final class AppModel: ObservableObject {
         return printerProfiles.first { $0.id == selectedPrinterProfileID }
     }
 
+    var isShowingDeletionConfirmation: Bool {
+        pendingDeletion != nil
+    }
+
+    var deletionConfirmationTitle: String {
+        pendingDeletion?.actionTitle ?? ActiveWorkCopy.deleteActionTitle
+    }
+
+    var deletionConfirmationMessage: String {
+        pendingDeletion?.confirmationMessage ?? ""
+    }
+
+    var isShowingDeletionError: Bool {
+        deletionError != nil
+    }
+
+    var deletionErrorTitle: String {
+        deletionError?.title ?? ActiveWorkCopy.deleteErrorTitle
+    }
+
+    var deletionErrorMessage: String? {
+        deletionError?.message
+    }
+
     var effectiveWorkflowStage: WorkflowStage {
         guard let detail = activeNewProfileDetail else { return .context }
         guard detail.stage == .blocked || detail.stage == .failed else { return detail.stage }
@@ -581,8 +652,18 @@ final class AppModel: ObservableObject {
     }
 
     var canDeleteCurrentWorkflow: Bool {
-        guard let jobId = activeNewProfileDetail?.id else { return false }
-        return isActiveWorkJob(jobId: jobId)
+        currentWorkflowDeletionActionTitle != nil
+    }
+
+    var currentWorkflowDeletionActionTitle: String? {
+        guard let detail = activeNewProfileDetail else { return nil }
+
+        if detail.publishedProfileId != nil {
+            return PrinterProfileCopy.deleteActionTitle
+        }
+
+        guard isActiveWorkJob(jobId: detail.id) else { return nil }
+        return ActiveWorkCopy.deleteActionTitle
     }
 
     var effectiveScanFilePath: String? {
@@ -750,54 +831,94 @@ final class AppModel: ObservableObject {
     }
 
     func requestActiveWorkDeletion(jobId: String, title: String) {
-        activeWorkDeletionJobID = jobId
-        activeWorkDeletionJobTitle = title
+        pendingDeletion = .activeWork(jobId: jobId, title: title)
     }
 
     func requestActiveWorkDeletion(_ item: ActiveWorkItem) {
         requestActiveWorkDeletion(jobId: item.id, title: item.title)
     }
 
+    func requestSelectedPrinterProfileDeletion() {
+        guard let profile = selectedPrinterProfile else { return }
+        pendingDeletion = .printerProfile(
+            profileId: profile.id,
+            profileName: profile.name,
+            sourceJobId: profile.createdFromJobId
+        )
+    }
+
     func requestCurrentWorkflowDeletion() {
         guard canDeleteCurrentWorkflow, let detail = activeNewProfileDetail else { return }
+
+        if let publishedProfileId = detail.publishedProfileId {
+            let profileName = detail.profileName.trimmed.isEmpty ? detail.title : detail.profileName
+            pendingDeletion = .printerProfile(
+                profileId: publishedProfileId,
+                profileName: profileName,
+                sourceJobId: detail.id
+            )
+            return
+        }
+
         requestActiveWorkDeletion(jobId: detail.id, title: detail.title)
     }
 
-    func cancelActiveWorkDeletion() {
-        activeWorkDeletionJobID = nil
-        activeWorkDeletionJobTitle = ""
+    func cancelPendingDeletion() {
+        pendingDeletion = nil
     }
 
-    func clearActiveWorkDeletionError() {
-        activeWorkDeletionErrorMessage = nil
+    func clearDeletionError() {
+        deletionError = nil
     }
 
-    func confirmActiveWorkDeletion() async {
-        guard let jobId = activeWorkDeletionJobID else { return }
-        let deletedJobTitle = activeWorkDeletionJobTitle
+    func confirmPendingDeletion() async {
+        guard let pendingDeletion else { return }
 
-        cancelActiveWorkDeletion()
+        self.pendingDeletion = nil
 
         await runRefresh {
-            let result = await self.bridge.deleteNewProfileJob(jobId: jobId)
-            await self.refreshDashboardSnapshot()
-            await self.refreshReferenceData()
+            switch pendingDeletion {
+            case let .activeWork(jobId, title):
+                let result = await self.bridge.deleteNewProfileJob(jobId: jobId)
+                await self.refreshDashboardSnapshot()
+                await self.refreshReferenceData()
 
-            if result.success {
-                if self.activeNewProfileDetail?.id == jobId {
-                    self.activeNewProfileDetail = nil
-                    self.activeWorkflow = nil
-                    self.lastWorkflowEditorSeed = nil
-                    self.stopWorkflowPolling()
-                }
+                if result.success {
+                    if self.activeNewProfileDetail?.id == jobId {
+                        self.activeNewProfileDetail = nil
+                        self.activeWorkflow = nil
+                        self.lastWorkflowEditorSeed = nil
+                        self.stopWorkflowPolling()
+                    }
 
-                if self.cliTranscriptTarget?.resolvedJobId == jobId || self.cliTranscriptDetail?.id == jobId {
-                    self.setCliTranscriptDeleted(jobTitle: deletedJobTitle)
+                    if self.cliTranscriptTarget?.resolvedJobId == jobId || self.cliTranscriptDetail?.id == jobId {
+                        self.setCliTranscriptDeleted(jobTitle: title)
+                    }
+                } else {
+                    self.deletionError = DeletionErrorState(
+                        title: pendingDeletion.errorTitle,
+                        message: result.message.trimmed.isEmpty ? pendingDeletion.fallbackErrorMessage : result.message
+                    )
                 }
-            } else {
-                self.activeWorkDeletionErrorMessage = result.message.trimmed.isEmpty
-                    ? "ArgyllUX couldn't delete this unpublished work."
-                    : result.message
+            case let .printerProfile(profileId, _, sourceJobId):
+                let result = await self.bridge.deletePrinterProfile(profileId: profileId)
+                await self.refreshDashboardSnapshot()
+                await self.refreshReferenceData()
+
+                if result.success {
+                    if self.activeNewProfileDetail?.id == sourceJobId {
+                        await self.loadNewProfileDetail(jobId: sourceJobId, forceEditorSync: false)
+                    }
+
+                    if self.cliTranscriptTarget?.resolvedJobId == sourceJobId || self.cliTranscriptDetail?.id == sourceJobId {
+                        await self.loadCliTranscriptDetail(jobId: sourceJobId, snapshot: self.dashboardSnapshot)
+                    }
+                } else {
+                    self.deletionError = DeletionErrorState(
+                        title: pendingDeletion.errorTitle,
+                        message: result.message.trimmed.isEmpty ? pendingDeletion.fallbackErrorMessage : result.message
+                    )
+                }
             }
         }
     }
