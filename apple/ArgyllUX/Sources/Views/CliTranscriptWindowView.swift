@@ -3,11 +3,11 @@ import SwiftUI
 struct CliTranscriptWindowView: View {
     static let windowID = "cli-transcript"
 
-    @ObservedObject var model: AppModel
+    @ObservedObject var transcript: CliTranscriptModel
 
     var body: some View {
         Group {
-            switch model.cliTranscriptState {
+            switch transcript.cliTranscriptState {
             case .empty:
                 transcriptPlaceholder(
                     title: "CLI Transcript",
@@ -104,7 +104,7 @@ struct CliTranscriptWindowView: View {
                     .font(.headline)
 
                 HStack(spacing: 10) {
-                    Text(stageTitle(detail.stage))
+                    Text(workflowStageTitle(detail.stage))
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.secondary)
 
@@ -129,11 +129,11 @@ struct CliTranscriptWindowView: View {
 
             VStack(alignment: .trailing, spacing: 8) {
                 Button("Show Job") {
-                    model.openNewProfileJob(jobId: detail.id)
+                    transcript.showJob(detail.id)
                 }
 
                 Button("Open Output Folder") {
-                    model.revealPathInFinder(detail.workspacePath)
+                    transcript.openOutputFolder(detail.workspacePath)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
@@ -178,7 +178,7 @@ struct CliTranscriptWindowView: View {
     }
 
     private var emptyTranscriptMessage: String {
-        switch model.cliTranscriptTarget {
+        switch transcript.cliTranscriptTarget {
         case .latestResumable(jobId: _):
             return "No active New Profile work is ready to inspect."
         case .job(jobId: _):
@@ -189,7 +189,7 @@ struct CliTranscriptWindowView: View {
     }
 
     private var emptyTranscriptSecondaryMessage: String {
-        switch model.cliTranscriptTarget {
+        switch transcript.cliTranscriptTarget {
         case .latestResumable(jobId: _):
             return "Start or resume New Profile from Home, Active work, or Settings, then choose CLI Transcript again from the footer."
         case .job(jobId: _):
@@ -200,7 +200,7 @@ struct CliTranscriptWindowView: View {
     }
 
     private var loadingTranscriptMessage: String {
-        switch model.cliTranscriptTarget {
+        switch transcript.cliTranscriptTarget {
         case .latestResumable(jobId: _):
             return "Loading the latest resumable New Profile transcript."
         case .job(jobId: _):
@@ -211,7 +211,7 @@ struct CliTranscriptWindowView: View {
     }
 
     private var loadingTranscriptSecondaryMessage: String {
-        switch model.cliTranscriptTarget {
+        switch transcript.cliTranscriptTarget {
         case .latestResumable(jobId: _):
             return "Argyll command output appears here for the job the footer just resolved."
         case .job(jobId: _):
@@ -222,7 +222,7 @@ struct CliTranscriptWindowView: View {
     }
 
     private var deletedTranscriptSecondaryMessage: String {
-        switch model.cliTranscriptTarget {
+        switch transcript.cliTranscriptTarget {
         case .latestResumable(jobId: _):
             return "Choose CLI Transcript again from the footer to load the latest resumable New Profile job."
         case .job(jobId: _):
@@ -243,33 +243,6 @@ struct CliTranscriptWindowView: View {
                 return "Failed (\(exitCode))"
             }
             return "Failed"
-        }
-    }
-
-    private func stageTitle(_ stage: WorkflowStage) -> String {
-        switch stage {
-        case .context:
-            "Context"
-        case .target:
-            "Target"
-        case .print:
-            "Print"
-        case .drying:
-            "Drying"
-        case .measure:
-            "Measure"
-        case .build:
-            "Build"
-        case .review:
-            "Review"
-        case .publish:
-            "Publish"
-        case .completed:
-            "Completed"
-        case .blocked:
-            "Blocked"
-        case .failed:
-            "Failed"
         }
     }
 

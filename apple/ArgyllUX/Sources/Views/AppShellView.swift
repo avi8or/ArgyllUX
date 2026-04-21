@@ -143,15 +143,99 @@ struct AppShellView: View {
     @ViewBuilder
     private var currentRouteView: some View {
         if model.isShowingNewProfileWorkflow {
-            NewProfileWorkflowView(model: model)
+            NewProfileWorkflowView(
+                workflow: model.workflow,
+                transcript: model.cliTranscript,
+                actions: NewProfileWorkflowActions(
+                    performPrimaryAction: {
+                        Task { await model.performWorkflowPrimaryAction() }
+                    },
+                    requestWorkflowDeletion: {
+                        model.requestCurrentWorkflowDeletion()
+                    },
+                    openCliTranscript: { jobId in
+                        openWindow(id: CliTranscriptWindowView.windowID)
+                        Task { await model.openCliTranscript(jobId: jobId) }
+                    },
+                    saveContext: {
+                        Task { await model.saveWorkflowContext() }
+                    },
+                    createWorkflowPrinter: {
+                        Task { await model.createWorkflowPrinter() }
+                    },
+                    createWorkflowPaper: {
+                        Task { await model.createWorkflowPaper() }
+                    },
+                    createWorkflowPreset: {
+                        Task { await model.createWorkflowPreset() }
+                    },
+                    saveTargetSettings: {
+                        Task { await model.saveTargetSettings() }
+                    },
+                    generateTarget: {
+                        Task { await model.generateTarget() }
+                    },
+                    savePrintSettings: {
+                        Task { await model.savePrintSettings() }
+                    },
+                    markChartPrinted: {
+                        Task { await model.markChartPrinted() }
+                    },
+                    markReadyToMeasure: {
+                        Task { await model.markReadyToMeasure() }
+                    },
+                    startMeasurement: {
+                        Task { await model.startMeasurement() }
+                    },
+                    buildProfile: {
+                        Task { await model.buildProfile() }
+                    },
+                    publishProfile: {
+                        Task { await model.publishProfile() }
+                    },
+                    openPublishedProfileLibrary: {
+                        model.openPublishedProfileLibrary()
+                    }
+                )
+            )
         } else {
             switch model.selectedRoute {
             case .home:
                 HomeView(model: model)
             case .settings:
-                SettingsView(model: model)
+                SettingsView(
+                    settings: model.settings,
+                    storagePaths: model.storagePaths,
+                    appHealth: model.appHealth,
+                    onApplyToolchainPath: {
+                        Task { await model.applyToolchainPath() }
+                    },
+                    onRevalidateToolchain: {
+                        Task { await model.revalidateToolchain() }
+                    },
+                    onClearToolchainOverride: {
+                        Task { await model.clearToolchainOverride() }
+                    },
+                    onStartNewProfile: { printerId, paperId in
+                        model.startNewProfileFromSettings(printerId: printerId, paperId: paperId)
+                    },
+                    onSavePrinter: {
+                        Task { await model.saveSettingsPrinter() }
+                    },
+                    onSavePaper: {
+                        Task { await model.saveSettingsPaper() }
+                    },
+                    onSavePreset: {
+                        Task { await model.saveSettingsPreset() }
+                    }
+                )
             case .printerProfiles:
-                PrinterProfilesView(model: model)
+                PrinterProfilesView(
+                    library: model.profileLibrary,
+                    onRevealPath: model.revealPathInFinder,
+                    onOpenJob: model.openNewProfileJob,
+                    onRequestDeletion: model.requestSelectedPrinterProfileDeletion
+                )
             case .troubleshoot, .inspect, .blackAndWhiteTuning:
                 PlaceholderRouteView(route: model.selectedRoute)
             }
@@ -173,104 +257,5 @@ struct AppShellView: View {
         }
 
         return model.selectedRoute == route
-    }
-}
-
-struct PrinterProfilesView: View {
-    @ObservedObject var model: AppModel
-
-    var body: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Printer Profiles")
-                    .font(.largeTitle.weight(.semibold))
-
-                if model.printerProfiles.isEmpty {
-                    Text("Publish a New Profile to populate the library.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(model.printerProfiles, id: \.id) { profile in
-                                Button {
-                                    model.selectedPrinterProfileID = profile.id
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text(profile.name)
-                                            .font(.headline)
-                                            .foregroundStyle(.primary)
-                                        Text("\(profile.printerName) • \(profile.paperName)")
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
-                                        Text(profile.result)
-                                            .font(AppTypography.trustSummarySupporting)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .padding(14)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(
-                                        model.selectedPrinterProfileID == profile.id
-                                            ? Color.accentColor.opacity(0.14)
-                                            : Color.secondary.opacity(0.08),
-                                        in: RoundedRectangle(cornerRadius: 8)
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-                }
-            }
-            .frame(width: 320, alignment: .topLeading)
-            .padding(24)
-
-            Divider()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    if let profile = model.selectedPrinterProfile {
-                        Text(profile.name)
-                            .font(.title.weight(.semibold))
-
-                        OperationalDetailRow(title: "Printer", value: profile.printerName)
-                        OperationalDetailRow(title: "Paper", value: profile.paperName)
-                        OperationalDetailRow(title: "Result", value: profile.result)
-                        OperationalDetailRow(title: "Print settings", value: profile.printSettings)
-                        OperationalDetailRow(title: "Verified against file", value: profile.verifiedAgainstFile)
-                        OperationalDetailRow(
-                            title: "Last verification date",
-                            value: profile.lastVerificationDate ?? "Not yet verified"
-                        )
-                        OperationalDetailRow(title: "ICC path", value: profile.profilePath)
-                        OperationalDetailRow(title: "Measurement path", value: profile.measurementPath)
-                        OperationalDetailRow(title: "Context", value: profile.contextStatus)
-                        OperationalDetailRow(title: "Created from job", value: profile.createdFromJobId)
-
-                        HStack(spacing: 10) {
-                            Button("Reveal ICC") {
-                                model.revealPathInFinder(profile.profilePath)
-                            }
-
-                            Button("Reveal Measurement") {
-                                model.revealPathInFinder(profile.measurementPath)
-                            }
-
-                            Button("Open Job") {
-                                model.openNewProfileJob(jobId: profile.createdFromJobId)
-                            }
-
-                            Button(PrinterProfileCopy.deleteActionTitle, role: .destructive) {
-                                model.requestSelectedPrinterProfileDeletion()
-                            }
-                        }
-                    } else {
-                        Text("Select a Printer Profile.")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(24)
-            }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
     }
 }

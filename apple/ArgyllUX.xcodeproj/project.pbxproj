@@ -23,13 +23,31 @@
 		A1000000000000000000000E /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* AppShellView.swift */; };
 		A1000000000000000000000F /* argyllux.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* argyllux.swift */; };
 		A10000000000000000000010 /* libargyllux_engine.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* libargyllux_engine.a */; };
-		A10000000000000000000011 /* AppModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* AppModelTests.swift */; };
+		A10000000000000000000011 /* AppModelShellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* AppModelShellTests.swift */; };
 		A10000000000000000000012 /* NewProfileWorkflowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* NewProfileWorkflowView.swift */; };
 		A10000000000000000000013 /* FooterStatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* FooterStatusBarView.swift */; };
 		A10000000000000000000014 /* LogViewerSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* LogViewerSheetView.swift */; };
 		A10000000000000000000015 /* CliTranscriptWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* CliTranscriptWindowView.swift */; };
 		A10000000000000000000016 /* AppTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* AppTypography.swift */; };
 		A10000000000000000000017 /* OperationalDetailRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* OperationalDetailRow.swift */; };
+		A10000000000000000000018 /* FileOpener.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001A /* FileOpener.swift */; };
+		A10000000000000000000019 /* StringTrimming.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001B /* StringTrimming.swift */; };
+		A1000000000000000000001A /* CatalogFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001C /* CatalogFormatting.swift */; };
+		A1000000000000000000001B /* ProfileLibraryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001D /* ProfileLibraryModel.swift */; };
+		A1000000000000000000001C /* CatalogDrafts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001E /* CatalogDrafts.swift */; };
+		A1000000000000000000001D /* SettingsCatalogModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001F /* SettingsCatalogModel.swift */; };
+		A1000000000000000000001E /* AppReferenceData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* AppReferenceData.swift */; };
+		A1000000000000000000001F /* CliTranscriptModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* CliTranscriptModel.swift */; };
+		A10000000000000000000020 /* NewProfileWorkflowModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000022 /* NewProfileWorkflowModel.swift */; };
+		A10000000000000000000021 /* PrinterProfilesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000023 /* PrinterProfilesView.swift */; };
+		A10000000000000000000022 /* SettingsRouteSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* SettingsRouteSections.swift */; };
+		A10000000000000000000023 /* SettingsEditorForms.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025 /* SettingsEditorForms.swift */; };
+		A10000000000000000000024 /* NewProfileWorkflowSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* NewProfileWorkflowSections.swift */; };
+		A10000000000000000000025 /* AppModelTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027 /* AppModelTestSupport.swift */; };
+		A10000000000000000000026 /* CliTranscriptModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000028 /* CliTranscriptModelTests.swift */; };
+		A10000000000000000000027 /* NewProfileWorkflowModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029 /* NewProfileWorkflowModelTests.swift */; };
+		A10000000000000000000028 /* SettingsCatalogModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002A /* SettingsCatalogModelTests.swift */; };
+		A10000000000000000000029 /* ProfileLibraryModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002B /* ProfileLibraryModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,7 +78,7 @@
 		A2000000000000000000000F /* ArgyllUX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ArgyllUX.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000010 /* argyllux.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = argyllux.swift; path = ArgyllUX/Bridge/Generated/argyllux.swift; sourceTree = SOURCE_ROOT; };
 		A20000000000000000000011 /* libargyllux_engine.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libargyllux_engine.a; path = ArgyllUX/Bridge/Generated/libargyllux_engine.a; sourceTree = SOURCE_ROOT; };
-		A20000000000000000000012 /* AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000012 /* AppModelShellTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelShellTests.swift; sourceTree = "<group>"; };
 		A20000000000000000000013 /* ArgyllUXTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ArgyllUXTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000014 /* NewProfileWorkflowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewProfileWorkflowView.swift; sourceTree = "<group>"; };
 		A20000000000000000000015 /* FooterStatusBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FooterStatusBarView.swift; sourceTree = "<group>"; };
@@ -68,6 +86,24 @@
 		A20000000000000000000017 /* CliTranscriptWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CliTranscriptWindowView.swift; sourceTree = "<group>"; };
 		A20000000000000000000018 /* AppTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTypography.swift; sourceTree = "<group>"; };
 		A20000000000000000000019 /* OperationalDetailRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationalDetailRow.swift; sourceTree = "<group>"; };
+		A2000000000000000000001A /* FileOpener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileOpener.swift; sourceTree = "<group>"; };
+		A2000000000000000000001B /* StringTrimming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringTrimming.swift; sourceTree = "<group>"; };
+		A2000000000000000000001C /* CatalogFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogFormatting.swift; sourceTree = "<group>"; };
+		A2000000000000000000001D /* ProfileLibraryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileLibraryModel.swift; sourceTree = "<group>"; };
+		A2000000000000000000001E /* CatalogDrafts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogDrafts.swift; sourceTree = "<group>"; };
+		A2000000000000000000001F /* SettingsCatalogModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsCatalogModel.swift; sourceTree = "<group>"; };
+		A20000000000000000000020 /* AppReferenceData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReferenceData.swift; sourceTree = "<group>"; };
+		A20000000000000000000021 /* CliTranscriptModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CliTranscriptModel.swift; sourceTree = "<group>"; };
+		A20000000000000000000022 /* NewProfileWorkflowModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewProfileWorkflowModel.swift; sourceTree = "<group>"; };
+		A20000000000000000000023 /* PrinterProfilesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrinterProfilesView.swift; sourceTree = "<group>"; };
+		A20000000000000000000024 /* SettingsRouteSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRouteSections.swift; sourceTree = "<group>"; };
+		A20000000000000000000025 /* SettingsEditorForms.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsEditorForms.swift; sourceTree = "<group>"; };
+		A20000000000000000000026 /* NewProfileWorkflowSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewProfileWorkflowSections.swift; sourceTree = "<group>"; };
+		A20000000000000000000027 /* AppModelTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTestSupport.swift; sourceTree = "<group>"; };
+		A20000000000000000000028 /* CliTranscriptModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CliTranscriptModelTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000029 /* NewProfileWorkflowModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewProfileWorkflowModelTests.swift; sourceTree = "<group>"; };
+		A2000000000000000000002A /* SettingsCatalogModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsCatalogModelTests.swift; sourceTree = "<group>"; };
+		A2000000000000000000002B /* ProfileLibraryModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileLibraryModelTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -134,6 +170,10 @@
 				A20000000000000000000004 /* StoragePaths.swift */,
 				A20000000000000000000005 /* EngineBridge.swift */,
 				A20000000000000000000006 /* AppModel.swift */,
+				A2000000000000000000001D /* ProfileLibraryModel.swift */,
+				A7000000000000000000000C /* Settings */,
+				A7000000000000000000000D /* Shell */,
+				A7000000000000000000000E /* Workflow */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -149,7 +189,12 @@
 		A70000000000000000000007 /* ArgyllUXTests */ = {
 			isa = PBXGroup;
 			children = (
-				A20000000000000000000012 /* AppModelTests.swift */,
+				A20000000000000000000012 /* AppModelShellTests.swift */,
+				A20000000000000000000028 /* CliTranscriptModelTests.swift */,
+				A20000000000000000000029 /* NewProfileWorkflowModelTests.swift */,
+				A2000000000000000000002A /* SettingsCatalogModelTests.swift */,
+				A2000000000000000000002B /* ProfileLibraryModelTests.swift */,
+				A70000000000000000000012 /* Support */,
 			);
 			path = ArgyllUXTests;
 			sourceTree = "<group>";
@@ -172,8 +217,11 @@
 				A2000000000000000000000B /* PlaceholderRouteView.swift */,
 				A2000000000000000000000C /* HomeView.swift */,
 				A2000000000000000000000D /* SettingsView.swift */,
+				A7000000000000000000000F /* Settings */,
 				A2000000000000000000000E /* AppShellView.swift */,
 				A20000000000000000000014 /* NewProfileWorkflowView.swift */,
+				A70000000000000000000010 /* Workflow */,
+				A70000000000000000000011 /* PrinterProfiles */,
 				A20000000000000000000015 /* FooterStatusBarView.swift */,
 				A20000000000000000000016 /* LogViewerSheetView.swift */,
 				A20000000000000000000017 /* CliTranscriptWindowView.swift */,
@@ -187,6 +235,9 @@
 			children = (
 				A20000000000000000000018 /* AppTypography.swift */,
 				A20000000000000000000007 /* PathSelection.swift */,
+				A2000000000000000000001A /* FileOpener.swift */,
+				A2000000000000000000001B /* StringTrimming.swift */,
+				A2000000000000000000001C /* CatalogFormatting.swift */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -198,6 +249,65 @@
 				A20000000000000000000011 /* libargyllux_engine.a */,
 			);
 			path = Generated;
+			sourceTree = "<group>";
+		};
+		A7000000000000000000000C /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000001E /* CatalogDrafts.swift */,
+				A2000000000000000000001F /* SettingsCatalogModel.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		A7000000000000000000000D /* Shell */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000020 /* AppReferenceData.swift */,
+				A20000000000000000000021 /* CliTranscriptModel.swift */,
+			);
+			path = Shell;
+			sourceTree = "<group>";
+		};
+		A7000000000000000000000E /* Workflow */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000022 /* NewProfileWorkflowModel.swift */,
+			);
+			path = Workflow;
+			sourceTree = "<group>";
+		};
+		A7000000000000000000000F /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000024 /* SettingsRouteSections.swift */,
+				A20000000000000000000025 /* SettingsEditorForms.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		A70000000000000000000010 /* Workflow */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000026 /* NewProfileWorkflowSections.swift */,
+			);
+			path = Workflow;
+			sourceTree = "<group>";
+		};
+		A70000000000000000000011 /* PrinterProfiles */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000023 /* PrinterProfilesView.swift */,
+			);
+			path = PrinterProfiles;
+			sourceTree = "<group>";
+		};
+		A70000000000000000000012 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000027 /* AppModelTestSupport.swift */,
+			);
+			path = Support;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -327,15 +437,28 @@
 				A10000000000000000000004 /* StoragePaths.swift in Sources */,
 				A10000000000000000000005 /* EngineBridge.swift in Sources */,
 				A10000000000000000000006 /* AppModel.swift in Sources */,
+				A1000000000000000000001B /* ProfileLibraryModel.swift in Sources */,
+				A1000000000000000000001C /* CatalogDrafts.swift in Sources */,
+				A1000000000000000000001D /* SettingsCatalogModel.swift in Sources */,
+				A1000000000000000000001E /* AppReferenceData.swift in Sources */,
+				A1000000000000000000001F /* CliTranscriptModel.swift in Sources */,
+				A10000000000000000000020 /* NewProfileWorkflowModel.swift in Sources */,
 				A10000000000000000000007 /* PathSelection.swift in Sources */,
+				A10000000000000000000018 /* FileOpener.swift in Sources */,
+				A10000000000000000000019 /* StringTrimming.swift in Sources */,
+				A1000000000000000000001A /* CatalogFormatting.swift in Sources */,
 				A10000000000000000000008 /* StatusBadgeView.swift in Sources */,
 				A10000000000000000000009 /* ActiveWorkDockView.swift in Sources */,
 				A1000000000000000000000A /* InspectorView.swift in Sources */,
 				A1000000000000000000000B /* PlaceholderRouteView.swift in Sources */,
 				A1000000000000000000000C /* HomeView.swift in Sources */,
 				A1000000000000000000000D /* SettingsView.swift in Sources */,
+				A10000000000000000000022 /* SettingsRouteSections.swift in Sources */,
+				A10000000000000000000023 /* SettingsEditorForms.swift in Sources */,
 				A1000000000000000000000E /* AppShellView.swift in Sources */,
 				A10000000000000000000012 /* NewProfileWorkflowView.swift in Sources */,
+				A10000000000000000000024 /* NewProfileWorkflowSections.swift in Sources */,
+				A10000000000000000000021 /* PrinterProfilesView.swift in Sources */,
 				A10000000000000000000013 /* FooterStatusBarView.swift in Sources */,
 				A10000000000000000000014 /* LogViewerSheetView.swift in Sources */,
 				A10000000000000000000015 /* CliTranscriptWindowView.swift in Sources */,
@@ -349,7 +472,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000000000000000000011 /* AppModelTests.swift in Sources */,
+				A10000000000000000000011 /* AppModelShellTests.swift in Sources */,
+				A10000000000000000000025 /* AppModelTestSupport.swift in Sources */,
+				A10000000000000000000026 /* CliTranscriptModelTests.swift in Sources */,
+				A10000000000000000000027 /* NewProfileWorkflowModelTests.swift in Sources */,
+				A10000000000000000000028 /* SettingsCatalogModelTests.swift in Sources */,
+				A10000000000000000000029 /* ProfileLibraryModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -468,6 +596,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated",
 				);
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -503,6 +632,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated",
 				);
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

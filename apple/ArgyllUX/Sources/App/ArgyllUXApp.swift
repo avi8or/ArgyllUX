@@ -12,7 +12,7 @@ struct ArgyllUXApp: App {
         .defaultSize(width: 1440, height: 900)
 
         Window("CLI Transcript", id: CliTranscriptWindowView.windowID) {
-            CliTranscriptWindowView(model: model)
+            CliTranscriptWindowView(transcript: model.cliTranscript)
         }
         .defaultSize(width: 920, height: 520)
     }
