@@ -6,8 +6,13 @@ struct ArgyllUXApp: App {
     @StateObject private var model = AppModel()
 
     init() {
-        // Local debug runs can hold onto a stale Dock icon, so refresh from the built bundle icon.
-        let bundleIcon = NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath)
+        // Avoid LaunchServices' cached bundle icon for local debug runs; read the compiled asset directly.
+        guard let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+              let bundleIcon = NSImage(contentsOf: iconURL)
+        else {
+            return
+        }
+
         bundleIcon.size = NSSize(width: 512, height: 512)
         NSApplication.shared.applicationIconImage = bundleIcon
     }
