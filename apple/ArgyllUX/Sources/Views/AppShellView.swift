@@ -103,8 +103,7 @@ struct AppShellView: View {
 
     private var topStrip: some View {
         HStack(spacing: 16) {
-            Text("ArgyllUX")
-                .font(.title3.weight(.semibold))
+            brandPlate
 
             ForEach(AppRoute.allCases) { route in
                 Button {
@@ -138,6 +137,15 @@ struct AppShellView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
+    }
+
+    private var brandPlate: some View {
+        Image("ArgyllUXMark")
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .frame(width: 68, height: 68)
+            .accessibilityLabel("ArgyllUX")
     }
 
     @ViewBuilder

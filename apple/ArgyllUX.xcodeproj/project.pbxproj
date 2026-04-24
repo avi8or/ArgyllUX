@@ -48,6 +48,7 @@
 		A10000000000000000000027 /* NewProfileWorkflowModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029 /* NewProfileWorkflowModelTests.swift */; };
 		A10000000000000000000028 /* SettingsCatalogModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002A /* SettingsCatalogModelTests.swift */; };
 		A10000000000000000000029 /* ProfileLibraryModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002B /* ProfileLibraryModelTests.swift */; };
+		A1000000000000000000002A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002C /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -104,6 +105,7 @@
 		A20000000000000000000029 /* NewProfileWorkflowModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewProfileWorkflowModelTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000002A /* SettingsCatalogModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsCatalogModelTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000002B /* ProfileLibraryModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileLibraryModelTests.swift; sourceTree = "<group>"; };
+		A2000000000000000000002C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -138,6 +140,7 @@
 			isa = PBXGroup;
 			children = (
 				A70000000000000000000003 /* Sources */,
+				A2000000000000000000002C /* Assets.xcassets */,
 				A70000000000000000000006 /* Bridge */,
 			);
 			path = ArgyllUX;
@@ -393,6 +396,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1000000000000000000002A /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -582,6 +586,7 @@
 		AA0000000000000000000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_STYLE = Automatic;
@@ -620,6 +625,7 @@
 		AA0000000000000000000004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_STYLE = Automatic;
