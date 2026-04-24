@@ -601,6 +601,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated",
 				);
+				INFOPLIST_KEY_CFBundleDisplayName = ArgyllUX;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -638,6 +639,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)/ArgyllUX/Bridge/Generated",
 				);
+				INFOPLIST_KEY_CFBundleDisplayName = ArgyllUX;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

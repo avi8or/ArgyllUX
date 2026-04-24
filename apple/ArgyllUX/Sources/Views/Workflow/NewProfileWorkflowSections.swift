@@ -81,57 +81,15 @@ struct NewProfileWorkflowSidebarView: View {
         VStack(alignment: .leading, spacing: 18) {
             NewProfileWorkflowTimelineView(detail: detail)
 
-            workflowSection("Recommended") {
-                Text(detail.nextAction)
-                    .foregroundStyle(.secondary)
-            }
-
-            workflowSection("Advanced") {
-                Text(advancedInspectorCopy)
-                    .foregroundStyle(.secondary)
-            }
-
-            workflowSection("Technical") {
-                OperationalDetailRow(title: "Stage", value: workflowStageTitle(detail.stage))
-                OperationalDetailRow(title: "Workspace", value: detail.workspacePath)
-                OperationalDetailRow(title: "Measurement Mode", value: workflowMeasurementModeLabel(workflow.workflowMeasurementMode))
-                OperationalDetailRow(title: "Command state", value: detail.isCommandRunning ? "Running" : "Idle")
-
-                if detail.measurement.hasMeasurementCheckpoint {
-                    OperationalDetailRow(title: "Measurement checkpoint", value: "Available")
-                }
-
-                if let latestError = detail.latestError {
-                    OperationalDetailRow(title: "Latest error", value: latestError)
+            workflowSection("Current Job") {
+                VStack(alignment: .leading, spacing: 10) {
+                    OperationalDetailRow(title: "Profile", value: detail.title)
+                    OperationalDetailRow(title: "Stage", value: workflowStageTitle(workflow.effectiveWorkflowStage))
+                    OperationalDetailRow(title: "Status", value: detail.status)
                 }
             }
         }
         .padding(20)
-    }
-
-    private var advancedInspectorCopy: String {
-        switch workflow.effectiveWorkflowStage {
-        case .context:
-            return "Save the printer, paper, and print-path assumptions before moving into target planning. Context stays attached to this job instead of turning into a separate workflow."
-        case .target:
-            return "Target planning persists in Rust, including Patch Count and whether an existing profile should help target planning."
-        case .print:
-            return "Print keeps unmanaged output explicit and holds the generated target artifacts with the job."
-        case .drying:
-            return "Drying Time is durable. The countdown is a shell convenience, while the printed and ready timestamps live in the engine."
-        case .measure:
-            return detail.measurement.hasMeasurementCheckpoint
-                ? "Measurement can resume because checkpoint artifacts were found in the job workspace."
-                : "Argyll command output appears in the CLI Transcript window while commands run."
-        case .build:
-            return "Build runs colprof and profcheck in sequence, then stores the first result summary back onto the job."
-        case .review, .publish:
-            return "Review stays explicit. Publishing creates the library record only after you inspect the result."
-        case .completed:
-            return "Completed jobs stay resumable through their linked printer profile, artifacts, and command transcript."
-        case .blocked, .failed:
-            return "A command failed on this job. Argyll command output appears in the CLI Transcript window."
-        }
     }
 }
 

@@ -4,6 +4,8 @@ struct AppShellView: View {
     @Environment(\.openWindow) private var openWindow
     @ObservedObject var model: AppModel
     @State private var isShowingErrorLogViewer = false
+    private let rightInspectorWidth: CGFloat = 320
+    private let minimumWidthForRightInspector: CGFloat = 1180
 
     var body: some View {
         let chrome = model.shellChromeConfiguration
@@ -12,8 +14,7 @@ struct AppShellView: View {
             topStrip
             Divider()
 
-            currentRouteSurface(for: chrome)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            contentRow(for: chrome)
 
             if chrome.showsActiveWorkDock {
                 Divider()
@@ -148,6 +149,23 @@ struct AppShellView: View {
             .accessibilityLabel("ArgyllUX")
     }
 
+    private func contentRow(for chrome: ShellChromeConfiguration) -> some View {
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                currentRouteSurface(for: chrome)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                if shouldShowRightInspector(for: chrome, availableWidth: geometry.size.width) {
+                    Divider()
+
+                    InspectorView(content: currentInspectorContent)
+                        .frame(width: rightInspectorWidth)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
     @ViewBuilder
     private func currentRouteSurface(for chrome: ShellChromeConfiguration) -> some View {
         switch chrome.routeAccessory {
@@ -256,6 +274,37 @@ struct AppShellView: View {
                 PlaceholderRouteView(route: model.selectedRoute)
             }
         }
+    }
+
+    private var currentInspectorContent: InspectorContent {
+        if model.isShowingNewProfileWorkflow {
+            guard let detail = model.activeNewProfileDetail else {
+                return InspectorContent.openingWorkflow(
+                    appHealth: model.appHealth,
+                    toolchainStatus: model.toolchainStatus
+                )
+            }
+
+            return InspectorContent.workflow(
+                workflow: model.workflow,
+                detail: detail,
+                appHealth: model.appHealth,
+                toolchainStatus: model.toolchainStatus
+            )
+        }
+
+        return InspectorContent.route(
+            route: model.selectedRoute,
+            appHealth: model.appHealth,
+            toolchainStatus: model.toolchainStatus
+        )
+    }
+
+    private func shouldShowRightInspector(
+        for chrome: ShellChromeConfiguration,
+        availableWidth: CGFloat
+    ) -> Bool {
+        chrome.showsRightInspector && availableWidth >= minimumWidthForRightInspector
     }
 
     private func utilityPill(title: String) -> some View {

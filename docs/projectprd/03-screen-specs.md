@@ -46,8 +46,8 @@ These are the only app-wide routes.
 ### Layout regions
 
 - Top strip for navigation and utilities
-- Main content area for the current route
-- Optional right inspector for `Recommended`, `Advanced`, and `Technical`
+- Main content area for the current route, with route-owned left sidebars when a screen needs item lists, hierarchy, catalog browsing, or workflow progress
+- Right utility inspector with tabbed `Recommended`, `Advanced`, and `Technical` context
 - Bottom active-work dock
 
 ### Shell wireframe
@@ -57,8 +57,8 @@ These are the only app-wide routes.
 | ArgyllUX | Home | Printer Profiles | Troubleshoot | Inspect | B&W Tuning | Settings | Search __________        |
 | Instrument: i1Pro3 Ready | Jobs 4 | Alerts 2 | Help                                                          |
 +------------------------------------------------------------------------------------------------------------------+
-| Main content area                                                                      | Recommended | Adv | Tech |
-|                                                                                        | local inspector tabs    |
+| Context list / timeline | Main content area                                             | Recommended | Adv | Tech |
+| route-owned when needed |                                                               | utility inspector tabs |
 +------------------------------------------------------------------------------------------------------------------+
 | Active work: [P900 Rag profile - Drying 00:42] [ET-8550 issue case - Needs review] [B&W wedge - Measuring]     |
 +------------------------------------------------------------------------------------------------------------------+
@@ -67,6 +67,7 @@ These are the only app-wide routes.
 ### Shell rules
 
 - Primary nav and right-inspector tabs must not look interchangeable.
+- Left sidebars are contextual route panes, not app-wide navigation.
 - Instrument state is visible in the shell but does not require a top-level route.
 - The bottom dock is for active or resumable work only.
 
@@ -232,9 +233,9 @@ Job detail is the main working screen for active workflows.
 
 - header with job identity and state
 - single next action
-- phase timeline
+- left sidebar with phase timeline
 - current-step workspace
-- right inspector with `Recommended`, `Advanced`, `Technical`
+- right utility inspector with tabbed `Recommended`, `Advanced`, `Technical`
 - CLI live panel at the bottom when relevant
 
 ### Job detail wireframe
@@ -244,13 +245,11 @@ Job detail is the main working screen for active workflows.
 | New Profile - P900 Rag                                                               Drying 00:42                |
 | Next action: Wait for the drying timer or mark the target ready to measure                                      |
 |------------------------------------------------------------------------------------------------------------------|
-| Timeline: Context + Target + Print + Drying * + Measure + Build + Review + Publish                              |
-|------------------------------------------------------------------------------------------------------------------|
-| Current step workspace                                                        | Recommended                      |
-| Drying guidance                                                               | Printer: Epson P900              |
-| - printed 2026-04-18 09:14                                                    | Paper: Canson Rag                |
-| - suggested wait: 2h                                                          | Instrument: i1Pro3               |
-| [Mark Ready to Measure] [Pause Job]                                           |                                   |
+| Timeline / job context | Current step workspace                                  | Recommended | Adv | Technical |
+| Context                | Drying guidance                                         | next action and utility context |
+| Target                 | - printed 2026-04-18 09:14                              |                                  |
+| Print                  | - suggested wait: 2h                                    |                                  |
+| Drying *               | [Mark Ready to Measure] [Pause Job]                     |                                  |
 +------------------------------------------------------------------------------------------------------------------+
 | CLI: colprof ...                                                                                                 |
 +------------------------------------------------------------------------------------------------------------------+

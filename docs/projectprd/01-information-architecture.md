@@ -11,8 +11,8 @@
 The application shell is built around four structural regions:
 
 1. top strip
-2. main work surface
-3. optional right inspector
+2. main work surface with optional route-owned left sidebar
+3. right utility inspector
 4. bottom active-work dock
 
 The center work surface always has priority as the window narrows.
@@ -32,11 +32,17 @@ The top strip holds the only app-wide navigation plus global utilities.
 
 ### Main work surface
 
-The main work surface is where route content lives. Screen-specific support content may appear as sections, panes, split views, lists, rows, tables, and detail views. It is not a second navigation system.
+The main work surface is where route content lives. Screen-specific support content may appear as sections, panes, split views, lists, rows, tables, and detail views. It is not a second app-wide navigation system.
+
+### Contextual left sidebar
+
+Left sidebars are route-owned and appear only when the current screen needs item navigation, file-style hierarchy, catalog browsing, or workflow progress. Examples include the Settings catalog, Printer Profiles list, and New Profile stage timeline.
+
+Left sidebars must not duplicate the top-level app routes.
 
 ### Right inspector
 
-The right inspector is optional and local to the current route or job. It holds `Recommended`, `Advanced`, and `Technical` disclosure for the active context.
+The right inspector is persistent shell utility chrome when space allows. It is local to the current route or job and exposes tabbed `Recommended`, `Advanced`, and `Technical` context. It is for guidance, deeper options, and technical state, not item navigation.
 
 ### Bottom active-work dock
 

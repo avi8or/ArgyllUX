@@ -51,7 +51,40 @@ Layer its bundled skills like this:
 - `swift-concurrency-pro`: actors, task lifecycles, async bridging, isolation, continuation/cancellation bugs.
 - `swift-testing-pro`: Swift Testing work in `apple/ArgyllUXTests/`.
 
+The repo-local plugin also exposes these workflow commands:
+
+- `/argyllux-apple-client:review-apple-client`
+- `/argyllux-apple-client:implement-swift-screen`
+- `/argyllux-apple-client:review-interface-copy`
+- `/argyllux-apple-client:validate-apple-client`
+
 If editing the repo-local plugin itself, also use `plugin-creator`. If adding or revising one of its bundled skills, also use `skill-creator` or `skill-forge`.
+
+### Installed OpenAI plugin: `Build macOS Apps`
+
+Use OpenAI's `Build macOS Apps` plugin as a supporting plugin when the task is primarily about macOS platform mechanics rather than ArgyllUX product behavior, especially for:
+
+- Xcode project or scheme discovery
+- local build/run wiring and Codex Run-button setup
+- macOS test triage
+- AppKit interop
+- window management and multiwindow behavior
+- view-file refactors
+- signing, entitlements, packaging, and notarization
+- macOS logging and telemetry
+
+Prefer this layering when it applies:
+
+- `argyllux-apple-client` first for ArgyllUX-specific architecture, ownership, workflow language, and screen behavior
+- `build-run-debug` for build/run/debug entrypoints and shell-first macOS execution
+- `test-triage` for failing macOS tests
+- `appkit-interop` for representables, responder-chain behavior, panels, or other desktop-only native bridges
+- `window-management` for titlebar, toolbar, placement, restore, launch, or multiwindow behavior
+- `swiftui-patterns` or `view-refactor` when the problem is SwiftUI structure rather than product workflow semantics
+- `signing-entitlements` or `packaging-notarization` for distribution issues
+- `telemetry` when the task needs `Logger`/`os.Logger` instrumentation or runtime-event inspection
+
+Do not let `Build macOS Apps` replace the repo-local Apple-client plugin for product decisions, copy, or Swift-versus-Rust ownership. Treat it as the platform specialist paired with ArgyllUX's local source-of-truth plugin.
 
 ### Global skills that matter in this repo
 
@@ -66,6 +99,7 @@ If editing the repo-local plugin itself, also use `plugin-creator`. If adding or
 These are available in the environment, but they are not the default path for this repo:
 
 - `Iced Rust Desktop`: this repo is not an Iced UI app. Do not route normal `rust/engine` work through Iced-specific guidance unless the user explicitly asks for Iced comparisons or shared Rust desktop patterns.
+- `Build macOS Apps`: useful here when installed, but use it as a companion for macOS platform mechanics rather than as a substitute for `argyllux-apple-client` or the product docs.
 - `Build Web Apps`, `Vercel`, `Cloudflare`, `Playwright`, `webapp-testing`: do not default to web/browser skills for the native macOS client.
 - `Figma`: use only when the user explicitly asks for design or Figma work.
 - `Computer Use`: use only when live visual inspection of the built macOS app is necessary and shell/build evidence is not enough.

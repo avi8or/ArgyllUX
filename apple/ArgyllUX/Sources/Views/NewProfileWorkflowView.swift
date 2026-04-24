@@ -34,6 +34,15 @@ struct NewProfileWorkflowView: View {
 
                     HStack(spacing: 0) {
                         ScrollView {
+                            NewProfileWorkflowSidebarView(workflow: workflow, detail: detail)
+                                .frame(maxWidth: .infinity, alignment: .topLeading)
+                        }
+                        .frame(minWidth: 300, maxWidth: 300, maxHeight: .infinity, alignment: .topLeading)
+                        .background(Color.secondary.opacity(0.04))
+
+                        Divider()
+
+                        ScrollView {
                             NewProfileWorkflowWorkspaceView(
                                 workflow: workflow,
                                 detail: detail,
@@ -43,15 +52,6 @@ struct NewProfileWorkflowView: View {
                             .frame(maxWidth: .infinity, alignment: .topLeading)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-                        Divider()
-
-                        ScrollView {
-                            NewProfileWorkflowSidebarView(workflow: workflow, detail: detail)
-                                .frame(maxWidth: .infinity, alignment: .topLeading)
-                        }
-                        .frame(minWidth: 320, maxWidth: 320, maxHeight: .infinity, alignment: .topLeading)
-                        .background(Color.secondary.opacity(0.04))
                     }
                 }
                 .sheet(item: $workflow.workflowContextSheet) { sheet in

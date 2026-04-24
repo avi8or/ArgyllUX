@@ -60,17 +60,20 @@ enum ShellRouteAccessory: Equatable {
 
 struct ShellChromeConfiguration: Equatable {
     let routeAccessory: ShellRouteAccessory
+    let showsRightInspector: Bool
     let showsActiveWorkDock: Bool
     let showsFooterStatusBar: Bool
 
     static let standard = ShellChromeConfiguration(
         routeAccessory: .none,
+        showsRightInspector: true,
         showsActiveWorkDock: true,
         showsFooterStatusBar: true
     )
 
     static let workflow = ShellChromeConfiguration(
         routeAccessory: .workflowManaged,
+        showsRightInspector: true,
         showsActiveWorkDock: true,
         showsFooterStatusBar: true
     )
