@@ -146,6 +146,42 @@ pub(crate) fn bootstrap_environment_details(
     .to_string()
 }
 
+/// Builds a privacy-safe CLI diagnostic detail payload without command output.
+pub(crate) fn command_summary_details(
+    command_kind: &str,
+    argv: &[String],
+    status: &str,
+    exit_code: Option<i32>,
+) -> String {
+    let sanitized_argv = argv
+        .iter()
+        .map(|arg| sanitize_command_arg(arg))
+        .collect::<Vec<_>>();
+
+    sanitize_event_input(DiagnosticEventInput {
+        level: DiagnosticLevel::Info,
+        category: DiagnosticCategory::Cli,
+        source: "engine.cli".to_string(),
+        message: "Command summary.".to_string(),
+        details_json: json!({
+            "command_kind": command_kind,
+            "argv": sanitized_argv,
+            "status": status,
+            "exit_code": exit_code,
+        })
+        .to_string(),
+        privacy: DiagnosticPrivacy::Internal,
+        job_id: None,
+        command_id: None,
+        profile_id: None,
+        issue_case_id: None,
+        duration_ms: None,
+        operation_id: None,
+        parent_operation_id: None,
+    })
+    .details_json
+}
+
 /// Produces the configured diagnostics retention status with runtime counters.
 pub(crate) fn retention_status(
     event_count: u32,
@@ -290,6 +326,23 @@ fn sanitize_argv(value: &mut Value) -> bool {
 
 fn looks_like_private_path(value: &str) -> bool {
     value.contains("/Users/") || value.contains("/var/folders/") || value.contains("/private/var/")
+}
+
+fn sanitize_command_arg(arg: &str) -> String {
+    if looks_like_private_path(arg) {
+        redact_path(arg)
+    } else if arg.starts_with("/opt/homebrew/")
+        || arg.starts_with("/usr/local/")
+        || arg.starts_with("/Applications/")
+    {
+        Path::new(arg)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(arg)
+            .to_string()
+    } else {
+        arg.to_string()
+    }
 }
 
 fn sanitize_detail_string(value: &mut String) -> bool {
@@ -465,6 +518,32 @@ fn trim_option(value: Option<String>) -> Option<String> {
             Some(trimmed.to_string())
         }
     })
+}
+
+#[cfg(test)]
+mod command_summary_tests {
+    use super::*;
+
+    #[test]
+    fn command_details_use_executable_names_and_redacted_private_paths() {
+        let details = command_summary_details(
+            "colprof",
+            &[
+                "/opt/homebrew/bin/colprof".to_string(),
+                "-v".to_string(),
+                "-O".to_string(),
+                "/Users/tylermiller/Profiles/P900 Rag v3.icc".to_string(),
+            ],
+            "succeeded",
+            Some(0),
+        );
+
+        assert!(details.contains("\"command_kind\":\"colprof\""));
+        assert!(
+            details.contains("\"argv\":[\"colprof\",\"-v\",\"-O\",\"$HOME/.../P900 Rag v3.icc\"]")
+        );
+        assert!(!details.contains("/Users/tylermiller/Profiles"));
+    }
 }
 
 #[cfg(test)]

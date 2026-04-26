@@ -1,8 +1,9 @@
 use crate::db;
+use crate::diagnostics;
 use crate::logging;
 use crate::model::{
-    ColorantFamily, CommandStream, MeasurementMode, ReviewSummaryRecord, ToolchainStatus,
-    WorkflowStage,
+    ColorantFamily, CommandStream, DiagnosticCategory, DiagnosticEventInput, DiagnosticLevel,
+    DiagnosticPrivacy, MeasurementMode, ReviewSummaryRecord, ToolchainStatus, WorkflowStage,
 };
 use crate::support::EngineResult;
 use crate::support::ensure_directory;
@@ -297,6 +298,25 @@ fn run_command_with_transcript(
         label,
         &argv,
     )?;
+    let command_started_at = std::time::Instant::now();
+    let _ = db::record_diagnostic_event(
+        &config.database_path,
+        &DiagnosticEventInput {
+            level: DiagnosticLevel::Info,
+            category: DiagnosticCategory::Cli,
+            source: "engine.cli".to_string(),
+            message: format!("Started {label}."),
+            details_json: diagnostics::command_summary_details(label, &argv, "running", None),
+            privacy: DiagnosticPrivacy::SensitiveRedacted,
+            job_id: Some(context.job_id.clone()),
+            command_id: Some(command_id.clone()),
+            profile_id: None,
+            issue_case_id: None,
+            duration_ms: None,
+            operation_id: Some(command_id.clone()),
+            parent_operation_id: Some(context.job_id.clone()),
+        },
+    );
 
     logging::append_log(
         &config.log_path,
@@ -330,6 +350,29 @@ fn run_command_with_transcript(
                 &format!("Failed to start {}: {}", label, error),
             )?;
             db::finish_job_command(&config.database_path, &command_id, false, None)?;
+            let _ = db::record_diagnostic_event(
+                &config.database_path,
+                &DiagnosticEventInput {
+                    level: DiagnosticLevel::Error,
+                    category: DiagnosticCategory::Cli,
+                    source: "engine.cli".to_string(),
+                    message: format!("Failed to start {label}."),
+                    details_json: diagnostics::command_summary_details(
+                        label,
+                        &argv,
+                        "failed_to_start",
+                        None,
+                    ),
+                    privacy: DiagnosticPrivacy::SensitiveRedacted,
+                    job_id: Some(context.job_id.clone()),
+                    command_id: Some(command_id.clone()),
+                    profile_id: None,
+                    issue_case_id: None,
+                    duration_ms: Some(duration_ms_since(command_started_at)),
+                    operation_id: Some(command_id.clone()),
+                    parent_operation_id: Some(context.job_id.clone()),
+                },
+            );
             return Err(error.into());
         }
     };
@@ -360,6 +403,40 @@ fn run_command_with_transcript(
 
     let succeeded = status.success();
     db::finish_job_command(&config.database_path, &command_id, succeeded, status.code())?;
+    let _ = db::record_diagnostic_event(
+        &config.database_path,
+        &DiagnosticEventInput {
+            level: if succeeded {
+                DiagnosticLevel::Info
+            } else {
+                DiagnosticLevel::Error
+            },
+            category: DiagnosticCategory::Cli,
+            source: "engine.cli".to_string(),
+            message: format!(
+                "{} {label}.",
+                if succeeded {
+                    "Finished"
+                } else {
+                    "Command failed"
+                }
+            ),
+            details_json: diagnostics::command_summary_details(
+                label,
+                &argv,
+                if succeeded { "succeeded" } else { "failed" },
+                status.code(),
+            ),
+            privacy: DiagnosticPrivacy::SensitiveRedacted,
+            job_id: Some(context.job_id.clone()),
+            command_id: Some(command_id.clone()),
+            profile_id: None,
+            issue_case_id: None,
+            duration_ms: Some(duration_ms_since(command_started_at)),
+            operation_id: Some(command_id.clone()),
+            parent_operation_id: Some(context.job_id.clone()),
+        },
+    );
     logging::append_log(
         &config.log_path,
         if succeeded { "info" } else { "error" },
@@ -398,6 +475,10 @@ fn run_command_with_transcript(
     }
 
     Ok(transcript)
+}
+
+fn duration_ms_since(started_at: std::time::Instant) -> u32 {
+    started_at.elapsed().as_millis().min(u32::MAX as u128) as u32
 }
 
 fn spawn_stream_reader(
@@ -861,5 +942,12 @@ mod tests {
             baseline_colprof
         );
         assert!(build_print_settings_summary(&context).starts_with("Photoshop -> Canon driver |"));
+    }
+
+    #[test]
+    fn command_duration_ms_uses_saturating_milliseconds() {
+        let started = std::time::Instant::now();
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        assert!(duration_ms_since(started) >= 1);
     }
 }

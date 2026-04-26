@@ -4467,7 +4467,7 @@ mod tests {
                 issue_case_id: None,
                 duration_ms: Some(1200),
                 operation_id: Some("op-1".to_string()),
-                parent_operation_id: None,
+                parent_operation_id: Some("job-1".to_string()),
             },
         )
         .unwrap();
@@ -4476,6 +4476,11 @@ mod tests {
         assert_eq!(record.privacy, DiagnosticPrivacy::SensitiveRedacted);
         assert!(record.details_json.contains("$HOME/.../private"));
         assert!(record.details_json.contains("\"stderr\":\"[redacted]\""));
+        assert_eq!(record.job_id.as_deref(), Some("job-1"));
+        assert_eq!(record.command_id.as_deref(), Some("command-1"));
+        assert_eq!(record.duration_ms, Some(1200));
+        assert_eq!(record.operation_id.as_deref(), Some("op-1"));
+        assert_eq!(record.parent_operation_id.as_deref(), Some("job-1"));
 
         let events = list_diagnostic_events(
             &config.database_path,

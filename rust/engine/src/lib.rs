@@ -643,6 +643,13 @@ impl Engine {
         };
         match db::prepare_generate_target(&config.database_path, &job_id) {
             Ok(detail) => {
+                record_workflow_event(
+                    &config,
+                    &job_id,
+                    "engine.workflow.new_profile",
+                    "New Profile target generation started.",
+                    Some(detail.stage.clone()),
+                );
                 runner::spawn_job_task(
                     config,
                     toolchain_status,
@@ -666,7 +673,15 @@ impl Engine {
     #[uniffi::method(name = "markNewProfilePrinted")]
     pub fn mark_new_profile_printed(&self, job_id: String) -> NewProfileJobDetail {
         match with_config(&self.state, |config| {
-            db::mark_new_profile_printed(&config.database_path, &job_id)
+            let detail = db::mark_new_profile_printed(&config.database_path, &job_id)?;
+            record_workflow_event(
+                config,
+                &job_id,
+                "engine.workflow.new_profile",
+                "New Profile chart marked printed.",
+                Some(detail.stage.clone()),
+            );
+            Ok(detail)
         }) {
             Ok(detail) => {
                 refresh_dashboard(&self.state);
@@ -686,7 +701,15 @@ impl Engine {
     #[uniffi::method(name = "markNewProfileReadyToMeasure")]
     pub fn mark_new_profile_ready_to_measure(&self, job_id: String) -> NewProfileJobDetail {
         match with_config(&self.state, |config| {
-            db::mark_new_profile_ready_to_measure(&config.database_path, &job_id)
+            let detail = db::mark_new_profile_ready_to_measure(&config.database_path, &job_id)?;
+            record_workflow_event(
+                config,
+                &job_id,
+                "engine.workflow.new_profile",
+                "New Profile marked ready to measure.",
+                Some(detail.stage.clone()),
+            );
+            Ok(detail)
         }) {
             Ok(detail) => {
                 refresh_dashboard(&self.state);
@@ -716,6 +739,13 @@ impl Engine {
         };
         match db::prepare_measurement(&config.database_path, &input) {
             Ok(detail) => {
+                record_workflow_event(
+                    &config,
+                    &input.job_id,
+                    "engine.workflow.new_profile",
+                    "New Profile measurement started.",
+                    Some(detail.stage.clone()),
+                );
                 runner::spawn_job_task(
                     config,
                     toolchain_status,
@@ -749,6 +779,13 @@ impl Engine {
         };
         match db::prepare_build_profile(&config.database_path, &job_id) {
             Ok(detail) => {
+                record_workflow_event(
+                    &config,
+                    &job_id,
+                    "engine.workflow.new_profile",
+                    "New Profile profile build started.",
+                    Some(detail.stage.clone()),
+                );
                 runner::spawn_job_task(
                     config,
                     toolchain_status,
@@ -772,7 +809,15 @@ impl Engine {
     #[uniffi::method(name = "publishNewProfile")]
     pub fn publish_new_profile(&self, job_id: String) -> NewProfileJobDetail {
         match with_config(&self.state, |config| {
-            db::publish_new_profile(&config.database_path, &job_id)
+            let detail = db::publish_new_profile(&config.database_path, &job_id)?;
+            record_workflow_event(
+                config,
+                &job_id,
+                "engine.workflow.new_profile",
+                "New Profile published to Printer Profiles.",
+                Some(detail.stage.clone()),
+            );
+            Ok(detail)
         }) {
             Ok(detail) => {
                 refresh_dashboard(&self.state);
@@ -963,6 +1008,38 @@ fn current_runtime_context(state: &RwLock<EngineState>) -> Option<(EngineConfig,
     let state = state.read().expect("engine state lock poisoned");
     let config = state.config.clone()?;
     Some((config, state.toolchain_status.clone()))
+}
+
+fn record_workflow_event(
+    config: &EngineConfig,
+    job_id: &str,
+    source: &str,
+    message: &str,
+    stage: Option<WorkflowStage>,
+) {
+    let details_json = serde_json::json!({
+        "stage": stage.map(|item| format!("{item:?}")).unwrap_or_else(|| "unknown".to_string())
+    })
+    .to_string();
+
+    let _ = db::record_diagnostic_event(
+        &config.database_path,
+        &DiagnosticEventInput {
+            level: DiagnosticLevel::Info,
+            category: DiagnosticCategory::Workflow,
+            source: source.to_string(),
+            message: message.to_string(),
+            details_json,
+            privacy: DiagnosticPrivacy::Public,
+            job_id: Some(job_id.to_string()),
+            command_id: None,
+            profile_id: None,
+            issue_case_id: None,
+            duration_ms: None,
+            operation_id: Some(job_id.to_string()),
+            parent_operation_id: None,
+        },
+    );
 }
 
 fn log_config_error(state: &RwLock<EngineState>, source: &str, message: &str) {
