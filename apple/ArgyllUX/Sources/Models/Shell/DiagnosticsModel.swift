@@ -99,8 +99,13 @@ final class DiagnosticsModel: ObservableObject {
     @Published var errorsOnly = false
 
     private let bridge: EngineBridge
+    private var refreshRequestID = 0
 
     var openCliTranscriptRequested: ((String) -> Void)?
+
+    // Tests use this seam to force refresh reentrancy at the point where stale
+    // bridge results used to overwrite newer state.
+    var refreshResultsReadyForTesting: (() async -> Void)?
 
     init(bridge: EngineBridge) {
         self.bridge = bridge
@@ -112,6 +117,8 @@ final class DiagnosticsModel: ObservableObject {
     }
 
     func refresh(limit: UInt32 = 200) async {
+        refreshRequestID += 1
+        let requestID = refreshRequestID
         isLoading = true
         let filter = DiagnosticEventFilter(
             levels: levelFilter.bridgeLevels,
@@ -126,6 +133,12 @@ final class DiagnosticsModel: ObservableObject {
         )
         let summary = await bridge.getDiagnosticsSummary()
         let events = await bridge.listDiagnosticEvents(filter: filter)
+
+        if let refreshResultsReadyForTesting {
+            await refreshResultsReadyForTesting()
+        }
+
+        guard requestID == refreshRequestID else { return }
 
         self.summary = summary
         visibleEvents = events
