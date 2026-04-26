@@ -994,14 +994,16 @@ fn log_config_error(state: &RwLock<EngineState>, source: &str, message: &str) {
     }
 }
 
-fn fallback_diagnostic_event(input: DiagnosticEventInput, error: String) -> DiagnosticEventRecord {
+const DIAGNOSTICS_UNAVAILABLE_MESSAGE: &str = "Diagnostics store unavailable.";
+
+fn fallback_diagnostic_event(input: DiagnosticEventInput, _error: String) -> DiagnosticEventRecord {
     DiagnosticEventRecord {
         id: "diagnostics-unavailable".to_string(),
         timestamp: crate::support::iso_timestamp(),
         level: DiagnosticLevel::Error,
         category: DiagnosticCategory::Database,
         source: "engine.diagnostics".to_string(),
-        message: format!("Diagnostics store unavailable: {error}"),
+        message: DIAGNOSTICS_UNAVAILABLE_MESSAGE.to_string(),
         details_json: "{}".to_string(),
         privacy: DiagnosticPrivacy::Public,
         job_id: input.job_id,
@@ -1020,16 +1022,16 @@ fn fallback_diagnostics_summary(
     argyll_path_category: &str,
 ) -> DiagnosticsSummary {
     DiagnosticsSummary {
-        total_count: 0,
+        total_count: 1,
         warning_count: 0,
-        error_count: 0,
-        critical_count: 0,
-        latest_critical_message: None,
+        error_count: 1,
+        critical_count: 1,
+        latest_critical_message: Some(DIAGNOSTICS_UNAVAILABLE_MESSAGE.to_string()),
         latest_event_timestamp: None,
         app_readiness: readiness.to_string(),
         argyll_version: argyll_version.to_string(),
         argyll_path_category: argyll_path_category.to_string(),
-        retention: diagnostics::retention_status(0, 0, None),
+        retention: diagnostics::retention_status(1, 0, None),
     }
 }
 
@@ -1270,6 +1272,37 @@ mod tests {
 mod lib {
     mod tests {
         use super::super::*;
+        use std::path::Path;
+
+        fn invalid_store_config(root: &Path) -> EngineConfig {
+            let database_path = root.join("app-support/argyllux.sqlite");
+            std::fs::create_dir_all(&database_path).unwrap();
+            EngineConfig {
+                app_support_path: root.join("app-support").to_string_lossy().to_string(),
+                database_path: database_path.to_string_lossy().to_string(),
+                log_path: root.join("logs/engine.log").to_string_lossy().to_string(),
+                argyll_override_path: None,
+                additional_search_roots: Vec::new(),
+            }
+        }
+
+        fn diagnostic_event_input() -> DiagnosticEventInput {
+            DiagnosticEventInput {
+                level: DiagnosticLevel::Warning,
+                category: DiagnosticCategory::Ui,
+                source: "swift.workflow.new_profile".to_string(),
+                message: "User started New Profile.".to_string(),
+                details_json: serde_json::json!({ "action": "new_profile" }).to_string(),
+                privacy: DiagnosticPrivacy::Public,
+                job_id: Some("job-1".to_string()),
+                command_id: None,
+                profile_id: None,
+                issue_case_id: None,
+                duration_ms: None,
+                operation_id: None,
+                parent_operation_id: None,
+            }
+        }
 
         #[test]
         fn bridge_records_lists_and_summarizes_diagnostic_events() {
@@ -1296,21 +1329,7 @@ mod lib {
             };
 
             engine.bootstrap(config);
-            let record = engine.record_diagnostic_event(DiagnosticEventInput {
-                level: DiagnosticLevel::Warning,
-                category: DiagnosticCategory::Ui,
-                source: "swift.workflow.new_profile".to_string(),
-                message: "User started New Profile.".to_string(),
-                details_json: serde_json::json!({ "action": "new_profile" }).to_string(),
-                privacy: DiagnosticPrivacy::Public,
-                job_id: Some("job-1".to_string()),
-                command_id: None,
-                profile_id: None,
-                issue_case_id: None,
-                duration_ms: None,
-                operation_id: None,
-                parent_operation_id: None,
-            });
+            let record = engine.record_diagnostic_event(diagnostic_event_input());
 
             assert_eq!(record.category, DiagnosticCategory::Ui);
 
@@ -1332,6 +1351,58 @@ mod lib {
             let summary = engine.get_diagnostics_summary();
             assert!(summary.total_count >= 1);
             assert_eq!(summary.warning_count, 1);
+        }
+
+        #[test]
+        fn fallback_diagnostic_event_does_not_expose_store_error_details() {
+            let temp = tempfile::tempdir().unwrap();
+            let engine = Engine::new();
+            let config = invalid_store_config(temp.path());
+            let database_path = config.database_path.clone();
+            engine.bootstrap(config);
+
+            let record = engine.record_diagnostic_event(diagnostic_event_input());
+
+            assert_eq!(record.level, DiagnosticLevel::Error);
+            assert_eq!(record.category, DiagnosticCategory::Database);
+            assert_eq!(record.privacy, DiagnosticPrivacy::Public);
+            assert_eq!(record.message, DIAGNOSTICS_UNAVAILABLE_MESSAGE);
+            assert_eq!(record.details_json, "{}");
+            assert!(!record.message.contains(&database_path));
+            assert!(
+                !record
+                    .message
+                    .contains(temp.path().to_string_lossy().as_ref())
+            );
+            assert!(!record.message.to_lowercase().contains("sqlite"));
+            assert!(!record.message.to_lowercase().contains("unable"));
+        }
+
+        #[test]
+        fn diagnostics_summary_fallback_signals_unavailable_store() {
+            let temp = tempfile::tempdir().unwrap();
+            let engine = Engine::new();
+            let config = invalid_store_config(temp.path());
+            let database_path = config.database_path.clone();
+            engine.bootstrap(config);
+
+            let summary = engine.get_diagnostics_summary();
+
+            assert_eq!(summary.total_count, 1);
+            assert_eq!(summary.error_count, 1);
+            assert_eq!(summary.critical_count, 1);
+            assert_eq!(
+                summary.latest_critical_message.as_deref(),
+                Some(DIAGNOSTICS_UNAVAILABLE_MESSAGE)
+            );
+            assert_eq!(summary.retention.event_count, 1);
+            assert!(
+                !summary
+                    .latest_critical_message
+                    .as_deref()
+                    .unwrap_or_default()
+                    .contains(&database_path)
+            );
         }
     }
 }
