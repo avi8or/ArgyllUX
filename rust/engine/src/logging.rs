@@ -1,3 +1,9 @@
+//! Compatibility writer for newline-delimited `engine.log`.
+//!
+//! New diagnostics features should persist structured events through the
+//! SQLite diagnostics store. This file remains for transitional debug output
+//! and local support visibility.
+
 use crate::model::LogEntry;
 use crate::support::{EngineResult, ensure_directory, iso_timestamp};
 use std::fs::OpenOptions;

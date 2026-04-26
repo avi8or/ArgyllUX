@@ -31,6 +31,18 @@ actor EngineBridge {
         engine.getRecentLogs(limit: limit)
     }
 
+    func recordDiagnosticEvent(input: DiagnosticEventInput) -> DiagnosticEventRecord {
+        engine.recordDiagnosticEvent(input: input)
+    }
+
+    func listDiagnosticEvents(filter: DiagnosticEventFilter) -> [DiagnosticEventRecord] {
+        engine.listDiagnosticEvents(filter: filter)
+    }
+
+    func getDiagnosticsSummary() -> DiagnosticsSummary {
+        engine.getDiagnosticsSummary()
+    }
+
     func listPrinters() -> [PrinterRecord] {
         engine.listPrinters()
     }

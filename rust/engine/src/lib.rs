@@ -75,6 +75,14 @@ impl Engine {
                 database_initialized = status.initialized;
                 migrations_applied = status.migrations_applied;
                 persisted_override_path = status.persisted_override_path;
+                if let Err(error) = db::prune_diagnostic_events(&sanitized_config.database_path) {
+                    logging::append_log(
+                        &sanitized_config.log_path,
+                        "warning",
+                        "engine.diagnostics",
+                        format!("Diagnostics retention pruning failed: {error}"),
+                    );
+                }
             }
             Err(error) => {
                 logging::append_log(
@@ -91,6 +99,32 @@ impl Engine {
         }
 
         let toolchain_status = toolchain::discover_toolchain(&sanitized_config);
+
+        if database_initialized {
+            let _ = db::record_diagnostic_event(
+                &sanitized_config.database_path,
+                &DiagnosticEventInput {
+                    level: DiagnosticLevel::Info,
+                    category: DiagnosticCategory::Environment,
+                    source: "engine.bootstrap".to_string(),
+                    message: "ArgyllUX bootstrap environment captured.".to_string(),
+                    details_json: diagnostics::bootstrap_environment_details(
+                        &sanitized_config.app_support_path,
+                        &sanitized_config.database_path,
+                        &toolchain_status,
+                        db::DATABASE_VERSION as u32,
+                    ),
+                    privacy: DiagnosticPrivacy::SensitiveRedacted,
+                    job_id: None,
+                    command_id: None,
+                    profile_id: None,
+                    issue_case_id: None,
+                    duration_ms: None,
+                    operation_id: Some("engine.bootstrap".to_string()),
+                    parent_operation_id: None,
+                },
+            );
+        }
 
         if database_initialized
             && let Err(error) =
@@ -237,6 +271,73 @@ impl Engine {
         config
             .map(|config| logging::read_recent_logs(&config.log_path, limit as usize))
             .unwrap_or_default()
+    }
+
+    #[uniffi::method(name = "recordDiagnosticEvent")]
+    pub fn record_diagnostic_event(&self, input: DiagnosticEventInput) -> DiagnosticEventRecord {
+        match with_config(&self.state, |config| {
+            db::record_diagnostic_event(&config.database_path, &input)
+        }) {
+            Ok(record) => record,
+            Err(error) => fallback_diagnostic_event(input, error.to_string()),
+        }
+    }
+
+    #[uniffi::method(name = "listDiagnosticEvents")]
+    pub fn list_diagnostic_events(
+        &self,
+        filter: DiagnosticEventFilter,
+    ) -> Vec<DiagnosticEventRecord> {
+        match with_config(&self.state, |config| {
+            db::list_diagnostic_events(&config.database_path, &filter)
+        }) {
+            Ok(events) => events,
+            Err(error) => vec![fallback_diagnostic_event(
+                DiagnosticEventInput {
+                    level: DiagnosticLevel::Error,
+                    category: DiagnosticCategory::Database,
+                    source: "engine.diagnostics".to_string(),
+                    message: format!("Listing diagnostics failed: {error}"),
+                    details_json: "{}".to_string(),
+                    privacy: DiagnosticPrivacy::Public,
+                    job_id: None,
+                    command_id: None,
+                    profile_id: None,
+                    issue_case_id: None,
+                    duration_ms: None,
+                    operation_id: None,
+                    parent_operation_id: None,
+                },
+                error.to_string(),
+            )],
+        }
+    }
+
+    #[uniffi::method(name = "getDiagnosticsSummary")]
+    pub fn get_diagnostics_summary(&self) -> DiagnosticsSummary {
+        let state = self.state.read().expect("engine state lock poisoned");
+        let Some(config) = state.config.clone() else {
+            return fallback_diagnostics_summary("Blocked", "Unknown", "not_resolved");
+        };
+        let readiness = readiness_label(&state.app_health.readiness);
+        let argyll_version = state
+            .toolchain_status
+            .argyll_version
+            .clone()
+            .unwrap_or_else(|| "Unknown".to_string());
+        let argyll_path_category =
+            diagnostics::path_category(state.toolchain_status.resolved_install_path.as_deref());
+        drop(state);
+
+        db::get_diagnostics_summary(
+            &config.database_path,
+            &readiness,
+            &argyll_version,
+            &argyll_path_category,
+        )
+        .unwrap_or_else(|_| {
+            fallback_diagnostics_summary(&readiness, &argyll_version, &argyll_path_category)
+        })
     }
 
     #[uniffi::method(name = "getDashboardSnapshot")]
@@ -872,6 +973,73 @@ fn log_config_error(state: &RwLock<EngineState>, source: &str, message: &str) {
         .clone()
     {
         logging::append_log(&config.log_path, "error", source, message.to_string());
+        let _ = db::record_diagnostic_event(
+            &config.database_path,
+            &DiagnosticEventInput {
+                level: DiagnosticLevel::Error,
+                category: DiagnosticCategory::Engine,
+                source: source.to_string(),
+                message: message.to_string(),
+                details_json: "{}".to_string(),
+                privacy: DiagnosticPrivacy::Public,
+                job_id: None,
+                command_id: None,
+                profile_id: None,
+                issue_case_id: None,
+                duration_ms: None,
+                operation_id: None,
+                parent_operation_id: None,
+            },
+        );
+    }
+}
+
+fn fallback_diagnostic_event(input: DiagnosticEventInput, error: String) -> DiagnosticEventRecord {
+    DiagnosticEventRecord {
+        id: "diagnostics-unavailable".to_string(),
+        timestamp: crate::support::iso_timestamp(),
+        level: DiagnosticLevel::Error,
+        category: DiagnosticCategory::Database,
+        source: "engine.diagnostics".to_string(),
+        message: format!("Diagnostics store unavailable: {error}"),
+        details_json: "{}".to_string(),
+        privacy: DiagnosticPrivacy::Public,
+        job_id: input.job_id,
+        command_id: input.command_id,
+        profile_id: input.profile_id,
+        issue_case_id: input.issue_case_id,
+        duration_ms: input.duration_ms,
+        operation_id: input.operation_id,
+        parent_operation_id: input.parent_operation_id,
+    }
+}
+
+fn fallback_diagnostics_summary(
+    readiness: &str,
+    argyll_version: &str,
+    argyll_path_category: &str,
+) -> DiagnosticsSummary {
+    DiagnosticsSummary {
+        total_count: 0,
+        warning_count: 0,
+        error_count: 0,
+        critical_count: 0,
+        latest_critical_message: None,
+        latest_event_timestamp: None,
+        app_readiness: readiness.to_string(),
+        argyll_version: argyll_version.to_string(),
+        argyll_path_category: argyll_path_category.to_string(),
+        retention: diagnostics::retention_status(0, 0, None),
+    }
+}
+
+fn readiness_label(value: &str) -> String {
+    match value {
+        "ready" => "Ready".to_string(),
+        "attention" => "Needs Attention".to_string(),
+        "blocked" => "Blocked".to_string(),
+        other if other.trim().is_empty() => "Blocked".to_string(),
+        other => other.to_string(),
     }
 }
 
@@ -1064,6 +1232,69 @@ mod tests {
 
         assert!(status.app_support_dir_ready);
         assert!(status.database_initialized);
+    }
+
+    #[test]
+    fn bridge_records_lists_and_summarizes_diagnostic_events() {
+        let temp = tempfile::tempdir().unwrap();
+        let engine = Engine::new();
+        let config = EngineConfig {
+            app_support_path: temp
+                .path()
+                .join("app-support")
+                .to_string_lossy()
+                .to_string(),
+            database_path: temp
+                .path()
+                .join("app-support/argyllux.sqlite")
+                .to_string_lossy()
+                .to_string(),
+            log_path: temp
+                .path()
+                .join("logs/engine.log")
+                .to_string_lossy()
+                .to_string(),
+            argyll_override_path: None,
+            additional_search_roots: Vec::new(),
+        };
+
+        engine.bootstrap(config);
+        let record = engine.record_diagnostic_event(DiagnosticEventInput {
+            level: DiagnosticLevel::Warning,
+            category: DiagnosticCategory::Ui,
+            source: "swift.workflow.new_profile".to_string(),
+            message: "User started New Profile.".to_string(),
+            details_json: serde_json::json!({ "action": "new_profile" }).to_string(),
+            privacy: DiagnosticPrivacy::Public,
+            job_id: Some("job-1".to_string()),
+            command_id: None,
+            profile_id: None,
+            issue_case_id: None,
+            duration_ms: None,
+            operation_id: None,
+            parent_operation_id: None,
+        });
+
+        assert_eq!(record.category, DiagnosticCategory::Ui);
+
+        let events = engine.list_diagnostic_events(DiagnosticEventFilter {
+            levels: vec![DiagnosticLevel::Warning],
+            categories: vec![DiagnosticCategory::Ui],
+            search_text: Some("New Profile".to_string()),
+            job_id: Some("job-1".to_string()),
+            profile_id: None,
+            since_timestamp: None,
+            until_timestamp: None,
+            errors_only: false,
+            limit: 50,
+        });
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].message, "User started New Profile.");
+
+        let summary = engine.get_diagnostics_summary();
+        assert!(summary.total_count >= 1);
+        assert_eq!(summary.warning_count, 1);
     }
 
     #[test]
