@@ -13,28 +13,21 @@ pub(crate) const DEFAULT_RETENTION_DAYS: u32 = 30;
 pub(crate) const DEFAULT_MAX_STORAGE_MB: u32 = 50;
 pub(crate) const MAX_DIAGNOSTIC_DETAILS_BYTES: usize = 64 * 1024;
 
-const PRIVATE_VALUE_KEYS: &[&str] = &[
-    "profile_name",
-    "printer_name",
-    "paper_name",
-    "issue_case_title",
-    "notes",
-    "stdout",
-    "stderr",
-    "hostname",
-    "username",
-    "serial_number",
-    "device_identifier",
-    "network",
-];
-
-const PATH_KEYS: &[&str] = &[
-    "path",
-    "file_path",
-    "workspace_path",
-    "profile_path",
-    "measurement_path",
-    "resolved_install_path",
+const PRIVATE_KEY_CONCEPTS: &[&[&str]] = &[
+    &["profile", "name"],
+    &["printer", "name"],
+    &["paper", "name"],
+    &["issue", "case", "title"],
+    &["stdout"],
+    &["stderr"],
+    &["hostname"],
+    &["host", "name"],
+    &["username"],
+    &["user", "name"],
+    &["serial", "number"],
+    &["device", "identifier"],
+    &["network"],
+    &["notes"],
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,8 +72,14 @@ pub(crate) fn sanitize_event_input(input: DiagnosticEventInput) -> SanitizedDiag
         truncate_details_json(serde_json::to_string(&details).unwrap_or_else(|_| "{}".to_string()));
     changed |= truncated;
 
-    let source = trim_or_fallback(input.source, "engine");
-    let message = trim_or_fallback(input.message, "Diagnostic event.");
+    let (source, source_changed) =
+        sanitize_free_text_field(input.source, "engine", "engine.redacted");
+    let (message, message_changed) = sanitize_free_text_field(
+        input.message,
+        "Diagnostic event.",
+        "[redacted diagnostic message]",
+    );
+    changed |= source_changed || message_changed;
 
     SanitizedDiagnosticEventInput {
         level: input.level,
@@ -233,14 +232,14 @@ fn sanitize_object(object: &mut Map<String, Value>) -> bool {
 
     for (key, value) in object.iter_mut() {
         let key = key.as_str();
-        if PRIVATE_VALUE_KEYS.contains(&key) {
+        if is_private_value_key(key) {
             if value != "[redacted]" {
                 *value = Value::String("[redacted]".to_string());
                 changed = true;
             }
         } else if key == "argv" {
             changed |= sanitize_argv(value);
-        } else if PATH_KEYS.contains(&key) {
+        } else if is_path_key(key) {
             match value {
                 Value::String(path) => {
                     let redacted = redact_path(path);
@@ -294,6 +293,82 @@ fn sanitize_argv(value: &mut Value) -> bool {
 
 fn looks_like_private_path(value: &str) -> bool {
     value.contains("/Users/") || value.contains("/var/folders/") || value.contains("/private/var/")
+}
+
+fn is_private_value_key(key: &str) -> bool {
+    let tokens = key_tokens(key);
+    PRIVATE_KEY_CONCEPTS
+        .iter()
+        .any(|concept| contains_token_sequence(&tokens, concept))
+}
+
+fn is_path_key(key: &str) -> bool {
+    let tokens = key_tokens(key);
+    tokens.iter().any(|token| token == "path")
+}
+
+fn key_tokens(key: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut previous_was_lowercase = false;
+
+    for character in key.chars() {
+        if character.is_ascii_alphanumeric() {
+            if character.is_ascii_uppercase() && previous_was_lowercase && !current.is_empty() {
+                tokens.push(std::mem::take(&mut current));
+            }
+            current.push(character.to_ascii_lowercase());
+            previous_was_lowercase = character.is_ascii_lowercase() || character.is_ascii_digit();
+        } else {
+            if !current.is_empty() {
+                tokens.push(std::mem::take(&mut current));
+            }
+            previous_was_lowercase = false;
+        }
+    }
+
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+
+    tokens
+}
+
+fn contains_token_sequence(tokens: &[String], sequence: &[&str]) -> bool {
+    !sequence.is_empty()
+        && tokens.windows(sequence.len()).any(|window| {
+            window
+                .iter()
+                .map(String::as_str)
+                .eq(sequence.iter().copied())
+        })
+}
+
+fn sanitize_free_text_field(
+    value: String,
+    fallback: &str,
+    unsafe_fallback: &str,
+) -> (String, bool) {
+    let trimmed = trim_or_fallback(value, fallback);
+    if free_text_may_contain_private_payload(&trimmed) {
+        // Persisted diagnostic source/message fields must stay summary-only.
+        // If free text resembles a path-bearing payload or stdout/stderr excerpt,
+        // keep the correlation event and replace the ambiguous text wholesale.
+        (unsafe_fallback.to_string(), true)
+    } else {
+        (trimmed, false)
+    }
+}
+
+fn free_text_may_contain_private_payload(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    looks_like_private_path(value)
+        || lower.contains("stdout:")
+        || lower.contains("stdout=")
+        || lower.contains("stderr:")
+        || lower.contains("stderr=")
+        || lower.contains("standard output:")
+        || lower.contains("standard error:")
 }
 
 fn redact_path(path: &str) -> String {
@@ -433,6 +508,73 @@ mod tests {
                 .details_json
                 .contains("\"argv\":[\"targen\",\"-v\",\"$HOME/.../p900\"]")
         );
+        assert_eq!(sanitized.privacy, DiagnosticPrivacy::SensitiveRedacted);
+    }
+
+    #[test]
+    fn sanitizer_redacts_private_source_and_message_before_persistence() {
+        let mut input = input_with_details(r#"{"safe":"kept"}"#);
+        input.source = "engine.cli /Users/tylermiller/private/run".to_string();
+        input.message =
+            "stderr: secret command output from /Users/tylermiller/job/p900".to_string();
+
+        let sanitized = sanitize_event_input(input);
+
+        assert_eq!(sanitized.source, "engine.redacted");
+        assert_eq!(sanitized.message, "[redacted diagnostic message]");
+        assert!(sanitized.details_json.contains("\"safe\":\"kept\""));
+        assert!(!sanitized.source.contains("/Users/tylermiller"));
+        assert!(!sanitized.message.contains("/Users/tylermiller"));
+        assert!(!sanitized.message.contains("secret command output"));
+        assert_eq!(sanitized.privacy, DiagnosticPrivacy::SensitiveRedacted);
+    }
+
+    #[test]
+    fn sanitizer_redacts_normalized_private_key_concepts() {
+        let sanitized = sanitize_event_input(input_with_details(
+            r#"{
+                "profileName":"P900 Rag v3",
+                "serialNumber":"abc-123",
+                "planning_profile_name":"Planning profile",
+                "measurement_notes":"private notes",
+                "paper-name":"Rag Paper",
+                "safe_label":"public summary"
+            }"#,
+        ));
+
+        assert!(
+            sanitized
+                .details_json
+                .contains("\"profileName\":\"[redacted]\"")
+        );
+        assert!(
+            sanitized
+                .details_json
+                .contains("\"serialNumber\":\"[redacted]\"")
+        );
+        assert!(
+            sanitized
+                .details_json
+                .contains("\"planning_profile_name\":\"[redacted]\"")
+        );
+        assert!(
+            sanitized
+                .details_json
+                .contains("\"measurement_notes\":\"[redacted]\"")
+        );
+        assert!(
+            sanitized
+                .details_json
+                .contains("\"paper-name\":\"[redacted]\"")
+        );
+        assert!(
+            sanitized
+                .details_json
+                .contains("\"safe_label\":\"public summary\"")
+        );
+        assert!(!sanitized.details_json.contains("P900 Rag v3"));
+        assert!(!sanitized.details_json.contains("abc-123"));
+        assert!(!sanitized.details_json.contains("private notes"));
         assert_eq!(sanitized.privacy, DiagnosticPrivacy::SensitiveRedacted);
     }
 
