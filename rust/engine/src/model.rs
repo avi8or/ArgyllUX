@@ -83,6 +83,35 @@ pub enum CommandStream {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+pub enum DiagnosticLevel {
+    Debug,
+    Info,
+    Warning,
+    Error,
+    Critical,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+pub enum DiagnosticCategory {
+    App,
+    Ui,
+    Workflow,
+    Engine,
+    Cli,
+    Database,
+    Toolchain,
+    Performance,
+    Environment,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+pub enum DiagnosticPrivacy {
+    Public,
+    Internal,
+    SensitiveRedacted,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
 pub enum ArtifactKind {
     Ti1,
     Ti2,
@@ -163,6 +192,97 @@ pub struct LogEntry {
     pub level: String,
     pub message: String,
     pub source: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct DiagnosticEventInput {
+    pub level: DiagnosticLevel,
+    pub category: DiagnosticCategory,
+    pub source: String,
+    pub message: String,
+    pub details_json: String,
+    pub privacy: DiagnosticPrivacy,
+    pub job_id: Option<String>,
+    pub command_id: Option<String>,
+    pub profile_id: Option<String>,
+    pub issue_case_id: Option<String>,
+    pub duration_ms: Option<u32>,
+    pub operation_id: Option<String>,
+    pub parent_operation_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct DiagnosticEventRecord {
+    pub id: String,
+    pub timestamp: String,
+    pub level: DiagnosticLevel,
+    pub category: DiagnosticCategory,
+    pub source: String,
+    pub message: String,
+    pub details_json: String,
+    pub privacy: DiagnosticPrivacy,
+    pub job_id: Option<String>,
+    pub command_id: Option<String>,
+    pub profile_id: Option<String>,
+    pub issue_case_id: Option<String>,
+    pub duration_ms: Option<u32>,
+    pub operation_id: Option<String>,
+    pub parent_operation_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct DiagnosticEventFilter {
+    pub levels: Vec<DiagnosticLevel>,
+    pub categories: Vec<DiagnosticCategory>,
+    pub search_text: Option<String>,
+    pub job_id: Option<String>,
+    pub profile_id: Option<String>,
+    pub since_timestamp: Option<String>,
+    pub until_timestamp: Option<String>,
+    pub errors_only: bool,
+    pub limit: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct DiagnosticsRetentionStatus {
+    pub retained_days: u32,
+    pub max_storage_mb: u32,
+    pub max_payload_bytes: u32,
+    pub event_count: u32,
+    pub estimated_storage_bytes: u64,
+    pub last_pruned_at: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct DiagnosticsSummary {
+    pub total_count: u32,
+    pub warning_count: u32,
+    pub error_count: u32,
+    pub critical_count: u32,
+    pub latest_critical_message: Option<String>,
+    pub latest_event_timestamp: Option<String>,
+    pub app_readiness: String,
+    pub argyll_version: String,
+    pub argyll_path_category: String,
+    pub retention: DiagnosticsRetentionStatus,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct DiagnosticsExportOptions {
+    pub output_directory: String,
+    pub include_cli_transcripts: bool,
+    pub include_local_paths: bool,
+    pub job_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]
+pub struct DiagnosticsExportResult {
+    pub success: bool,
+    pub bundle_path: String,
+    pub message: String,
+    pub included_event_count: u32,
+    pub included_transcript_count: u32,
+    pub redacted_paths_count: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, uniffi::Record)]

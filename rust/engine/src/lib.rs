@@ -1,4 +1,5 @@
 mod db;
+mod diagnostics;
 mod logging;
 mod model;
 mod runner;
@@ -8,14 +9,17 @@ mod toolchain;
 pub use model::{
     ActiveWorkItem, AppHealth, ArtifactKind, BootstrapStatus, ColorantFamily, CommandRunState,
     CommandStream, CreateNewProfileDraftInput, CreatePaperInput, CreatePrinterInput,
-    CreatePrinterPaperPresetInput, DashboardSnapshot, DeleteResult, EngineConfig,
-    InstrumentConnectionState, InstrumentStatus, JobArtifactRecord, JobCommandEventRecord,
-    JobCommandRecord, LogEntry, MeasurementMode, MeasurementStatusRecord, NewProfileContextRecord,
-    NewProfileJobDetail, PaperRecord, PrintSettingsRecord, PrinterPaperPresetRecord,
-    PrinterProfileRecord, PrinterRecord, ReviewSummaryRecord, SaveNewProfileContextInput,
-    SavePrintSettingsInput, SaveTargetSettingsInput, StartMeasurementInput, TargetSettingsRecord,
-    ToolchainState, ToolchainStatus, UpdatePaperInput, UpdatePrinterInput,
-    UpdatePrinterPaperPresetInput, WorkflowStage, WorkflowStageState, WorkflowStageSummary,
+    CreatePrinterPaperPresetInput, DashboardSnapshot, DeleteResult, DiagnosticCategory,
+    DiagnosticEventFilter, DiagnosticEventInput, DiagnosticEventRecord, DiagnosticLevel,
+    DiagnosticPrivacy, DiagnosticsExportOptions, DiagnosticsExportResult,
+    DiagnosticsRetentionStatus, DiagnosticsSummary, EngineConfig, InstrumentConnectionState,
+    InstrumentStatus, JobArtifactRecord, JobCommandEventRecord, JobCommandRecord, LogEntry,
+    MeasurementMode, MeasurementStatusRecord, NewProfileContextRecord, NewProfileJobDetail,
+    PaperRecord, PrintSettingsRecord, PrinterPaperPresetRecord, PrinterProfileRecord,
+    PrinterRecord, ReviewSummaryRecord, SaveNewProfileContextInput, SavePrintSettingsInput,
+    SaveTargetSettingsInput, StartMeasurementInput, TargetSettingsRecord, ToolchainState,
+    ToolchainStatus, UpdatePaperInput, UpdatePrinterInput, UpdatePrinterPaperPresetInput,
+    WorkflowStage, WorkflowStageState, WorkflowStageSummary,
 };
 
 use crate::model::EngineState;
