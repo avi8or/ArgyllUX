@@ -15,7 +15,7 @@ use crate::model::{
 };
 use crate::support::{EngineResult, ensure_directory, iso_timestamp};
 use chrono::{Duration, Utc};
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension, params, params_from_iter, types::Value};
 use std::path::Path;
 
 const TOOLCHAIN_OVERRIDE_KEY: &str = "toolchain.override_path";
@@ -188,23 +188,31 @@ pub fn list_diagnostic_events(
 ) -> EngineResult<Vec<DiagnosticEventRecord>> {
     let connection = open_connection(database_path)?;
     let limit = filter.limit.clamp(1, 500);
-    let rows = connection
-        .prepare(
-            r#"
+    let (where_clause, mut query_params) = diagnostic_filter_sql(filter);
+    let mut query = r#"
             SELECT id, timestamp, level, category, source, message, details_json, privacy,
                    job_id, command_id, profile_id, issue_case_id, duration_ms, operation_id, parent_operation_id
             FROM diagnostic_events
-            ORDER BY timestamp DESC
-            LIMIT ?1
-            "#,
+"#
+    .to_string();
+
+    if !where_clause.is_empty() {
+        query.push_str(" WHERE ");
+        query.push_str(&where_clause);
+    }
+
+    query.push_str(" ORDER BY timestamp DESC LIMIT ?");
+    query_params.push(Value::Integer(i64::from(limit)));
+
+    let rows = connection
+        .prepare(&query)?
+        .query_map(
+            params_from_iter(query_params.iter()),
+            diagnostic_event_from_row,
         )?
-        .query_map(params![limit], diagnostic_event_from_row)?
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(rows
-        .into_iter()
-        .filter(|event| diagnostic_event_matches_filter(event, filter))
-        .collect())
+    Ok(rows)
 }
 
 pub fn get_diagnostics_summary(
@@ -267,64 +275,100 @@ fn diagnostic_event_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Diagno
     })
 }
 
-fn diagnostic_event_matches_filter(
-    event: &DiagnosticEventRecord,
-    filter: &DiagnosticEventFilter,
-) -> bool {
-    if filter.errors_only
-        && !matches!(
-            event.level,
-            DiagnosticLevel::Error | DiagnosticLevel::Critical
-        )
-    {
-        return false;
+fn diagnostic_filter_sql(filter: &DiagnosticEventFilter) -> (String, Vec<Value>) {
+    let mut predicates = Vec::new();
+    let mut params = Vec::new();
+
+    if filter.errors_only {
+        predicates.push("level IN ('error', 'critical')".to_string());
     }
 
-    if !filter.levels.is_empty() && !filter.levels.contains(&event.level) {
-        return false;
+    add_diagnostic_in_predicate(
+        &mut predicates,
+        &mut params,
+        "level",
+        filter.levels.iter().map(encode_diagnostic_level),
+    );
+    add_diagnostic_in_predicate(
+        &mut predicates,
+        &mut params,
+        "category",
+        filter.categories.iter().map(encode_diagnostic_category),
+    );
+
+    if let Some(job_id) = filter.job_id.as_deref() {
+        predicates.push("job_id = ?".to_string());
+        params.push(Value::Text(job_id.to_string()));
     }
 
-    if !filter.categories.is_empty() && !filter.categories.contains(&event.category) {
-        return false;
+    if let Some(profile_id) = filter.profile_id.as_deref() {
+        predicates.push("profile_id = ?".to_string());
+        params.push(Value::Text(profile_id.to_string()));
     }
 
-    if let Some(job_id) = filter.job_id.as_deref()
-        && event.job_id.as_deref() != Some(job_id)
-    {
-        return false;
+    if let Some(since) = filter.since_timestamp.as_deref() {
+        predicates.push("timestamp >= ?".to_string());
+        params.push(Value::Text(since.to_string()));
     }
 
-    if let Some(profile_id) = filter.profile_id.as_deref()
-        && event.profile_id.as_deref() != Some(profile_id)
-    {
-        return false;
-    }
-
-    if let Some(since) = filter.since_timestamp.as_deref()
-        && event.timestamp.as_str() < since
-    {
-        return false;
-    }
-
-    if let Some(until) = filter.until_timestamp.as_deref()
-        && event.timestamp.as_str() > until
-    {
-        return false;
+    if let Some(until) = filter.until_timestamp.as_deref() {
+        predicates.push("timestamp <= ?".to_string());
+        params.push(Value::Text(until.to_string()));
     }
 
     if let Some(search_text) = filter.search_text.as_deref() {
         let needle = search_text.trim().to_ascii_lowercase();
         if !needle.is_empty() {
-            let haystack = format!(
-                "{} {} {} {}",
-                event.source, event.message, event.details_json, event.timestamp
-            )
-            .to_ascii_lowercase();
-            return haystack.contains(&needle);
+            let pattern = format!("%{}%", escape_sql_like(&needle));
+            predicates.push(
+                "(LOWER(source) LIKE ? ESCAPE '\\' OR LOWER(message) LIKE ? ESCAPE '\\' OR LOWER(details_json) LIKE ? ESCAPE '\\' OR LOWER(timestamp) LIKE ? ESCAPE '\\')"
+                    .to_string(),
+            );
+            params.push(Value::Text(pattern.clone()));
+            params.push(Value::Text(pattern.clone()));
+            params.push(Value::Text(pattern.clone()));
+            params.push(Value::Text(pattern));
         }
     }
 
-    true
+    (predicates.join(" AND "), params)
+}
+
+fn add_diagnostic_in_predicate(
+    predicates: &mut Vec<String>,
+    params: &mut Vec<Value>,
+    column: &str,
+    values: impl Iterator<Item = &'static str>,
+) {
+    let values = values.collect::<Vec<_>>();
+    if values.is_empty() {
+        return;
+    }
+
+    let placeholders = std::iter::repeat_n("?", values.len())
+        .collect::<Vec<_>>()
+        .join(", ");
+    predicates.push(format!("{column} IN ({placeholders})"));
+
+    for value in values {
+        params.push(Value::Text(value.to_string()));
+    }
+}
+
+fn escape_sql_like(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+
+    for character in value.chars() {
+        match character {
+            '%' | '_' | '\\' => {
+                escaped.push('\\');
+                escaped.push(character);
+            }
+            _ => escaped.push(character),
+        }
+    }
+
+    escaped
 }
 
 fn diagnostic_count(connection: &Connection, level: Option<&str>) -> EngineResult<u32> {
@@ -4451,6 +4495,68 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].id, record.id);
+    }
+
+    #[test]
+    fn diagnostic_filters_are_applied_before_limit() {
+        let temp = tempdir().unwrap();
+        let config = build_config(temp.path());
+        std::fs::create_dir_all(temp.path().join("app-support")).unwrap();
+        initialize_database(&config).unwrap();
+
+        let connection = open_connection(&config.database_path).unwrap();
+        connection
+            .execute(
+                r#"
+                INSERT INTO diagnostic_events (
+                    id, timestamp, level, category, source, message, details_json, privacy,
+                    job_id, command_id, profile_id, issue_case_id, duration_ms, operation_id, parent_operation_id
+                )
+                VALUES (?1, ?2, 'error', 'cli', 'engine.cli', 'Older matching needle event',
+                    '{"summary":"needle"}', 'public', 'job-match', NULL, NULL, NULL, NULL, NULL, NULL)
+                "#,
+                params!["diag-match", "2026-04-20T00:00:00Z"],
+            )
+            .unwrap();
+
+        for (id, timestamp) in [
+            ("diag-newer-1", "2026-04-20T00:00:03Z"),
+            ("diag-newer-2", "2026-04-20T00:00:02Z"),
+            ("diag-newer-3", "2026-04-20T00:00:01Z"),
+        ] {
+            connection
+                .execute(
+                    r#"
+                    INSERT INTO diagnostic_events (
+                        id, timestamp, level, category, source, message, details_json, privacy,
+                        job_id, command_id, profile_id, issue_case_id, duration_ms, operation_id, parent_operation_id
+                    )
+                    VALUES (?1, ?2, 'info', 'engine', 'engine.test', 'Newer non-matching event',
+                        '{}', 'public', 'job-other', NULL, NULL, NULL, NULL, NULL, NULL)
+                    "#,
+                    params![id, timestamp],
+                )
+                .unwrap();
+        }
+
+        let events = list_diagnostic_events(
+            &config.database_path,
+            &DiagnosticEventFilter {
+                levels: vec![DiagnosticLevel::Error],
+                categories: vec![DiagnosticCategory::Cli],
+                search_text: Some("needle".to_string()),
+                job_id: Some("job-match".to_string()),
+                profile_id: None,
+                since_timestamp: None,
+                until_timestamp: None,
+                errors_only: false,
+                limit: 1,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].id, "diag-match");
     }
 
     #[test]
