@@ -478,7 +478,11 @@ fn run_command_with_transcript(
 }
 
 fn duration_ms_since(started_at: std::time::Instant) -> u32 {
-    started_at.elapsed().as_millis().min(u32::MAX as u128) as u32
+    duration_ms_from_millis(started_at.elapsed().as_millis())
+}
+
+fn duration_ms_from_millis(millis: u128) -> u32 {
+    millis.min(u32::MAX as u128) as u32
 }
 
 fn spawn_stream_reader(
@@ -946,8 +950,8 @@ mod tests {
 
     #[test]
     fn command_duration_ms_uses_saturating_milliseconds() {
-        let started = std::time::Instant::now();
-        std::thread::sleep(std::time::Duration::from_millis(2));
-        assert!(duration_ms_since(started) >= 1);
+        assert_eq!(duration_ms_from_millis(42), 42);
+        assert_eq!(duration_ms_from_millis(u32::MAX as u128), u32::MAX);
+        assert_eq!(duration_ms_from_millis(u32::MAX as u128 + 1), u32::MAX);
     }
 }
