@@ -50,6 +50,8 @@
 		A10000000000000000000029 /* ProfileLibraryModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002B /* ProfileLibraryModelTests.swift */; };
 		A1000000000000000000002A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002C /* Assets.xcassets */; };
 		A1000000000000000000002B /* HitTargetButtonStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002D /* HitTargetButtonStyles.swift */; };
+		A1000000000000000000002C /* DiagnosticsModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002E /* DiagnosticsModelTests.swift */; };
+		A1000000000000000000002D /* DiagnosticsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002F /* DiagnosticsModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -108,6 +110,8 @@
 		A2000000000000000000002B /* ProfileLibraryModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileLibraryModelTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000002C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A2000000000000000000002D /* HitTargetButtonStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HitTargetButtonStyles.swift; sourceTree = "<group>"; };
+		A2000000000000000000002E /* DiagnosticsModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsModelTests.swift; sourceTree = "<group>"; };
+		A2000000000000000000002F /* DiagnosticsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -199,6 +203,7 @@
 				A20000000000000000000029 /* NewProfileWorkflowModelTests.swift */,
 				A2000000000000000000002A /* SettingsCatalogModelTests.swift */,
 				A2000000000000000000002B /* ProfileLibraryModelTests.swift */,
+				A2000000000000000000002E /* DiagnosticsModelTests.swift */,
 				A70000000000000000000012 /* Support */,
 			);
 			path = ArgyllUXTests;
@@ -271,6 +276,7 @@
 			children = (
 				A20000000000000000000020 /* AppReferenceData.swift */,
 				A20000000000000000000021 /* CliTranscriptModel.swift */,
+				A2000000000000000000002F /* DiagnosticsModel.swift */,
 			);
 			path = Shell;
 			sourceTree = "<group>";
@@ -449,6 +455,7 @@
 				A1000000000000000000001D /* SettingsCatalogModel.swift in Sources */,
 				A1000000000000000000001E /* AppReferenceData.swift in Sources */,
 				A1000000000000000000001F /* CliTranscriptModel.swift in Sources */,
+				A1000000000000000000002D /* DiagnosticsModel.swift in Sources */,
 				A10000000000000000000020 /* NewProfileWorkflowModel.swift in Sources */,
 				A10000000000000000000007 /* PathSelection.swift in Sources */,
 				A10000000000000000000018 /* FileOpener.swift in Sources */,
@@ -486,6 +493,7 @@
 				A10000000000000000000027 /* NewProfileWorkflowModelTests.swift in Sources */,
 				A10000000000000000000028 /* SettingsCatalogModelTests.swift in Sources */,
 				A10000000000000000000029 /* ProfileLibraryModelTests.swift in Sources */,
+				A1000000000000000000002C /* DiagnosticsModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

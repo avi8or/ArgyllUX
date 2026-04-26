@@ -70,6 +70,8 @@ final class FakeEngine: EngineProtocol, @unchecked Sendable {
     private(set) var lastDeletedJobId: String?
     private(set) var lastDeletedProfileId: String?
     private(set) var lastUpdatedPresetInput: UpdatePrinterPaperPresetInput?
+    private(set) var recordedDiagnosticInputs: [DiagnosticEventInput] = []
+    private(set) var lastDiagnosticFilter: DiagnosticEventFilter?
 
     var bootstrapStatusValue = BootstrapStatus(
         appSupportDirReady: true,
@@ -106,6 +108,8 @@ final class FakeEngine: EngineProtocol, @unchecked Sendable {
     var dashboardSnapshotAfterDeletePrinterProfile: DashboardSnapshot?
     var jobDetailAfterDeletePrinterProfile: NewProfileJobDetail?
     var loadedJobDetails: [String: NewProfileJobDetail] = [:]
+    var diagnosticEventsValue: [DiagnosticEventRecord] = []
+    var diagnosticsSummaryValue = makeDiagnosticsSummary()
 
     func bootstrap(config: EngineConfig) -> BootstrapStatus {
         bootstrapCallCount += 1
@@ -185,6 +189,28 @@ final class FakeEngine: EngineProtocol, @unchecked Sendable {
             }
         }
         return deletePrinterProfileResult
+    }
+
+    func recordDiagnosticEvent(input: DiagnosticEventInput) -> DiagnosticEventRecord {
+        recordedDiagnosticInputs.append(input)
+        let record = makeDiagnosticEvent(
+            level: input.level,
+            category: input.category,
+            message: input.message,
+            jobId: input.jobId,
+            commandId: input.commandId
+        )
+        diagnosticEventsValue.insert(record, at: 0)
+        return record
+    }
+
+    func listDiagnosticEvents(filter: DiagnosticEventFilter) -> [DiagnosticEventRecord] {
+        lastDiagnosticFilter = filter
+        return diagnosticEventsValue
+    }
+
+    func getDiagnosticsSummary() -> DiagnosticsSummary {
+        diagnosticsSummaryValue
     }
 
     func createPaper(input: CreatePaperInput) -> PaperRecord {
@@ -462,6 +488,59 @@ func makeDashboard(activeWorkItems: [ActiveWorkItem]) -> DashboardSnapshot {
             label: "No Instrument Connected",
             detail: nil
         )
+    )
+}
+
+func makeDiagnosticsSummary(
+    total: UInt32 = 0,
+    warnings: UInt32 = 0,
+    errors: UInt32 = 0,
+    critical: UInt32 = 0
+) -> DiagnosticsSummary {
+    DiagnosticsSummary(
+        totalCount: total,
+        warningCount: warnings,
+        errorCount: errors,
+        criticalCount: critical,
+        latestCriticalMessage: nil,
+        latestEventTimestamp: nil,
+        appReadiness: "Ready",
+        argyllVersion: "3.5.0",
+        argyllPathCategory: "system_toolchain",
+        retention: DiagnosticsRetentionStatus(
+            retainedDays: 30,
+            maxStorageMb: 50,
+            maxPayloadBytes: 65536,
+            eventCount: total,
+            estimatedStorageBytes: 2048,
+            lastPrunedAt: nil
+        )
+    )
+}
+
+func makeDiagnosticEvent(
+    level: DiagnosticLevel = .info,
+    category: DiagnosticCategory = .app,
+    message: String = "Diagnostic event.",
+    jobId: String? = nil,
+    commandId: String? = nil
+) -> DiagnosticEventRecord {
+    DiagnosticEventRecord(
+        id: UUID().uuidString,
+        timestamp: "2026-04-26T18:30:00Z",
+        level: level,
+        category: category,
+        source: "test.diagnostics",
+        message: message,
+        detailsJson: "{}",
+        privacy: .public,
+        jobId: jobId,
+        commandId: commandId,
+        profileId: nil,
+        issueCaseId: nil,
+        durationMs: nil,
+        operationId: nil,
+        parentOperationId: nil
     )
 }
 

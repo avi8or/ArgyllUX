@@ -111,6 +111,7 @@ final class AppModel: ObservableObject {
     let workflow: NewProfileWorkflowModel
     let profileLibrary: ProfileLibraryModel
     let cliTranscript: CliTranscriptModel
+    let diagnostics: DiagnosticsModel
 
     private let bridge: EngineBridge
     private let fileOpener: FileOpening
@@ -129,6 +130,7 @@ final class AppModel: ObservableObject {
         workflow = NewProfileWorkflowModel(bridge: bridge, fileOpener: fileOpener)
         profileLibrary = ProfileLibraryModel()
         cliTranscript = CliTranscriptModel(bridge: bridge, fileOpener: fileOpener)
+        diagnostics = DiagnosticsModel(bridge: bridge)
 
         configureFeatureModels()
         observeFeatureModels()
@@ -580,6 +582,11 @@ final class AppModel: ObservableObject {
         selectedRoute = .home
         activeWorkflow = .newProfile
         await refreshShellState(status: settings.toolchainStatus, bootstrapStatus: bootstrapStatus)
+        await diagnostics.recordUiEvent(
+            source: "swift.workflow.new_profile",
+            message: "User opened New Profile.",
+            details: ["entry_point": "app_shell"]
+        )
         await workflow.openNewProfileWorkflow(printerId: printerId, paperId: paperId)
     }
 
@@ -690,6 +697,12 @@ final class AppModel: ObservableObject {
                         title: pendingDeletion.errorTitle,
                         message: result.message.trimmed.isEmpty ? pendingDeletion.fallbackErrorMessage : result.message
                     )
+                    await self.diagnostics.recordUiEvent(
+                        source: "swift.active_work.delete",
+                        message: "Active Work deletion failed.",
+                        details: ["result": "failed"],
+                        jobID: jobId
+                    )
                 }
             case let .printerProfile(profileId, _, sourceJobId):
                 let result = await self.bridge.deletePrinterProfile(profileId: profileId)
@@ -705,6 +718,11 @@ final class AppModel: ObservableObject {
                     self.deletionError = DeletionErrorState(
                         title: pendingDeletion.errorTitle,
                         message: result.message.trimmed.isEmpty ? pendingDeletion.fallbackErrorMessage : result.message
+                    )
+                    await self.diagnostics.recordUiEvent(
+                        source: "swift.printer_profiles.delete",
+                        message: "Printer Profile deletion failed.",
+                        details: ["result": "failed"]
                     )
                 }
             }
@@ -922,6 +940,13 @@ final class AppModel: ObservableObject {
         cliTranscript.showJobRequested = { [weak self] jobId in
             self?.openNewProfileJob(jobId: jobId)
         }
+
+        diagnostics.openCliTranscriptRequested = { [weak self] jobId in
+            guard let self else { return }
+            Task {
+                await self.openCliTranscript(jobId: jobId)
+            }
+        }
     }
 
     private func observeFeatureModels() {
@@ -929,6 +954,7 @@ final class AppModel: ObservableObject {
         observe(workflow)
         observe(profileLibrary)
         observe(cliTranscript)
+        observe(diagnostics)
     }
 
     private func observe(_ featureModel: some ObservableObject) {
