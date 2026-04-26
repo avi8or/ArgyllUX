@@ -211,7 +211,15 @@ pub(crate) fn now_timestamp() -> String {
 fn sanitize_json_value(value: &mut Value) -> bool {
     match value {
         Value::Object(object) => sanitize_object(object),
-        Value::Array(values) => values.iter_mut().any(sanitize_json_value),
+        Value::Array(values) => {
+            let mut changed = false;
+            for value in values {
+                if sanitize_json_value(value) {
+                    changed = true;
+                }
+            }
+            changed
+        }
         Value::String(text) if looks_like_private_path(text) => {
             *text = redact_path(text);
             true
@@ -437,6 +445,30 @@ mod tests {
 
         assert!(sanitized.details_json.len() <= MAX_DIAGNOSTIC_DETAILS_BYTES);
         assert!(sanitized.details_json.contains("truncated"));
+    }
+
+    #[test]
+    fn sanitizer_visits_every_array_entry_before_persistence() {
+        let sanitized = sanitize_event_input(input_with_details(
+            r#"{
+                "events":[
+                    "/Users/tylermiller/Profiles/First.icc",
+                    {"stdout":"second secret"},
+                    {"path":"/Users/tylermiller/Profiles/Third.icc"}
+                ]
+            }"#,
+        ));
+
+        assert!(sanitized.details_json.contains("\"$HOME/.../First.icc\""));
+        assert!(sanitized.details_json.contains("\"stdout\":\"[redacted]\""));
+        assert!(
+            sanitized
+                .details_json
+                .contains("\"path\":\"$HOME/.../Third.icc\"")
+        );
+        assert!(!sanitized.details_json.contains("/Users/tylermiller"));
+        assert!(!sanitized.details_json.contains("second secret"));
+        assert_eq!(sanitized.privacy, DiagnosticPrivacy::SensitiveRedacted);
     }
 
     #[test]
