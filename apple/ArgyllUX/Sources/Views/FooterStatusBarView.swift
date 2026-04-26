@@ -12,7 +12,7 @@ struct FooterStatusBarView: View {
     let lastValidationLabel: String
     let isRefreshing: Bool
     let onOpenCliTranscript: () -> Void
-    let onOpenErrorLogs: () -> Void
+    let onOpenDiagnostics: () -> Void
 
     var body: some View {
         HStack(spacing: 14) {
@@ -39,7 +39,7 @@ struct FooterStatusBarView: View {
                 Button("CLI Transcript", action: onOpenCliTranscript)
                     .buttonStyle(FooterLinkButtonStyle())
 
-                Button("Error Log Viewer", action: onOpenErrorLogs)
+                Button("Diagnostics", action: onOpenDiagnostics)
                     .buttonStyle(FooterLinkButtonStyle())
             }
         }

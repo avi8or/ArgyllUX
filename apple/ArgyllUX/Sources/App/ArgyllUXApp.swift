@@ -28,5 +28,10 @@ struct ArgyllUXApp: App {
             CliTranscriptWindowView(transcript: model.cliTranscript)
         }
         .defaultSize(width: 920, height: 520)
+
+        Window("Diagnostics", id: DiagnosticsWindowView.windowID) {
+            DiagnosticsWindowView(diagnostics: model.diagnostics)
+        }
+        .defaultSize(width: 1040, height: 680)
     }
 }

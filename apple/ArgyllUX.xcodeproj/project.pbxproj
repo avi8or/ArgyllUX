@@ -26,7 +26,7 @@
 		A10000000000000000000011 /* AppModelShellTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* AppModelShellTests.swift */; };
 		A10000000000000000000012 /* NewProfileWorkflowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* NewProfileWorkflowView.swift */; };
 		A10000000000000000000013 /* FooterStatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* FooterStatusBarView.swift */; };
-		A10000000000000000000014 /* LogViewerSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* LogViewerSheetView.swift */; };
+		A10000000000000000000014 /* DiagnosticsWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* DiagnosticsWindowView.swift */; };
 		A10000000000000000000015 /* CliTranscriptWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* CliTranscriptWindowView.swift */; };
 		A10000000000000000000016 /* AppTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* AppTypography.swift */; };
 		A10000000000000000000017 /* OperationalDetailRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* OperationalDetailRow.swift */; };
@@ -86,7 +86,7 @@
 		A20000000000000000000013 /* ArgyllUXTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ArgyllUXTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000014 /* NewProfileWorkflowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewProfileWorkflowView.swift; sourceTree = "<group>"; };
 		A20000000000000000000015 /* FooterStatusBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FooterStatusBarView.swift; sourceTree = "<group>"; };
-		A20000000000000000000016 /* LogViewerSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogViewerSheetView.swift; sourceTree = "<group>"; };
+		A20000000000000000000016 /* DiagnosticsWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsWindowView.swift; sourceTree = "<group>"; };
 		A20000000000000000000017 /* CliTranscriptWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CliTranscriptWindowView.swift; sourceTree = "<group>"; };
 		A20000000000000000000018 /* AppTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTypography.swift; sourceTree = "<group>"; };
 		A20000000000000000000019 /* OperationalDetailRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationalDetailRow.swift; sourceTree = "<group>"; };
@@ -234,7 +234,7 @@
 				A70000000000000000000010 /* Workflow */,
 				A70000000000000000000011 /* PrinterProfiles */,
 				A20000000000000000000015 /* FooterStatusBarView.swift */,
-				A20000000000000000000016 /* LogViewerSheetView.swift */,
+				A20000000000000000000016 /* DiagnosticsWindowView.swift */,
 				A20000000000000000000017 /* CliTranscriptWindowView.swift */,
 				A20000000000000000000019 /* OperationalDetailRow.swift */,
 			);
@@ -475,7 +475,7 @@
 				A10000000000000000000024 /* NewProfileWorkflowSections.swift in Sources */,
 				A10000000000000000000021 /* PrinterProfilesView.swift in Sources */,
 				A10000000000000000000013 /* FooterStatusBarView.swift in Sources */,
-				A10000000000000000000014 /* LogViewerSheetView.swift in Sources */,
+				A10000000000000000000014 /* DiagnosticsWindowView.swift in Sources */,
 				A10000000000000000000015 /* CliTranscriptWindowView.swift in Sources */,
 				A10000000000000000000016 /* AppTypography.swift in Sources */,
 				A10000000000000000000017 /* OperationalDetailRow.swift in Sources */,

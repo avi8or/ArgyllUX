@@ -3,7 +3,6 @@ import SwiftUI
 struct AppShellView: View {
     @Environment(\.openWindow) private var openWindow
     @ObservedObject var model: AppModel
-    @State private var isShowingErrorLogViewer = false
     private let rightInspectorWidth: CGFloat = 320
     private let minimumWidthForRightInspector: CGFloat = 1180
 
@@ -48,8 +47,9 @@ struct AppShellView: View {
                         openWindow(id: CliTranscriptWindowView.windowID)
                         Task { await model.openLatestCliTranscript() }
                     },
-                    onOpenErrorLogs: {
-                        isShowingErrorLogViewer = true
+                    onOpenDiagnostics: {
+                        openWindow(id: DiagnosticsWindowView.windowID)
+                        Task { await model.diagnostics.refresh() }
                     }
                 )
             }
@@ -57,9 +57,6 @@ struct AppShellView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .task {
             await model.bootstrapIfNeeded()
-        }
-        .sheet(isPresented: $isShowingErrorLogViewer) {
-            LogViewerSheetView(model: model, kind: .error)
         }
         .confirmationDialog(
             model.deletionConfirmationTitle,

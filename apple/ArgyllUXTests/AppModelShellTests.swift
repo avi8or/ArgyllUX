@@ -44,6 +44,21 @@ struct AppModelShellTests {
     }
 
     @Test
+    func diagnosticsModelRefreshesThroughAppModel() async {
+        let fakeEngine = FakeEngine()
+        fakeEngine.diagnosticsSummaryValue = makeDiagnosticsSummary(total: 1)
+        fakeEngine.diagnosticEventsValue = [
+            makeDiagnosticEvent(level: .info, category: .environment, message: "Bootstrap environment captured.")
+        ]
+
+        let model = makeAppModel(fakeEngine: fakeEngine)
+        await model.diagnostics.refresh()
+
+        #expect(model.diagnostics.summary?.totalCount == 1)
+        #expect(model.diagnostics.visibleEvents.first?.message == "Bootstrap environment captured.")
+    }
+
+    @Test
     func confirmActiveWorkDeletionClearsDeletedJob() async {
         let draftDetail = makeJobDetail(stage: .context, nextAction: "Save Context")
         let fakeEngine = FakeEngine()
