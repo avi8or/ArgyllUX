@@ -1025,8 +1025,8 @@ fn fallback_diagnostics_summary(
         total_count: 1,
         warning_count: 0,
         error_count: 1,
-        critical_count: 1,
-        latest_critical_message: Some(DIAGNOSTICS_UNAVAILABLE_MESSAGE.to_string()),
+        critical_count: 0,
+        latest_critical_message: None,
         latest_event_timestamp: None,
         app_readiness: readiness.to_string(),
         argyll_version: argyll_version.to_string(),
@@ -1390,19 +1390,10 @@ mod lib {
 
             assert_eq!(summary.total_count, 1);
             assert_eq!(summary.error_count, 1);
-            assert_eq!(summary.critical_count, 1);
-            assert_eq!(
-                summary.latest_critical_message.as_deref(),
-                Some(DIAGNOSTICS_UNAVAILABLE_MESSAGE)
-            );
+            assert_eq!(summary.critical_count, 0);
+            assert_eq!(summary.latest_critical_message, None);
             assert_eq!(summary.retention.event_count, 1);
-            assert!(
-                !summary
-                    .latest_critical_message
-                    .as_deref()
-                    .unwrap_or_default()
-                    .contains(&database_path)
-            );
+            assert!(!format!("{summary:?}").contains(&database_path));
         }
     }
 }
