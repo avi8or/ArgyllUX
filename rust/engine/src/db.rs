@@ -4503,7 +4503,7 @@ mod tests {
     }
 
     #[test]
-    fn retention_prunes_events_older_than_retention_window() {
+    fn diagnostic_retention_prunes_events_older_than_retention_window() {
         let temp = tempdir().unwrap();
         let config = build_config(temp.path());
         std::fs::create_dir_all(temp.path().join("app-support")).unwrap();
