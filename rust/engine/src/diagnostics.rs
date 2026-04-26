@@ -219,10 +219,7 @@ fn sanitize_json_value(value: &mut Value) -> bool {
             }
             changed
         }
-        Value::String(text) if looks_like_private_path(text) => {
-            *text = redact_path(text);
-            true
-        }
+        Value::String(text) => sanitize_detail_string(text),
         _ => false,
     }
 }
@@ -293,6 +290,21 @@ fn sanitize_argv(value: &mut Value) -> bool {
 
 fn looks_like_private_path(value: &str) -> bool {
     value.contains("/Users/") || value.contains("/var/folders/") || value.contains("/private/var/")
+}
+
+fn sanitize_detail_string(value: &mut String) -> bool {
+    if looks_like_private_path(value) {
+        let redacted = redact_path(value);
+        if *value != redacted {
+            *value = redacted;
+            return true;
+        }
+    } else if free_text_may_contain_private_payload(value) {
+        *value = "[redacted]".to_string();
+        return true;
+    }
+
+    false
 }
 
 fn is_private_value_key(key: &str) -> bool {
@@ -540,6 +552,41 @@ mod tests {
         assert!(!sanitized.details_json.contains("secret command output"));
         assert!(!sanitized.details_json.contains("stderr:"));
         assert_eq!(sanitized.privacy, DiagnosticPrivacy::SensitiveRedacted);
+    }
+
+    #[test]
+    fn sanitizer_redacts_unsafe_detail_string_under_neutral_key() {
+        let sanitized = sanitize_event_input(input_with_details(
+            r#"{"detail":"stderr: secret command output"}"#,
+        ));
+
+        assert!(sanitized.details_json.contains("\"detail\":\"[redacted]\""));
+        assert!(!sanitized.details_json.contains("secret command output"));
+        assert_eq!(sanitized.privacy, DiagnosticPrivacy::SensitiveRedacted);
+    }
+
+    #[test]
+    fn sanitizer_redacts_unsafe_top_level_detail_string() {
+        let sanitized = sanitize_event_input(input_with_details(
+            &serde_json::json!("stdout: secret command output").to_string(),
+        ));
+
+        assert_eq!(sanitized.details_json, "\"[redacted]\"");
+        assert!(!sanitized.details_json.contains("secret command output"));
+        assert_eq!(sanitized.privacy, DiagnosticPrivacy::SensitiveRedacted);
+    }
+
+    #[test]
+    fn sanitizer_preserves_safe_detail_string_values() {
+        let sanitized =
+            sanitize_event_input(input_with_details(r#"{"detail":"Command finished."}"#));
+
+        assert!(
+            sanitized
+                .details_json
+                .contains("\"detail\":\"Command finished.\"")
+        );
+        assert_eq!(sanitized.privacy, DiagnosticPrivacy::Internal);
     }
 
     #[test]
