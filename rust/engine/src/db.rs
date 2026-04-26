@@ -1,14 +1,17 @@
+use crate::diagnostics;
 use crate::model::{
     ActiveWorkItem, ArtifactKind, ColorantFamily, CommandRunState, CommandStream,
     CreateNewProfileDraftInput, CreatePaperInput, CreatePrinterInput,
-    CreatePrinterPaperPresetInput, DashboardSnapshot, DeleteResult, EngineConfig, InstrumentStatus,
-    JobArtifactRecord, JobCommandEventRecord, JobCommandRecord, MeasurementMode,
-    MeasurementStatusRecord, NewProfileContextRecord, NewProfileJobDetail, PaperRecord,
-    PaperThicknessUnit, PaperWeightUnit, PrintSettingsRecord, PrinterPaperPresetRecord,
-    PrinterProfileRecord, PrinterRecord, ReviewSummaryRecord, SaveNewProfileContextInput,
-    SavePrintSettingsInput, SaveTargetSettingsInput, StartMeasurementInput, TargetSettingsRecord,
-    ToolchainState, ToolchainStatus, UpdatePaperInput, UpdatePrinterInput,
-    UpdatePrinterPaperPresetInput, WorkflowStage, WorkflowStageState, WorkflowStageSummary,
+    CreatePrinterPaperPresetInput, DashboardSnapshot, DeleteResult, DiagnosticCategory,
+    DiagnosticEventFilter, DiagnosticEventInput, DiagnosticEventRecord, DiagnosticLevel,
+    DiagnosticPrivacy, DiagnosticsSummary, EngineConfig, InstrumentStatus, JobArtifactRecord,
+    JobCommandEventRecord, JobCommandRecord, MeasurementMode, MeasurementStatusRecord,
+    NewProfileContextRecord, NewProfileJobDetail, PaperRecord, PaperThicknessUnit, PaperWeightUnit,
+    PrintSettingsRecord, PrinterPaperPresetRecord, PrinterProfileRecord, PrinterRecord,
+    ReviewSummaryRecord, SaveNewProfileContextInput, SavePrintSettingsInput,
+    SaveTargetSettingsInput, StartMeasurementInput, TargetSettingsRecord, ToolchainState,
+    ToolchainStatus, UpdatePaperInput, UpdatePrinterInput, UpdatePrinterPaperPresetInput,
+    WorkflowStage, WorkflowStageState, WorkflowStageSummary,
 };
 use crate::support::{EngineResult, ensure_directory, iso_timestamp};
 use chrono::{Duration, Utc};
@@ -16,7 +19,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use std::path::Path;
 
 const TOOLCHAIN_OVERRIDE_KEY: &str = "toolchain.override_path";
-const DATABASE_VERSION: i64 = 5;
+pub(crate) const DATABASE_VERSION: i64 = 6;
 
 pub struct DatabaseStatus {
     pub initialized: bool,
@@ -136,6 +139,246 @@ pub fn persist_toolchain_status(database_path: &str, status: &ToolchainStatus) -
         ],
     )?;
     Ok(())
+}
+
+pub fn record_diagnostic_event(
+    database_path: &str,
+    input: &DiagnosticEventInput,
+) -> EngineResult<DiagnosticEventRecord> {
+    let connection = open_connection(database_path)?;
+    let sanitized = diagnostics::sanitize_event_input(input.clone());
+    let id = diagnostics::diagnostic_id();
+    let timestamp = diagnostics::now_timestamp();
+
+    connection.execute(
+        r#"
+        INSERT INTO diagnostic_events (
+            id, timestamp, level, category, source, message, details_json, privacy,
+            job_id, command_id, profile_id, issue_case_id, duration_ms, operation_id, parent_operation_id
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+        "#,
+        params![
+            &id,
+            &timestamp,
+            encode_diagnostic_level(&sanitized.level),
+            encode_diagnostic_category(&sanitized.category),
+            &sanitized.source,
+            &sanitized.message,
+            &sanitized.details_json,
+            encode_diagnostic_privacy(&sanitized.privacy),
+            &sanitized.job_id,
+            &sanitized.command_id,
+            &sanitized.profile_id,
+            &sanitized.issue_case_id,
+            sanitized.duration_ms,
+            &sanitized.operation_id,
+            &sanitized.parent_operation_id,
+        ],
+    )?;
+
+    Ok(diagnostics::event_record_from_input(
+        id, timestamp, sanitized,
+    ))
+}
+
+pub fn list_diagnostic_events(
+    database_path: &str,
+    filter: &DiagnosticEventFilter,
+) -> EngineResult<Vec<DiagnosticEventRecord>> {
+    let connection = open_connection(database_path)?;
+    let limit = filter.limit.clamp(1, 500);
+    let rows = connection
+        .prepare(
+            r#"
+            SELECT id, timestamp, level, category, source, message, details_json, privacy,
+                   job_id, command_id, profile_id, issue_case_id, duration_ms, operation_id, parent_operation_id
+            FROM diagnostic_events
+            ORDER BY timestamp DESC
+            LIMIT ?1
+            "#,
+        )?
+        .query_map(params![limit], diagnostic_event_from_row)?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(rows
+        .into_iter()
+        .filter(|event| diagnostic_event_matches_filter(event, filter))
+        .collect())
+}
+
+pub fn get_diagnostics_summary(
+    database_path: &str,
+    app_readiness: &str,
+    argyll_version: &str,
+    argyll_path_category: &str,
+) -> EngineResult<DiagnosticsSummary> {
+    let connection = open_connection(database_path)?;
+    let total_count = diagnostic_count(&connection, None)?;
+    let warning_count = diagnostic_count(&connection, Some("warning"))?;
+    let error_count = diagnostic_count(&connection, Some("error"))?;
+    let critical_count = diagnostic_count(&connection, Some("critical"))?;
+    let latest_critical_message = latest_diagnostic_message(&connection, "critical")?;
+    let latest_event_timestamp = latest_diagnostic_timestamp(&connection)?;
+    let estimated_storage_bytes = estimate_diagnostic_storage_bytes(&connection)?;
+
+    Ok(DiagnosticsSummary {
+        total_count,
+        warning_count,
+        error_count,
+        critical_count,
+        latest_critical_message,
+        latest_event_timestamp,
+        app_readiness: app_readiness.to_string(),
+        argyll_version: argyll_version.to_string(),
+        argyll_path_category: argyll_path_category.to_string(),
+        retention: diagnostics::retention_status(total_count, estimated_storage_bytes, None),
+    })
+}
+
+pub fn prune_diagnostic_events(database_path: &str) -> EngineResult<u32> {
+    let connection = open_connection(database_path)?;
+    let cutoff =
+        (Utc::now() - Duration::days(diagnostics::DEFAULT_RETENTION_DAYS as i64)).to_rfc3339();
+    let deleted = connection.execute(
+        "DELETE FROM diagnostic_events WHERE timestamp < ?1",
+        params![cutoff],
+    )?;
+    Ok(deleted as u32)
+}
+
+fn diagnostic_event_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<DiagnosticEventRecord> {
+    Ok(DiagnosticEventRecord {
+        id: row.get(0)?,
+        timestamp: row.get(1)?,
+        level: decode_diagnostic_level(&row.get::<_, String>(2)?),
+        category: decode_diagnostic_category(&row.get::<_, String>(3)?),
+        source: row.get(4)?,
+        message: row.get(5)?,
+        details_json: row.get(6)?,
+        privacy: decode_diagnostic_privacy(&row.get::<_, String>(7)?),
+        job_id: row.get(8)?,
+        command_id: row.get(9)?,
+        profile_id: row.get(10)?,
+        issue_case_id: row.get(11)?,
+        duration_ms: row.get(12)?,
+        operation_id: row.get(13)?,
+        parent_operation_id: row.get(14)?,
+    })
+}
+
+fn diagnostic_event_matches_filter(
+    event: &DiagnosticEventRecord,
+    filter: &DiagnosticEventFilter,
+) -> bool {
+    if filter.errors_only
+        && !matches!(
+            event.level,
+            DiagnosticLevel::Error | DiagnosticLevel::Critical
+        )
+    {
+        return false;
+    }
+
+    if !filter.levels.is_empty() && !filter.levels.contains(&event.level) {
+        return false;
+    }
+
+    if !filter.categories.is_empty() && !filter.categories.contains(&event.category) {
+        return false;
+    }
+
+    if let Some(job_id) = filter.job_id.as_deref()
+        && event.job_id.as_deref() != Some(job_id)
+    {
+        return false;
+    }
+
+    if let Some(profile_id) = filter.profile_id.as_deref()
+        && event.profile_id.as_deref() != Some(profile_id)
+    {
+        return false;
+    }
+
+    if let Some(since) = filter.since_timestamp.as_deref()
+        && event.timestamp.as_str() < since
+    {
+        return false;
+    }
+
+    if let Some(until) = filter.until_timestamp.as_deref()
+        && event.timestamp.as_str() > until
+    {
+        return false;
+    }
+
+    if let Some(search_text) = filter.search_text.as_deref() {
+        let needle = search_text.trim().to_ascii_lowercase();
+        if !needle.is_empty() {
+            let haystack = format!(
+                "{} {} {} {}",
+                event.source, event.message, event.details_json, event.timestamp
+            )
+            .to_ascii_lowercase();
+            return haystack.contains(&needle);
+        }
+    }
+
+    true
+}
+
+fn diagnostic_count(connection: &Connection, level: Option<&str>) -> EngineResult<u32> {
+    let count: i64 = match level {
+        Some(level) => connection.query_row(
+            "SELECT COUNT(*) FROM diagnostic_events WHERE level = ?1",
+            params![level],
+            |row| row.get(0),
+        )?,
+        None => connection.query_row("SELECT COUNT(*) FROM diagnostic_events", [], |row| {
+            row.get(0)
+        })?,
+    };
+    Ok(count as u32)
+}
+
+fn latest_diagnostic_message(connection: &Connection, level: &str) -> EngineResult<Option<String>> {
+    connection
+        .query_row(
+            "SELECT message FROM diagnostic_events WHERE level = ?1 ORDER BY timestamp DESC LIMIT 1",
+            params![level],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(Into::into)
+}
+
+fn latest_diagnostic_timestamp(connection: &Connection) -> EngineResult<Option<String>> {
+    connection
+        .query_row(
+            "SELECT timestamp FROM diagnostic_events ORDER BY timestamp DESC LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(Into::into)
+}
+
+fn estimate_diagnostic_storage_bytes(connection: &Connection) -> EngineResult<u64> {
+    let bytes: Option<i64> = connection.query_row(
+        r#"
+        SELECT SUM(
+            LENGTH(id) + LENGTH(timestamp) + LENGTH(level) + LENGTH(category) +
+            LENGTH(source) + LENGTH(message) + LENGTH(details_json) + LENGTH(privacy) +
+            COALESCE(LENGTH(job_id), 0) + COALESCE(LENGTH(command_id), 0) +
+            COALESCE(LENGTH(profile_id), 0) + COALESCE(LENGTH(issue_case_id), 0) +
+            COALESCE(LENGTH(operation_id), 0) + COALESCE(LENGTH(parent_operation_id), 0)
+        )
+        FROM diagnostic_events
+        "#,
+        [],
+        |row| row.get(0),
+    )?;
+    Ok(bytes.unwrap_or(0).max(0) as u64)
 }
 
 pub fn load_dashboard_snapshot(database_path: &str) -> EngineResult<DashboardSnapshot> {
@@ -2999,6 +3242,39 @@ fn create_latest_schema(connection: &Connection) -> EngineResult<()> {
             timestamp TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS diagnostic_events (
+            id TEXT PRIMARY KEY,
+            timestamp TEXT NOT NULL,
+            level TEXT NOT NULL,
+            category TEXT NOT NULL,
+            source TEXT NOT NULL,
+            message TEXT NOT NULL,
+            details_json TEXT NOT NULL,
+            privacy TEXT NOT NULL,
+            job_id TEXT,
+            command_id TEXT,
+            profile_id TEXT,
+            issue_case_id TEXT,
+            duration_ms INTEGER,
+            operation_id TEXT,
+            parent_operation_id TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_diagnostic_events_timestamp
+            ON diagnostic_events(timestamp DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_diagnostic_events_level
+            ON diagnostic_events(level);
+
+        CREATE INDEX IF NOT EXISTS idx_diagnostic_events_category
+            ON diagnostic_events(category);
+
+        CREATE INDEX IF NOT EXISTS idx_diagnostic_events_job_id
+            ON diagnostic_events(job_id);
+
+        CREATE INDEX IF NOT EXISTS idx_diagnostic_events_command_id
+            ON diagnostic_events(command_id);
+
         CREATE TABLE IF NOT EXISTS printer_profiles (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
@@ -3687,6 +3963,70 @@ fn decode_command_stream(value: &str) -> CommandStream {
     }
 }
 
+fn encode_diagnostic_level(level: &DiagnosticLevel) -> &'static str {
+    match level {
+        DiagnosticLevel::Debug => "debug",
+        DiagnosticLevel::Info => "info",
+        DiagnosticLevel::Warning => "warning",
+        DiagnosticLevel::Error => "error",
+        DiagnosticLevel::Critical => "critical",
+    }
+}
+
+fn decode_diagnostic_level(value: &str) -> DiagnosticLevel {
+    match value {
+        "debug" => DiagnosticLevel::Debug,
+        "warning" => DiagnosticLevel::Warning,
+        "error" => DiagnosticLevel::Error,
+        "critical" => DiagnosticLevel::Critical,
+        _ => DiagnosticLevel::Info,
+    }
+}
+
+fn encode_diagnostic_category(category: &DiagnosticCategory) -> &'static str {
+    match category {
+        DiagnosticCategory::App => "app",
+        DiagnosticCategory::Ui => "ui",
+        DiagnosticCategory::Workflow => "workflow",
+        DiagnosticCategory::Engine => "engine",
+        DiagnosticCategory::Cli => "cli",
+        DiagnosticCategory::Database => "database",
+        DiagnosticCategory::Toolchain => "toolchain",
+        DiagnosticCategory::Performance => "performance",
+        DiagnosticCategory::Environment => "environment",
+    }
+}
+
+fn decode_diagnostic_category(value: &str) -> DiagnosticCategory {
+    match value {
+        "app" => DiagnosticCategory::App,
+        "ui" => DiagnosticCategory::Ui,
+        "workflow" => DiagnosticCategory::Workflow,
+        "cli" => DiagnosticCategory::Cli,
+        "database" => DiagnosticCategory::Database,
+        "toolchain" => DiagnosticCategory::Toolchain,
+        "performance" => DiagnosticCategory::Performance,
+        "environment" => DiagnosticCategory::Environment,
+        _ => DiagnosticCategory::Engine,
+    }
+}
+
+fn encode_diagnostic_privacy(privacy: &DiagnosticPrivacy) -> &'static str {
+    match privacy {
+        DiagnosticPrivacy::Public => "public",
+        DiagnosticPrivacy::Internal => "internal",
+        DiagnosticPrivacy::SensitiveRedacted => "sensitive_redacted",
+    }
+}
+
+fn decode_diagnostic_privacy(value: &str) -> DiagnosticPrivacy {
+    match value {
+        "internal" => DiagnosticPrivacy::Internal,
+        "sensitive_redacted" => DiagnosticPrivacy::SensitiveRedacted,
+        _ => DiagnosticPrivacy::Public,
+    }
+}
+
 fn encode_bool(value: bool) -> i64 {
     if value { 1 } else { 0 }
 }
@@ -4002,7 +4342,9 @@ fn job_timestamp_seed() -> i64 {
 mod tests {
     use super::*;
     use crate::model::{
-        InstrumentConnectionState, PaperThicknessUnit, PaperWeightUnit, SaveNewProfileContextInput,
+        DiagnosticCategory, DiagnosticEventFilter, DiagnosticEventInput, DiagnosticLevel,
+        DiagnosticPrivacy, InstrumentConnectionState, PaperThicknessUnit, PaperWeightUnit,
+        SaveNewProfileContextInput,
     };
     use tempfile::tempdir;
 
@@ -4053,6 +4395,176 @@ mod tests {
             monochrome_path_notes: "".to_string(),
             notes: "".to_string(),
         }
+    }
+
+    #[test]
+    fn diagnostic_events_are_persisted_sanitized_and_filterable() {
+        let temp = tempdir().unwrap();
+        let config = build_config(temp.path());
+        std::fs::create_dir_all(temp.path().join("app-support")).unwrap();
+        initialize_database(&config).unwrap();
+
+        let record = record_diagnostic_event(
+            &config.database_path,
+            &DiagnosticEventInput {
+                level: DiagnosticLevel::Error,
+                category: DiagnosticCategory::Cli,
+                source: "engine.cli".to_string(),
+                message: "Command failed.".to_string(),
+                details_json: serde_json::json!({
+                    "argv": ["/opt/homebrew/bin/targen", "-v", "/Users/tylermiller/job/private"],
+                    "stderr": "private output"
+                })
+                .to_string(),
+                privacy: DiagnosticPrivacy::Internal,
+                job_id: Some("job-1".to_string()),
+                command_id: Some("command-1".to_string()),
+                profile_id: None,
+                issue_case_id: None,
+                duration_ms: Some(1200),
+                operation_id: Some("op-1".to_string()),
+                parent_operation_id: None,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(record.level, DiagnosticLevel::Error);
+        assert_eq!(record.privacy, DiagnosticPrivacy::SensitiveRedacted);
+        assert!(record.details_json.contains("$HOME/.../private"));
+        assert!(record.details_json.contains("\"stderr\":\"[redacted]\""));
+
+        let events = list_diagnostic_events(
+            &config.database_path,
+            &DiagnosticEventFilter {
+                levels: vec![DiagnosticLevel::Error],
+                categories: vec![DiagnosticCategory::Cli],
+                search_text: Some("command".to_string()),
+                job_id: Some("job-1".to_string()),
+                profile_id: None,
+                since_timestamp: None,
+                until_timestamp: None,
+                errors_only: false,
+                limit: 50,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].id, record.id);
+    }
+
+    #[test]
+    fn diagnostics_summary_counts_warning_error_and_critical_events() {
+        let temp = tempdir().unwrap();
+        let config = build_config(temp.path());
+        std::fs::create_dir_all(temp.path().join("app-support")).unwrap();
+        initialize_database(&config).unwrap();
+
+        for (level, message) in [
+            (DiagnosticLevel::Info, "Bootstrap complete"),
+            (DiagnosticLevel::Warning, "Toolchain partial"),
+            (DiagnosticLevel::Error, "Database write failed"),
+            (DiagnosticLevel::Critical, "Diagnostics unavailable"),
+        ] {
+            record_diagnostic_event(
+                &config.database_path,
+                &DiagnosticEventInput {
+                    level,
+                    category: DiagnosticCategory::Engine,
+                    source: "engine.test".to_string(),
+                    message: message.to_string(),
+                    details_json: "{}".to_string(),
+                    privacy: DiagnosticPrivacy::Public,
+                    job_id: None,
+                    command_id: None,
+                    profile_id: None,
+                    issue_case_id: None,
+                    duration_ms: None,
+                    operation_id: None,
+                    parent_operation_id: None,
+                },
+            )
+            .unwrap();
+        }
+
+        let summary =
+            get_diagnostics_summary(&config.database_path, "Ready", "3.5.0", "system_toolchain")
+                .unwrap();
+
+        assert_eq!(summary.total_count, 4);
+        assert_eq!(summary.warning_count, 1);
+        assert_eq!(summary.error_count, 1);
+        assert_eq!(summary.critical_count, 1);
+        assert_eq!(
+            summary.latest_critical_message.as_deref(),
+            Some("Diagnostics unavailable")
+        );
+        assert_eq!(summary.argyll_version, "3.5.0");
+    }
+
+    #[test]
+    fn retention_prunes_events_older_than_retention_window() {
+        let temp = tempdir().unwrap();
+        let config = build_config(temp.path());
+        std::fs::create_dir_all(temp.path().join("app-support")).unwrap();
+        initialize_database(&config).unwrap();
+
+        let connection = open_connection(&config.database_path).unwrap();
+        connection
+            .execute(
+                r#"
+                INSERT INTO diagnostic_events (
+                    id, timestamp, level, category, source, message, details_json, privacy,
+                    job_id, command_id, profile_id, issue_case_id, duration_ms, operation_id, parent_operation_id
+                )
+                VALUES (?1, ?2, 'info', 'engine', 'engine.test', 'old', '{}', 'public',
+                    NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+                "#,
+                params!["diag-old", "2020-01-01T00:00:00Z"],
+            )
+            .unwrap();
+
+        record_diagnostic_event(
+            &config.database_path,
+            &DiagnosticEventInput {
+                level: DiagnosticLevel::Info,
+                category: DiagnosticCategory::Engine,
+                source: "engine.test".to_string(),
+                message: "new".to_string(),
+                details_json: "{}".to_string(),
+                privacy: DiagnosticPrivacy::Public,
+                job_id: None,
+                command_id: None,
+                profile_id: None,
+                issue_case_id: None,
+                duration_ms: None,
+                operation_id: None,
+                parent_operation_id: None,
+            },
+        )
+        .unwrap();
+
+        let pruned = prune_diagnostic_events(&config.database_path).unwrap();
+        assert_eq!(pruned, 1);
+
+        let events = list_diagnostic_events(
+            &config.database_path,
+            &DiagnosticEventFilter {
+                levels: Vec::new(),
+                categories: Vec::new(),
+                search_text: None,
+                job_id: None,
+                profile_id: None,
+                since_timestamp: None,
+                until_timestamp: None,
+                errors_only: false,
+                limit: 50,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].message, "new");
     }
 
     #[test]
