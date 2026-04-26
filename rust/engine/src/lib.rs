@@ -1235,69 +1235,6 @@ mod tests {
     }
 
     #[test]
-    fn bridge_records_lists_and_summarizes_diagnostic_events() {
-        let temp = tempfile::tempdir().unwrap();
-        let engine = Engine::new();
-        let config = EngineConfig {
-            app_support_path: temp
-                .path()
-                .join("app-support")
-                .to_string_lossy()
-                .to_string(),
-            database_path: temp
-                .path()
-                .join("app-support/argyllux.sqlite")
-                .to_string_lossy()
-                .to_string(),
-            log_path: temp
-                .path()
-                .join("logs/engine.log")
-                .to_string_lossy()
-                .to_string(),
-            argyll_override_path: None,
-            additional_search_roots: Vec::new(),
-        };
-
-        engine.bootstrap(config);
-        let record = engine.record_diagnostic_event(DiagnosticEventInput {
-            level: DiagnosticLevel::Warning,
-            category: DiagnosticCategory::Ui,
-            source: "swift.workflow.new_profile".to_string(),
-            message: "User started New Profile.".to_string(),
-            details_json: serde_json::json!({ "action": "new_profile" }).to_string(),
-            privacy: DiagnosticPrivacy::Public,
-            job_id: Some("job-1".to_string()),
-            command_id: None,
-            profile_id: None,
-            issue_case_id: None,
-            duration_ms: None,
-            operation_id: None,
-            parent_operation_id: None,
-        });
-
-        assert_eq!(record.category, DiagnosticCategory::Ui);
-
-        let events = engine.list_diagnostic_events(DiagnosticEventFilter {
-            levels: vec![DiagnosticLevel::Warning],
-            categories: vec![DiagnosticCategory::Ui],
-            search_text: Some("New Profile".to_string()),
-            job_id: Some("job-1".to_string()),
-            profile_id: None,
-            since_timestamp: None,
-            until_timestamp: None,
-            errors_only: false,
-            limit: 50,
-        });
-
-        assert_eq!(events.len(), 1);
-        assert_eq!(events[0].message, "User started New Profile.");
-
-        let summary = engine.get_diagnostics_summary();
-        assert!(summary.total_count >= 1);
-        assert_eq!(summary.warning_count, 1);
-    }
-
-    #[test]
     fn create_new_profile_draft_updates_dashboard_snapshot() {
         let temp = tempdir().unwrap();
         let engine = Engine::new();
@@ -1326,5 +1263,75 @@ mod tests {
             status.state,
             ToolchainState::Ready | ToolchainState::Partial | ToolchainState::NotFound
         ));
+    }
+}
+
+#[cfg(test)]
+mod lib {
+    mod tests {
+        use super::super::*;
+
+        #[test]
+        fn bridge_records_lists_and_summarizes_diagnostic_events() {
+            let temp = tempfile::tempdir().unwrap();
+            let engine = Engine::new();
+            let config = EngineConfig {
+                app_support_path: temp
+                    .path()
+                    .join("app-support")
+                    .to_string_lossy()
+                    .to_string(),
+                database_path: temp
+                    .path()
+                    .join("app-support/argyllux.sqlite")
+                    .to_string_lossy()
+                    .to_string(),
+                log_path: temp
+                    .path()
+                    .join("logs/engine.log")
+                    .to_string_lossy()
+                    .to_string(),
+                argyll_override_path: None,
+                additional_search_roots: Vec::new(),
+            };
+
+            engine.bootstrap(config);
+            let record = engine.record_diagnostic_event(DiagnosticEventInput {
+                level: DiagnosticLevel::Warning,
+                category: DiagnosticCategory::Ui,
+                source: "swift.workflow.new_profile".to_string(),
+                message: "User started New Profile.".to_string(),
+                details_json: serde_json::json!({ "action": "new_profile" }).to_string(),
+                privacy: DiagnosticPrivacy::Public,
+                job_id: Some("job-1".to_string()),
+                command_id: None,
+                profile_id: None,
+                issue_case_id: None,
+                duration_ms: None,
+                operation_id: None,
+                parent_operation_id: None,
+            });
+
+            assert_eq!(record.category, DiagnosticCategory::Ui);
+
+            let events = engine.list_diagnostic_events(DiagnosticEventFilter {
+                levels: vec![DiagnosticLevel::Warning],
+                categories: vec![DiagnosticCategory::Ui],
+                search_text: Some("New Profile".to_string()),
+                job_id: Some("job-1".to_string()),
+                profile_id: None,
+                since_timestamp: None,
+                until_timestamp: None,
+                errors_only: false,
+                limit: 50,
+            });
+
+            assert_eq!(events.len(), 1);
+            assert_eq!(events[0].message, "User started New Profile.");
+
+            let summary = engine.get_diagnostics_summary();
+            assert!(summary.total_count >= 1);
+            assert_eq!(summary.warning_count, 1);
+        }
     }
 }
