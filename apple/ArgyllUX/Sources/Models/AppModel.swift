@@ -86,7 +86,6 @@ final class AppModel: ObservableObject {
     @Published var bootstrapStatus: BootstrapStatus?
     @Published var dashboardSnapshot: DashboardSnapshot?
     @Published var appHealth: AppHealth?
-    @Published var recentLogs: [LogEntry] = []
     @Published private var pendingDeletion: PendingDeletion?
     @Published private var deletionError: DeletionErrorState?
     @Published var isRefreshing = false
@@ -563,10 +562,6 @@ final class AppModel: ObservableObject {
         await runRefresh {
             await self.settings.revalidateToolchain()
         }
-    }
-
-    func refreshLogs(limit: UInt32 = 200) async {
-        recentLogs = await bridge.getRecentLogs(limit: limit)
     }
 
     func selectRoute(_ route: AppRoute) {

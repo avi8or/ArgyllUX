@@ -21,14 +21,6 @@ struct AppModelShellTests {
             blockingIssues: [],
             warnings: ["Storage location: /tmp/ArgyllUX"]
         )
-        fakeEngine.logsValue = [
-            LogEntry(
-                timestamp: "2026-04-19T18:30:00Z",
-                level: "info",
-                message: "Bootstrap completed.",
-                source: "engine.bootstrap"
-            )
-        ]
 
         let model = makeAppModel(root: root, fakeEngine: fakeEngine)
         await model.bootstrapIfNeeded()
@@ -39,7 +31,6 @@ struct AppModelShellTests {
         #expect(model.appHealth?.readiness == "ready")
         #expect(model.jobsCount == 0)
         #expect(model.detectedToolchainPath == "/opt/homebrew/bin")
-        #expect(model.recentLogs.isEmpty)
         #expect(model.toolchainPathInput == "/opt/homebrew/bin")
     }
 

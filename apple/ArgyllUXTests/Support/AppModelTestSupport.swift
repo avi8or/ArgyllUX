@@ -83,7 +83,6 @@ final class FakeEngine: EngineProtocol, @unchecked Sendable {
     var setToolchainPathResult = makeToolchainStatus(state: .ready, path: "/opt/homebrew/bin")
     var dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [])
     var appHealthValue = AppHealth(readiness: "ready", blockingIssues: [], warnings: [])
-    var logsValue: [LogEntry] = []
     var printersCurrent: [PrinterRecord] = []
     var papersCurrent: [PaperRecord] = []
     var printerPaperPresetsCurrent: [PrinterPaperPresetRecord] = []
@@ -305,7 +304,7 @@ final class FakeEngine: EngineProtocol, @unchecked Sendable {
     }
 
     func getRecentLogs(limit: UInt32) -> [LogEntry] {
-        Array(logsValue.prefix(Int(limit)))
+        []
     }
 
     func getToolchainStatus() -> ToolchainStatus {
