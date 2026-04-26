@@ -61,7 +61,7 @@ pub(crate) fn sanitize_event_input(input: DiagnosticEventInput) -> SanitizedDiag
             Ok(value) => value,
             Err(_) => {
                 changed = true;
-                json!({ "raw": raw_details })
+                json!({ "unstructured": "[redacted]" })
             }
         }
     };
@@ -526,6 +526,19 @@ mod tests {
         assert!(!sanitized.source.contains("/Users/tylermiller"));
         assert!(!sanitized.message.contains("/Users/tylermiller"));
         assert!(!sanitized.message.contains("secret command output"));
+        assert_eq!(sanitized.privacy, DiagnosticPrivacy::SensitiveRedacted);
+    }
+
+    #[test]
+    fn sanitizer_redacts_malformed_non_empty_details_before_persistence() {
+        let sanitized = sanitize_event_input(input_with_details(
+            "stderr: secret command output from /Users/tylermiller/job/p900",
+        ));
+
+        assert_eq!(sanitized.details_json, r#"{"unstructured":"[redacted]"}"#);
+        assert!(!sanitized.details_json.contains("/Users/tylermiller"));
+        assert!(!sanitized.details_json.contains("secret command output"));
+        assert!(!sanitized.details_json.contains("stderr:"));
         assert_eq!(sanitized.privacy, DiagnosticPrivacy::SensitiveRedacted);
     }
 
