@@ -57,6 +57,13 @@ struct UntouchedBlankDraftCandidate {
     workspace_path: String,
 }
 
+#[derive(Debug, Clone)]
+struct ResumableNewProfileJobCandidate {
+    id: String,
+    workspace_path: String,
+    has_running_command: bool,
+}
+
 pub fn initialize_database(config: &EngineConfig) -> EngineResult<DatabaseStatus> {
     let database_exists = Path::new(&config.database_path).exists();
     let connection = open_connection(&config.database_path)?;
@@ -814,14 +821,33 @@ pub fn resolve_new_profile_launch(
 
     let detail = {
         let transaction = connection.transaction()?;
-        let duplicates = list_untouched_blank_new_profile_draft_candidates(&transaction)?;
-        for candidate in duplicates.into_iter().skip(1) {
+        // New Profile is a single-active-work workflow. Launch resolution owns
+        // duplicate cleanup so Swift entry points can simply ask to open it.
+        let candidates = list_resumable_new_profile_job_candidates(&transaction)?;
+        let retained = candidates
+            .iter()
+            .find(|candidate| candidate.has_running_command)
+            .or_else(|| candidates.first())
+            .cloned();
+
+        for candidate in &candidates {
+            if retained
+                .as_ref()
+                .is_some_and(|retained| retained.id == candidate.id)
+            {
+                continue;
+            }
+
+            if candidate.has_running_command {
+                continue;
+            }
+
             delete_new_profile_job_records(&transaction, &candidate.id)?;
-            deleted_workspace_paths.push(candidate.workspace_path);
+            deleted_workspace_paths.push(candidate.workspace_path.clone());
         }
 
-        let detail = if let Some(job_id) = load_latest_resumable_new_profile_job_id(&transaction)? {
-            load_new_profile_job_detail_from_connection(&transaction, &job_id)?
+        let detail = if let Some(retained) = retained {
+            load_new_profile_job_detail_from_connection(&transaction, &retained.id)?
         } else {
             create_new_profile_draft_with_connection(&transaction, app_support_path, input)?
         };
@@ -2089,24 +2115,37 @@ fn list_untouched_blank_new_profile_draft_candidates(
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
-fn load_latest_resumable_new_profile_job_id(
+fn list_resumable_new_profile_job_candidates(
     connection: &Connection,
-) -> EngineResult<Option<String>> {
-    connection
-        .query_row(
-            r#"
-            SELECT id
-            FROM jobs
-            WHERE kind = 'new_profile'
-              AND status IN ('draft', 'ready', 'active', 'review', 'blocked', 'failed')
-            ORDER BY updated_at DESC, created_at DESC, id DESC
-            LIMIT 1
-            "#,
-            [],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(Into::into)
+) -> EngineResult<Vec<ResumableNewProfileJobCandidate>> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT
+            jobs.id,
+            new_profile_jobs.workspace_path,
+            EXISTS (
+                SELECT 1
+                FROM job_commands
+                WHERE job_commands.job_id = jobs.id
+                  AND job_commands.state = 'running'
+            ) AS has_running_command
+        FROM jobs
+        INNER JOIN new_profile_jobs ON new_profile_jobs.id = jobs.id
+        WHERE jobs.kind = 'new_profile'
+          AND jobs.status IN ('draft', 'ready', 'active', 'review', 'blocked', 'failed')
+        ORDER BY jobs.updated_at DESC, jobs.created_at DESC, jobs.id DESC
+        "#,
+    )?;
+
+    let rows = statement.query_map([], |row| {
+        Ok(ResumableNewProfileJobCandidate {
+            id: row.get(0)?,
+            workspace_path: row.get(1)?,
+            has_running_command: row.get::<_, i64>(2)? != 0,
+        })
+    })?;
+
+    rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
 }
 
 fn collapse_untouched_blank_new_profile_drafts(connection: &mut Connection) -> EngineResult<()> {
@@ -4284,7 +4323,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_new_profile_launch_preserves_non_blank_resumable_jobs() {
+    fn resolve_new_profile_launch_keeps_only_latest_resumable_job() {
         let temp = tempdir().unwrap();
         let config = build_config(temp.path());
         std::fs::create_dir_all(temp.path().join("app-support")).unwrap();
@@ -4367,21 +4406,12 @@ mod tests {
         .unwrap();
 
         assert_eq!(resolved.id, second.id);
+        assert!(!Path::new(&first.workspace_path).exists());
+        assert!(Path::new(&second.workspace_path).exists());
 
         let snapshot = load_dashboard_snapshot(&config.database_path).unwrap();
-        assert_eq!(snapshot.active_work_items.len(), 2);
-        assert!(
-            snapshot
-                .active_work_items
-                .iter()
-                .any(|item| item.id == first.id)
-        );
-        assert!(
-            snapshot
-                .active_work_items
-                .iter()
-                .any(|item| item.id == second.id)
-        );
+        assert_eq!(snapshot.active_work_items.len(), 1);
+        assert_eq!(snapshot.active_work_items[0].id, second.id);
     }
 
     #[test]

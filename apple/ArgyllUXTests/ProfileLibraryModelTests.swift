@@ -121,7 +121,8 @@ struct ProfileLibraryModelTests {
         let model = makeAppModel(fakeEngine: fakeEngine)
         await model.openNewProfileWorkflow()
         model.requestCurrentWorkflowDeletion()
-        await model.confirmPendingDeletion()
+        let deletionTask = model.confirmPendingDeletion()
+        await deletionTask?.value
 
         #expect(fakeEngine.lastDeletedProfileId == "profile-1")
         #expect(model.activeNewProfileDetail?.stage == .review)

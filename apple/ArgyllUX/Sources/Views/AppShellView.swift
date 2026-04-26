@@ -74,7 +74,7 @@ struct AppShellView: View {
             titleVisibility: .visible
         ) {
             Button(model.deletionConfirmationTitle, role: .destructive) {
-                Task { await model.confirmPendingDeletion() }
+                model.confirmPendingDeletion()
             }
 
             Button("Cancel", role: .cancel) {

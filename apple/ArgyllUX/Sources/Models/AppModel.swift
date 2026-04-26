@@ -7,7 +7,7 @@ enum WorkflowDestination: Equatable {
 
 // Keep destructive flows in one shell-level model so workflow, footer, and
 // library surfaces share the same confirmation and error presentation rules.
-private enum PendingDeletion: Equatable {
+private enum PendingDeletion: Equatable, Sendable {
     case activeWork(jobId: String, title: String)
     case printerProfile(profileId: String, profileName: String, sourceJobId: String)
 
@@ -658,11 +658,18 @@ final class AppModel: ObservableObject {
         deletionError = nil
     }
 
-    func confirmPendingDeletion() async {
-        guard let pendingDeletion else { return }
+    @discardableResult
+    func confirmPendingDeletion() -> Task<Void, Never>? {
+        guard let pendingDeletion else { return nil }
 
         self.pendingDeletion = nil
 
+        return Task {
+            await self.performPendingDeletion(pendingDeletion)
+        }
+    }
+
+    private func performPendingDeletion(_ pendingDeletion: PendingDeletion) async {
         await runRefresh {
             switch pendingDeletion {
             case let .activeWork(jobId, title):

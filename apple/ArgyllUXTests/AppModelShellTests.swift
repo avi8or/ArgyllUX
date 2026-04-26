@@ -56,7 +56,8 @@ struct AppModelShellTests {
         await model.openNewProfileWorkflow()
         await model.openCliTranscript(jobId: draftDetail.id)
         model.requestActiveWorkDeletion(makeActiveWorkItem(id: draftDetail.id))
-        await model.confirmPendingDeletion()
+        let deletionTask = model.confirmPendingDeletion()
+        await deletionTask?.value
 
         #expect(fakeEngine.lastDeletedJobId == draftDetail.id)
         #expect(model.activeNewProfileDetail == nil)
@@ -101,7 +102,8 @@ struct AppModelShellTests {
         let model = makeAppModel(fakeEngine: fakeEngine)
         await model.openLatestCliTranscript()
         model.requestActiveWorkDeletion(makeActiveWorkItem(id: newerDetail.id, title: newerDetail.title, nextAction: newerDetail.nextAction, stage: newerDetail.stage))
-        await model.confirmPendingDeletion()
+        let deletionTask = model.confirmPendingDeletion()
+        await deletionTask?.value
 
         guard case let .deleted(jobTitle) = model.cliTranscriptState else {
             Issue.record("Expected the transcript window to move into the deleted-job state.")
@@ -124,7 +126,8 @@ struct AppModelShellTests {
         let model = makeAppModel(fakeEngine: fakeEngine)
         await model.openNewProfileWorkflow()
         model.requestActiveWorkDeletion(makeActiveWorkItem(id: draftDetail.id))
-        await model.confirmPendingDeletion()
+        let deletionTask = model.confirmPendingDeletion()
+        await deletionTask?.value
 
         #expect(model.activeNewProfileDetail?.id == draftDetail.id)
         #expect(model.activeWorkItems.map(\.id) == [draftDetail.id])
@@ -169,7 +172,45 @@ struct AppModelShellTests {
 
         #expect(model.deletionConfirmationMessage == "This removes New Profile (job-blank-1) and its unpublished working files.")
 
-        await model.confirmPendingDeletion()
+        let deletionTask = model.confirmPendingDeletion()
+        await deletionTask?.value
+
+        #expect(fakeEngine.lastDeletedJobId == draftDetail.id)
+        #expect(model.activeNewProfileDetail == nil)
+        #expect(model.activeWorkflow == nil)
+        #expect(model.activeWorkItems.isEmpty)
+    }
+
+    @Test
+    func confirmedDeletionSurvivesDialogDismissalClearingPresentationBinding() async {
+        let draftDetail = makeJobDetail(
+            id: "job-blank-1",
+            title: "New Profile",
+            stage: .context,
+            nextAction: "Save Context"
+        )
+        let fakeEngine = FakeEngine()
+        fakeEngine.toolchainStatusValue = makeToolchainStatus(state: .ready, path: "/opt/homebrew/bin")
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(
+            activeWorkItems: [
+                makeActiveWorkItem(
+                    id: draftDetail.id,
+                    title: draftDetail.title,
+                    nextAction: draftDetail.nextAction,
+                    stage: draftDetail.stage
+                )
+            ]
+        )
+        fakeEngine.loadedJobDetails[draftDetail.id] = draftDetail
+        fakeEngine.deleteNewProfileJobResult = DeleteResult(success: true, message: "")
+
+        let model = makeAppModel(fakeEngine: fakeEngine)
+        await model.openNewProfileWorkflow()
+        model.requestCurrentWorkflowDeletion()
+
+        let deletionTask = model.confirmPendingDeletion()
+        model.cancelPendingDeletion()
+        await deletionTask?.value
 
         #expect(fakeEngine.lastDeletedJobId == draftDetail.id)
         #expect(model.activeNewProfileDetail == nil)
