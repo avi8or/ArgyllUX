@@ -61,10 +61,8 @@ struct HomeView: View {
                                 .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
-                        .padding(12)
-                        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(SurfaceRowButtonStyle())
                     .disabled(action.kind != .newProfile)
                 }
             }
@@ -98,20 +96,17 @@ struct HomeView: View {
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(SurfaceRowButtonStyle())
 
                             Button(role: .destructive) {
                                 model.requestActiveWorkDeletion(item)
                             } label: {
                                 Image(systemName: "trash")
-                                    .frame(width: 28, height: 28)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(IconActionButtonStyle(size: 30, tone: .destructive))
                             .accessibilityLabel(ActiveWorkCopy.deleteAccessibilityLabel(for: item.title, jobId: item.id))
                             .help(ActiveWorkCopy.deleteActionTitle)
                         }
-                        .padding(12)
-                        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
                     }
                 }
             }
@@ -143,10 +138,8 @@ struct HomeView: View {
                                     .foregroundStyle(.secondary)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12)
-                            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(SurfaceRowButtonStyle())
                     }
                 }
             }

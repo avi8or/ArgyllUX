@@ -135,8 +135,7 @@ struct CliTranscriptWindowView: View {
                 Button("Open Output Folder") {
                     transcript.openOutputFolder(detail.workspacePath)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .buttonStyle(FooterLinkButtonStyle(foregroundColor: .secondary))
             }
         }
     }

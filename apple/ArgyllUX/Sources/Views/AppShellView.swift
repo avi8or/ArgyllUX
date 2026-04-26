@@ -117,16 +117,8 @@ struct AppShellView: View {
                                 ? AppTypography.shellNavigation.weight(.semibold)
                                 : AppTypography.shellNavigation
                         )
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(
-                            isRouteHighlighted(route)
-                                ? Color.accentColor.opacity(0.14)
-                                : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 8)
-                        )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ShellNavigationButtonStyle(isSelected: isRouteHighlighted(route)))
             }
 
             Spacer()

@@ -608,7 +608,7 @@ struct WorkflowPrinterChooserSheet: View {
                         isSelected: workflow.workflowSelectedPrinterID == printer.id
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(SurfaceRowButtonStyle(isSelected: workflow.workflowSelectedPrinterID == printer.id))
             }
         }
     }
@@ -639,7 +639,7 @@ struct WorkflowPaperChooserSheet: View {
                         isSelected: workflow.workflowSelectedPaperID == paper.id
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(SurfaceRowButtonStyle(isSelected: workflow.workflowSelectedPaperID == paper.id))
             }
         }
     }
@@ -668,8 +668,6 @@ private struct WorkflowCatalogChoiceRow: View {
                     .foregroundStyle(Color.accentColor)
             }
         }
-        .padding(12)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -805,7 +803,7 @@ func workflowArtifactsList(workflow: NewProfileWorkflowModel, artifacts: [JobArt
                         Button("Reveal") {
                             workflow.revealPathInFinder(path)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(FooterLinkButtonStyle())
                     }
                 }
                 .padding(.vertical, 4)

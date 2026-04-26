@@ -71,6 +71,12 @@ This distinction must stay consistent across the product:
 
 More patches, more aggressive correction, or more advanced settings are not automatically better than a stable print path and trustworthy measurements.
 
+### 2.8 Keep clickable hit areas friendly
+
+Every custom clickable surface must make its full visible control area clickable, including padding, row whitespace, and the space between an icon and label. Do not ship controls that only respond on text glyphs or icon pixels.
+
+On macOS, custom compact controls should meet Apple control-size guidance as a floor, use explicit SwiftUI hit-testing shapes when styled manually, and provide hover or pressed feedback so the target feels responsive.
+
 ---
 
 ## 3. Product Truth Statements

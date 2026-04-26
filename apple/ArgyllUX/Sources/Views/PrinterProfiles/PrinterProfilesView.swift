@@ -33,16 +33,16 @@ struct PrinterProfilesView: View {
                                             .font(AppTypography.trustSummarySupporting)
                                             .foregroundStyle(.secondary)
                                     }
-                                    .padding(14)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(
-                                        library.selectedPrinterProfileID == profile.id
-                                            ? Color.accentColor.opacity(0.14)
-                                            : Color.secondary.opacity(0.08),
-                                        in: RoundedRectangle(cornerRadius: 8)
-                                    )
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(
+                                    SurfaceRowButtonStyle(
+                                        isSelected: library.selectedPrinterProfileID == profile.id,
+                                        cornerRadius: 8,
+                                        horizontalPadding: 14,
+                                        verticalPadding: 10
+                                    )
+                                )
                             }
                         }
                     }

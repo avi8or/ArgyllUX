@@ -36,25 +36,20 @@ struct ActiveWorkDockView: View {
                                             .foregroundStyle(.secondary)
                                             .lineLimit(2)
                                     }
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 10)
-                                    .frame(width: 260, alignment: .leading)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(SurfaceRowButtonStyle(fixedWidth: 260, fillsAvailableWidth: false))
 
                                 Button(role: .destructive) {
                                     onDelete(item)
                                 } label: {
                                     Image(systemName: "trash")
                                         .font(AppTypography.shellUtility.weight(.semibold))
-                                        .frame(width: 30, height: 30)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(IconActionButtonStyle(size: 30, tone: .destructive))
                                 .accessibilityLabel(ActiveWorkCopy.deleteAccessibilityLabel(for: item.title, jobId: item.id))
                                 .accessibilityHint(ActiveWorkCopy.deleteHint)
                                 .help(ActiveWorkCopy.deleteActionTitle)
                             }
-                            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
                         }
                     }
                 }

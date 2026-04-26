@@ -37,10 +37,10 @@ struct FooterStatusBarView: View {
 
             HStack(spacing: 12) {
                 Button("CLI Transcript", action: onOpenCliTranscript)
-                    .buttonStyle(.link)
+                    .buttonStyle(FooterLinkButtonStyle())
 
                 Button("Error Log Viewer", action: onOpenErrorLogs)
-                    .buttonStyle(.link)
+                    .buttonStyle(FooterLinkButtonStyle())
             }
         }
         .padding(.horizontal, 20)
