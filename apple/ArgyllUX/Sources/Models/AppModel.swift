@@ -92,18 +92,84 @@ final class AppModel: ObservableObject {
     @Published var isRefreshing = false
 
     let launcherActions: [LauncherAction] = [
-        LauncherAction(title: "New Profile", detail: "Create a printer and paper profile.", kind: .newProfile),
-        LauncherAction(title: "Improve Profile", detail: "Locked into the shell.", kind: .placeholder),
-        LauncherAction(title: "Import Profile", detail: "Finished ICC profiles.", kind: .placeholder),
-        LauncherAction(title: "Import Measurements", detail: "Raw measurement evidence.", kind: .placeholder),
-        LauncherAction(title: "Match a Reference", detail: "Reference matching lives here next.", kind: .placeholder),
-        LauncherAction(title: "Verify Output", detail: "Verification surface comes next.", kind: .placeholder),
-        LauncherAction(title: "Recalibrate", detail: "Maintenance stays distinct.", kind: .placeholder),
-        LauncherAction(title: "Rebuild", detail: "Characterization rebuilds stay explicit.", kind: .placeholder),
-        LauncherAction(title: "Spot Measure", detail: "Spot reads will land here.", kind: .placeholder),
-        LauncherAction(title: "Compare Measurements", detail: "Comparison tooling comes next.", kind: .placeholder),
-        LauncherAction(title: "Troubleshoot", detail: "Symptom-first by default.", kind: .placeholder),
-        LauncherAction(title: "B&W Tuning", detail: "Monochrome workflow entry point.", kind: .placeholder),
+        LauncherAction(
+            title: "New Profile",
+            detail: "Create a printer profile from a printed and measured target.",
+            status: "Available",
+            kind: .newProfile
+        ),
+        LauncherAction(
+            title: "Troubleshoot",
+            detail: "Start from a visible print problem and collect evidence.",
+            status: "Entry screen",
+            kind: .route(.troubleshoot)
+        ),
+        LauncherAction(
+            title: "Inspect",
+            detail: "Review measurements, gamuts, and profile internals.",
+            status: "Entry screen",
+            kind: .route(.inspect)
+        ),
+        LauncherAction(
+            title: "B&W Tuning",
+            detail: "Review monochrome neutrality and tonal behavior.",
+            status: "Entry screen",
+            kind: .route(.blackAndWhiteTuning)
+        ),
+        LauncherAction(
+            title: "Improve Profile",
+            detail: "Add better data to an existing profile.",
+            status: "Planned",
+            kind: .planned
+        ),
+        LauncherAction(
+            title: "Import Profile",
+            detail: "Bring a finished ICC profile into the library.",
+            status: "Planned",
+            kind: .planned
+        ),
+        LauncherAction(
+            title: "Import Measurements",
+            detail: "Bring raw measurement data into analysis or follow-up work.",
+            status: "Planned",
+            kind: .planned
+        ),
+        LauncherAction(
+            title: "Match a Reference",
+            detail: "Push output toward a known reference condition.",
+            status: "Planned",
+            kind: .planned
+        ),
+        LauncherAction(
+            title: "Verify Output",
+            detail: "Check whether current output is still trustworthy.",
+            status: "Planned",
+            kind: .planned
+        ),
+        LauncherAction(
+            title: "Recalibrate",
+            detail: "Restore a previously trusted calibrated state.",
+            status: "Planned",
+            kind: .planned
+        ),
+        LauncherAction(
+            title: "Rebuild",
+            detail: "Create a new characterization when assumptions changed.",
+            status: "Planned",
+            kind: .planned
+        ),
+        LauncherAction(
+            title: "Spot Measure",
+            detail: "Capture individual color readings as evidence.",
+            status: "Planned",
+            kind: .planned
+        ),
+        LauncherAction(
+            title: "Compare Measurements",
+            detail: "Compare current readings to a trusted baseline.",
+            status: "Planned",
+            kind: .planned
+        ),
     ]
 
     let storagePaths: StoragePaths
@@ -250,6 +316,63 @@ final class AppModel: ObservableObject {
         }
 
         return .standard
+    }
+
+    var availableLauncherActions: [LauncherAction] {
+        launcherActions.filter(\.isEnabled)
+    }
+
+    var plannedLauncherActions: [LauncherAction] {
+        launcherActions.filter { !$0.isEnabled }
+    }
+
+    var shellJumpItems: [ShellJumpItem] {
+        var items = AppRoute.allCases.map { route in
+            ShellJumpItem(
+                title: route.title,
+                subtitle: route.jumpSubtitle,
+                systemImage: route.symbolName,
+                destination: .route(route)
+            )
+        }
+
+        items.append(contentsOf: activeWorkItems.map { item in
+            ShellJumpItem(
+                title: item.title,
+                subtitle: "Active work - \(workflowStageDisplayTitle(item.stage)) - \(workflowNextActionDisplayTitle(stage: item.stage, rawTitle: item.nextAction))",
+                systemImage: "clock.arrow.circlepath",
+                destination: .newProfileJob(item.id)
+            )
+        })
+
+        items.append(contentsOf: printerProfiles.map { profile in
+            ShellJumpItem(
+                title: profile.name,
+                subtitle: "Printer Profile - \(profile.printerName) / \(profile.paperName)",
+                systemImage: "printer",
+                destination: .printerProfile(profile.id)
+            )
+        })
+
+        items.append(contentsOf: settings.printers.map { printer in
+            ShellJumpItem(
+                title: printer.displayName,
+                subtitle: "Printer settings",
+                systemImage: "printer",
+                destination: .settings(.printer(printer.id))
+            )
+        })
+
+        items.append(contentsOf: settings.papers.map { paper in
+            ShellJumpItem(
+                title: paper.displayName,
+                subtitle: "Paper settings",
+                systemImage: "doc.text",
+                destination: .settings(.paper(paper.id))
+            )
+        })
+
+        return items
     }
 
     var printers: [PrinterRecord] {
@@ -573,6 +696,23 @@ final class AppModel: ObservableObject {
 
         if route == .printerProfiles, profileLibrary.selectedPrinterProfileID == nil {
             profileLibrary.selectProfile(id: profileLibrary.printerProfiles.first?.id)
+        }
+    }
+
+    func openJumpItem(_ item: ShellJumpItem) {
+        switch item.destination {
+        case let .route(route):
+            selectRoute(route)
+        case let .newProfileJob(jobId):
+            openNewProfileJob(jobId: jobId)
+        case let .printerProfile(profileId):
+            selectedRoute = .printerProfiles
+            activeWorkflow = nil
+            profileLibrary.selectProfile(id: profileId)
+        case let .settings(selection):
+            selectedRoute = .settings
+            activeWorkflow = nil
+            settings.select(selection)
         }
     }
 

@@ -76,20 +76,54 @@ enum AppRoute: String, CaseIterable, Identifiable {
         }
     }
 
+    var jumpSubtitle: String {
+        switch self {
+        case .home:
+            "Operational overview"
+        case .printerProfiles:
+            "Profile library and trust summaries"
+        case .troubleshoot:
+            "Symptom-first diagnosis"
+        case .inspect:
+            "Measurement, gamut, and profile analysis"
+        case .blackAndWhiteTuning:
+            "Monochrome tuning and validation"
+        case .settings:
+            "Printers, papers, Argyll, storage, and defaults"
+        }
+    }
+
     var inspectorNote: String {
         switch self {
         case .home:
-            "Keep the operational overview honest. Health belongs in the shell before workflow depth exists."
+            "Start or resume work from here. Use the active-work dock for jobs that already have a next step."
         case .printerProfiles:
-            "The library stays profile-first, with context supporting the profile instead of replacing it."
+            "Review whether a profile is trustworthy before improving, rebuilding, or using it as a reference."
         case .troubleshoot:
-            "Troubleshoot answers what to do next. Inspect answers what the evidence looks like."
+            "Start with the visible print problem, then attach evidence before choosing a follow-up workflow."
         case .inspect:
-            "Inspect stays analytical. It should not drift into diagnosis language."
+            "Use Inspect when you want to understand measurements, gamuts, or profile internals without starting a repair flow."
         case .blackAndWhiteTuning:
-            "B&W Tuning stays explicit about neutrality and tonal behavior rather than promising a generic profile flow."
+            "Use this space for monochrome neutrality, tonal smoothness, and validation history."
         case .settings:
-            "Settings owns support objects and toolchain configuration, not front-door workflow nouns."
+            "Create reusable printers, papers, print-path settings, and correct the Argyll installation here."
+        }
+    }
+
+    var advancedInspectorNote: String {
+        switch self {
+        case .home:
+            "Use Home for launch and resume decisions. Keep detailed setup in the route that owns the work."
+        case .printerProfiles:
+            "A profile is useful only with context: printer, paper, print settings, verification, and linked measurements."
+        case .troubleshoot:
+            "Evidence should come before repair. Start with symptoms, then link measurements or profiles when those surfaces are available."
+        case .inspect:
+            "Inspect is for analysis and comparison. It should not choose a fix without a troubleshooting case or workflow context."
+        case .blackAndWhiteTuning:
+            "B&W tuning may produce correction assets and validation results, not always a conventional ICC profile."
+        case .settings:
+            "Settings changes reusable support records. Workflows should reference those records instead of duplicating assumptions."
         }
     }
 }

@@ -6,7 +6,7 @@ struct SettingsSidebarView: View {
     var body: some View {
         List(selection: $settings.selection) {
             Section("General") {
-                sidebarRow("Toolchain", systemImage: "hammer", selection: .toolchain)
+                sidebarRow("Argyll", systemImage: "hammer", selection: .toolchain)
                 sidebarRow("Storage", systemImage: "internaldrive", selection: .storage)
                 sidebarRow("Defaults", systemImage: "slider.horizontal.3", selection: .defaults)
             }
@@ -160,8 +160,8 @@ private struct ToolchainSettingsDetailPane: View {
 
     var body: some View {
         SettingsDetailScaffold(
-            title: "Toolchain",
-            subtitle: "Toolchain status stays persistent in the footer, but Settings is where you correct the actual Argyll path and inspect readiness details."
+            title: "Argyll",
+            subtitle: "Argyll status stays persistent in the footer, but Settings is where you correct the install path and inspect readiness details."
         ) {
             SettingsDetailCard("Status") {
                 HStack(spacing: 10) {

@@ -28,10 +28,10 @@ struct ActiveWorkDockView: View {
                                         Text(item.title)
                                             .font(AppTypography.activeWorkTitle)
                                             .foregroundStyle(.primary)
-                                        Text(stageTitle(item.stage))
+                                        Text(workflowStageDisplayTitle(item.stage))
                                             .font(AppTypography.activeWorkStage)
                                             .foregroundStyle(.secondary)
-                                        Text("Next: \(item.nextAction)")
+                                        Text("Next: \(workflowNextActionDisplayTitle(stage: item.stage, rawTitle: item.nextAction))")
                                             .font(AppTypography.activeWorkSupporting)
                                             .foregroundStyle(.secondary)
                                             .lineLimit(2)
@@ -58,32 +58,5 @@ struct ActiveWorkDockView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
-    }
-
-    private func stageTitle(_ stage: WorkflowStage) -> String {
-        switch stage {
-        case .context:
-            "Context"
-        case .target:
-            "Target"
-        case .print:
-            "Print"
-        case .drying:
-            "Drying"
-        case .measure:
-            "Measure"
-        case .build:
-            "Build"
-        case .review:
-            "Review"
-        case .publish:
-            "Publish"
-        case .completed:
-            "Completed"
-        case .blocked:
-            "Blocked"
-        case .failed:
-            "Failed"
-        }
     }
 }

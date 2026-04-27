@@ -28,7 +28,7 @@ struct InspectorContent: Hashable {
     ) -> InspectorContent {
         InspectorContent(
             recommendedBody: route.inspectorNote,
-            advancedBody: "Route-specific controls stay in the main work surface. Use this sidebar for guidance, deeper context, and technical details without changing app navigation.",
+            advancedBody: route.advancedInspectorNote,
             technicalRows: shellTechnicalRows(appHealth: appHealth, toolchainStatus: toolchainStatus)
         )
     }
@@ -69,7 +69,7 @@ struct InspectorContent: Hashable {
         rows.append(contentsOf: shellTechnicalRows(appHealth: appHealth, toolchainStatus: toolchainStatus))
 
         return InspectorContent(
-            recommendedBody: detail.nextAction,
+            recommendedBody: workflowNextActionDisplayTitle(detail),
             advancedBody: workflowAdvancedCopy(workflow: workflow, detail: detail),
             technicalRows: rows
         )
@@ -80,7 +80,7 @@ struct InspectorContent: Hashable {
         toolchainStatus: ToolchainStatus?
     ) -> [InspectorDetailRow] {
         [
-            InspectorDetailRow(title: "Toolchain", value: technicalToolchainLabel(toolchainStatus)),
+            InspectorDetailRow(title: "Argyll", value: technicalToolchainLabel(toolchainStatus)),
             InspectorDetailRow(
                 title: "Last validation",
                 value: toolchainStatus?.lastValidationTime ?? "Waiting for validation"
@@ -107,25 +107,25 @@ struct InspectorContent: Hashable {
     ) -> String {
         switch workflow.effectiveWorkflowStage {
         case .context:
-            "Save the printer, paper, and print-path assumptions before moving into target planning. Context stays attached to this job instead of turning into a separate workflow."
+            "Choose the printer, paper, print settings, and measurement setup before target planning."
         case .target:
-            "Target planning persists in Rust, including Patch Count and whether an existing profile should help target planning."
+            "Keep the default patch count unless you have a reason to spend more print and measurement time."
         case .print:
-            "Print keeps unmanaged output explicit and holds the generated target artifacts with the job."
+            "Print the generated target without color management. Managed target output will produce a bad profile."
         case .drying:
-            "Drying Time is durable. The countdown is a shell convenience, while the printed and ready timestamps live in the engine."
+            "Wait for the print to stabilize before measuring, especially on fine-art or high-ink papers."
         case .measure:
             detail.measurement.hasMeasurementCheckpoint
-                ? "Measurement can resume because checkpoint artifacts were found in the job workspace."
-                : "Argyll command output appears in the CLI Transcript window while commands run."
+                ? "Resume the measurement from the saved checkpoint, or open the transcript if you need command detail."
+                : "Measure the target when the instrument and printed chart are ready."
         case .build:
-            "Build runs colprof and profcheck in sequence, then stores the first result summary back onto the job."
+            "Build the profile from the measured chart only after the measurement source is available."
         case .review, .publish:
-            "Review stays explicit. Publishing creates the library record only after you inspect the result."
+            "Review the first result before publishing it into Printer Profiles."
         case .completed:
-            "Completed jobs stay resumable through their linked printer profile, artifacts, and command transcript."
+            "Open the published profile to review trust, linked measurements, and follow-up actions."
         case .blocked, .failed:
-            "A command failed on this job. Argyll command output appears in the CLI Transcript window."
+            "Open the CLI Transcript for command output, then fix the blocking condition before retrying."
         }
     }
 }

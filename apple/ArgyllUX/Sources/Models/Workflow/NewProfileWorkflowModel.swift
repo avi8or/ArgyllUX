@@ -107,7 +107,7 @@ final class NewProfileWorkflowModel: ObservableObject {
 
         switch effectiveWorkflowStage {
         case .context:
-            return "Save Context"
+            return "Continue"
         case .target:
             return "Generate Target"
         case .print:

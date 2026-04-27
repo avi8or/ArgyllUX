@@ -8,96 +8,276 @@ struct PrinterProfilesView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Printer Profiles")
-                    .font(.largeTitle.weight(.semibold))
-
-                if library.printerProfiles.isEmpty {
-                    Text("Publish a New Profile to populate the library.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(library.printerProfiles, id: \.id) { profile in
-                                Button {
-                                    library.selectProfile(profile)
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text(profile.name)
-                                            .font(.headline)
-                                            .foregroundStyle(.primary)
-                                        Text("\(profile.printerName) • \(profile.paperName)")
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
-                                        Text(profile.result)
-                                            .font(AppTypography.trustSummarySupporting)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                                .buttonStyle(
-                                    SurfaceRowButtonStyle(
-                                        isSelected: library.selectedPrinterProfileID == profile.id,
-                                        cornerRadius: 8,
-                                        horizontalPadding: 14,
-                                        verticalPadding: 10
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            .frame(width: 320, alignment: .topLeading)
-            .padding(24)
+            profileList
+                .frame(width: 340, alignment: .topLeading)
+                .frame(maxHeight: .infinity, alignment: .topLeading)
+                .padding(24)
 
             Divider()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    if let profile = library.selectedPrinterProfile {
-                        Text(profile.name)
-                            .font(.title.weight(.semibold))
+            profileDetail
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
 
-                        OperationalDetailRow(title: "Printer", value: profile.printerName)
-                        OperationalDetailRow(title: "Paper", value: profile.paperName)
-                        OperationalDetailRow(title: "Result", value: profile.result)
-                        OperationalDetailRow(title: "Print settings", value: profile.printSettings)
-                        OperationalDetailRow(title: "Verified against file", value: profile.verifiedAgainstFile)
-                        OperationalDetailRow(
-                            title: "Last verification date",
-                            value: profile.lastVerificationDate ?? "Not yet verified"
-                        )
-                        OperationalDetailRow(title: "ICC path", value: profile.profilePath)
-                        OperationalDetailRow(title: "Measurement path", value: profile.measurementPath)
-                        OperationalDetailRow(title: "Context", value: profile.contextStatus)
-                        OperationalDetailRow(title: "Created from job", value: profile.createdFromJobId)
+    private var profileList: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Printer Profiles")
+                    .font(.largeTitle.weight(.semibold))
+                Text("Browse profiles by trust, context, and recent verification.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
 
-                        HStack(spacing: 10) {
-                            Button("Reveal ICC") {
-                                onRevealPath(profile.profilePath)
+            if library.printerProfiles.isEmpty {
+                EmptyProfileLibraryView()
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(library.printerProfiles, id: \.id) { profile in
+                            Button {
+                                library.selectProfile(profile)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 7) {
+                                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                        Text(profile.name)
+                                            .font(.headline)
+                                            .foregroundStyle(.primary)
+                                        Spacer()
+                                        Text(profile.contextStatus)
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Text("\(profile.printerName) / \(profile.paperName)")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+
+                                    Text("Result: \(profile.result)")
+                                        .font(AppTypography.trustSummarySupporting)
+                                        .foregroundStyle(.secondary)
+
+                                    Text("Last verification date: \(profile.lastVerificationDate ?? "Not yet verified")")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
+                            .buttonStyle(
+                                SurfaceRowButtonStyle(
+                                    isSelected: library.selectedPrinterProfileID == profile.id,
+                                    cornerRadius: 8,
+                                    horizontalPadding: 14,
+                                    verticalPadding: 12
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 
-                            Button("Reveal Measurement") {
-                                onRevealPath(profile.measurementPath)
-                            }
+    @ViewBuilder
+    private var profileDetail: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                if let profile = library.selectedPrinterProfile {
+                    ProfileTrustHeader(profile: profile)
 
+                    ProfileDetailSection("Verification Summary") {
+                        LazyVGrid(columns: detailColumns, alignment: .leading, spacing: 12) {
+                            SummaryTile(title: "Result", value: profile.result)
+                            SummaryTile(title: "Last verification date", value: profile.lastVerificationDate ?? "Not yet verified")
+                            SummaryTile(title: "Verified against file", value: profile.verifiedAgainstFile)
+                            SummaryTile(title: "Print settings", value: profile.printSettings)
+                        }
+                    }
+
+                    ProfileDetailSection("Context") {
+                        LazyVGrid(columns: detailColumns, alignment: .leading, spacing: 12) {
+                            OperationalDetailRow(title: "Printer", value: profile.printerName)
+                            OperationalDetailRow(title: "Paper", value: profile.paperName)
+                            OperationalDetailRow(title: "Context status", value: profile.contextStatus)
+                            OperationalDetailRow(title: "Created from job", value: profile.createdFromJobId)
+                        }
+                    }
+
+                    ProfileDetailSection("Actions") {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 10)], alignment: .leading, spacing: 10) {
                             Button("Open Job") {
                                 onOpenJob(profile.createdFromJobId)
                             }
+                            .buttonStyle(.borderedProminent)
 
-                            Button(PrinterProfileCopy.deleteActionTitle, role: .destructive) {
-                                onRequestDeletion()
-                            }
+                            PlannedProfileAction("Improve Profile")
+                            PlannedProfileAction("Verify Output")
+                            PlannedProfileAction("Recalibrate")
+                            PlannedProfileAction("Rebuild")
+                            PlannedProfileAction("Match a Reference")
+                            PlannedProfileAction("Inspect Measurements")
+                            PlannedProfileAction("Inspect Gamut")
+                            PlannedProfileAction("Inspect Profile")
                         }
-                    } else {
-                        Text("Select a Printer Profile.")
-                            .foregroundStyle(.secondary)
                     }
+
+                    ProfileDetailSection("Linked Artifacts") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            ArtifactRow(title: "ICC profile", path: profile.profilePath, onReveal: onRevealPath)
+                            ArtifactRow(title: "Measurements", path: profile.measurementPath, onReveal: onRevealPath)
+                        }
+                    }
+
+                    ProfileDetailSection("Library Management") {
+                        Button(PrinterProfileCopy.deleteActionTitle, role: .destructive) {
+                            onRequestDeletion()
+                        }
+                    }
+                } else {
+                    EmptyProfileLibraryView(message: "Select a Printer Profile to review trust, context, and linked measurements.")
                 }
-                .padding(24)
             }
+            .padding(24)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+    }
+
+    private var detailColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 210), spacing: 12)]
+    }
+}
+
+private struct ProfileTrustHeader: View {
+    let profile: PrinterProfileRecord
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(profile.name)
+                    .font(.title.weight(.semibold))
+                Text(profile.contextStatus)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.secondary.opacity(0.08), in: Capsule())
+            }
+
+            Text("\(profile.printerName) / \(profile.paperName)")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+
+            Text("Use this view to decide whether the profile is still trustworthy before improving, rebuilding, or using it as a reference.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct ProfileDetailSection<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
+
+    init(_ title: String, @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.content = content
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.title2.weight(.semibold))
+            content()
+        }
+        .padding(18)
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct PlannedProfileAction: View {
+    let title: String
+
+    init(_ title: String) {
+        self.title = title
+    }
+
+    var body: some View {
+        Button {} label: {
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(.headline)
+                Text("Planned")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+        }
+        .buttonStyle(SurfaceRowButtonStyle(cornerRadius: 8, horizontalPadding: 12, verticalPadding: 8))
+        .disabled(true)
+        .accessibilityLabel("\(title). Planned.")
+        .help("Planned action. Not runnable in this build.")
+    }
+}
+
+private struct ArtifactRow: View {
+    let title: String
+    let path: String
+    let onReveal: (String) -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                Text(path)
+                    .font(.system(.footnote, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+
+            Spacer()
+
+            Button("Reveal") {
+                onReveal(path)
+            }
+            .buttonStyle(FooterLinkButtonStyle())
+        }
+        .padding(12)
+        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct EmptyProfileLibraryView: View {
+    var message = "Publish a New Profile to populate the library."
+
+    var body: some View {
+        Text(message)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct SummaryTile: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.body)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
+        .padding(12)
+        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
     }
 }

@@ -4,6 +4,7 @@ struct AppShellView: View {
     @Environment(\.openWindow) private var openWindow
     @ObservedObject var model: AppModel
     @State private var isShowingErrorLogViewer = false
+    @State private var isShowingJumpSheet = false
     private let rightInspectorWidth: CGFloat = 320
     private let minimumWidthForRightInspector: CGFloat = 1180
 
@@ -61,6 +62,12 @@ struct AppShellView: View {
         .sheet(isPresented: $isShowingErrorLogViewer) {
             LogViewerSheetView(model: model, kind: .error)
         }
+        .sheet(isPresented: $isShowingJumpSheet) {
+            ShellJumpSheetView(items: model.shellJumpItems) { item in
+                model.openJumpItem(item)
+                isShowingJumpSheet = false
+            }
+        }
         .confirmationDialog(
             model.deletionConfirmationTitle,
             isPresented: Binding(
@@ -103,7 +110,7 @@ struct AppShellView: View {
     }
 
     private var topStrip: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             brandPlate
 
             ForEach(AppRoute.allCases) { route in
@@ -123,13 +130,21 @@ struct AppShellView: View {
 
             Spacer()
 
-            utilityPill(title: "Search / Jump")
-            utilityPill(title: model.instrumentStatusLabel)
-            utilityPill(title: "Jobs \(model.jobsCount)")
-            utilityPill(title: "Alerts \(model.alertsCount)")
+            Button {
+                isShowingJumpSheet = true
+            } label: {
+                Label("Jump", systemImage: "magnifyingglass")
+            }
+            .buttonStyle(ShellNavigationButtonStyle(isSelected: false))
+            .keyboardShortcut("k", modifiers: [.command])
+            .help("Jump to routes, active jobs, profiles, printers, or papers.")
+
+            utilityPill(title: model.instrumentStatusLabel, systemImage: "scope")
+            utilityPill(title: "Jobs \(model.jobsCount)", systemImage: "clock")
+            utilityPill(title: "Alerts \(model.alertsCount)", systemImage: "exclamationmark.triangle")
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 14)
+        .padding(.vertical, 10)
     }
 
     private var brandPlate: some View {
@@ -137,7 +152,7 @@ struct AppShellView: View {
             .resizable()
             .interpolation(.high)
             .scaledToFit()
-            .frame(width: 68, height: 68)
+            .frame(width: 44, height: 44)
             .accessibilityLabel("ArgyllUX")
     }
 
@@ -263,7 +278,7 @@ struct AppShellView: View {
                     onRequestDeletion: model.requestSelectedPrinterProfileDeletion
                 )
             case .troubleshoot, .inspect, .blackAndWhiteTuning:
-                PlaceholderRouteView(route: model.selectedRoute)
+                RouteEntryView(route: model.selectedRoute)
             }
         }
     }
@@ -299,13 +314,18 @@ struct AppShellView: View {
         chrome.showsRightInspector && availableWidth >= minimumWidthForRightInspector
     }
 
-    private func utilityPill(title: String) -> some View {
-        Text(title)
+    private func utilityPill(title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .labelStyle(.titleAndIcon)
             .font(AppTypography.shellUtility)
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 8)
-            .background(Color.secondary.opacity(0.08), in: Capsule())
+            .padding(.horizontal, 9)
+            .padding(.vertical, 7)
+            .background(Color.secondary.opacity(0.06), in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+            }
     }
 
     private func isRouteHighlighted(_ route: AppRoute) -> Bool {
@@ -314,5 +334,72 @@ struct AppShellView: View {
         }
 
         return model.selectedRoute == route
+    }
+}
+
+private struct ShellJumpSheetView: View {
+    let items: [ShellJumpItem]
+    let onSelect: (ShellJumpItem) -> Void
+    @State private var query = ""
+
+    private var filteredItems: [ShellJumpItem] {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuery.isEmpty else { return items }
+        return items.filter { item in
+            item.title.localizedCaseInsensitiveContains(trimmedQuery) ||
+                item.subtitle.localizedCaseInsensitiveContains(trimmedQuery)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Jump")
+                    .font(.title2.weight(.semibold))
+                Text("Open a route, active job, profile, printer, or paper.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            TextField("Search", text: $query)
+                .textFieldStyle(.roundedBorder)
+
+            if filteredItems.isEmpty {
+                Text("No matching destinations.")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 220, alignment: .center)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(filteredItems) { item in
+                            Button {
+                                onSelect(item)
+                            } label: {
+                                HStack(alignment: .top, spacing: 12) {
+                                    Image(systemName: item.systemImage)
+                                        .foregroundStyle(Color.accentColor)
+                                        .frame(width: 20)
+
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(item.title)
+                                            .font(.headline)
+                                            .foregroundStyle(.primary)
+                                        Text(item.subtitle)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Spacer()
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(SurfaceRowButtonStyle(cornerRadius: 8))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(24)
+        .frame(minWidth: 560, minHeight: 520)
     }
 }
