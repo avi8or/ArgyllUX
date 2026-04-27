@@ -153,10 +153,7 @@ pub(crate) fn command_summary_details(
     status: &str,
     exit_code: Option<i32>,
 ) -> String {
-    let sanitized_argv = argv
-        .iter()
-        .map(|arg| sanitize_command_arg(arg))
-        .collect::<Vec<_>>();
+    let summarized_argv = summarize_command_argv(argv);
 
     sanitize_event_input(DiagnosticEventInput {
         level: DiagnosticLevel::Info,
@@ -165,7 +162,7 @@ pub(crate) fn command_summary_details(
         message: "Command summary.".to_string(),
         details_json: json!({
             "command_kind": command_kind,
-            "argv": sanitized_argv,
+            "argv": summarized_argv,
             "status": status,
             "exit_code": exit_code,
         })
@@ -328,21 +325,70 @@ fn looks_like_private_path(value: &str) -> bool {
     value.contains("/Users/") || value.contains("/var/folders/") || value.contains("/private/var/")
 }
 
-fn sanitize_command_arg(arg: &str) -> String {
-    if looks_like_private_path(arg) {
-        redact_path(arg)
-    } else if arg.starts_with("/opt/homebrew/")
-        || arg.starts_with("/usr/local/")
-        || arg.starts_with("/Applications/")
-    {
+fn summarize_command_argv(argv: &[String]) -> Vec<String> {
+    let Some((executable, arguments)) = argv.split_first() else {
+        return Vec::new();
+    };
+
+    let mut summary = vec![command_executable_name(executable)];
+    let mut index = 0;
+    while index < arguments.len() {
+        let argument = &arguments[index];
+        if is_sensitive_value_flag(argument) {
+            summary.push(argument.to_string());
+            if index + 1 < arguments.len() {
+                summary.push("[redacted value]".to_string());
+                index += 2;
+            } else {
+                index += 1;
+            }
+        } else if is_safe_value_flag(argument)
+            && arguments
+                .get(index + 1)
+                .is_some_and(|value| is_safe_operational_value(value))
+        {
+            summary.push(argument.to_string());
+            summary.push(arguments[index + 1].to_string());
+            index += 2;
+        } else if argument.starts_with('-') {
+            summary.push(argument.to_string());
+            index += 1;
+        } else {
+            summary.push("[redacted value]".to_string());
+            index += 1;
+        }
+    }
+
+    summary
+}
+
+fn command_executable_name(arg: &str) -> String {
+    if arg.starts_with('/') {
         Path::new(arg)
             .file_name()
             .and_then(|name| name.to_str())
-            .unwrap_or(arg)
+            .unwrap_or("[redacted executable]")
             .to_string()
     } else {
         arg.to_string()
     }
+}
+
+fn is_sensitive_value_flag(argument: &str) -> bool {
+    matches!(argument, "-D" | "-A" | "-M" | "-O" | "-c" | "-k")
+}
+
+fn is_safe_value_flag(argument: &str) -> bool {
+    matches!(argument, "-f" | "-l" | "-L" | "-T" | "-p" | "-Q" | "-v")
+}
+
+fn is_safe_operational_value(value: &str) -> bool {
+    !looks_like_private_path(value)
+        && !value.starts_with('-')
+        && !value.contains('/')
+        && value
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '.'))
 }
 
 fn sanitize_detail_string(value: &mut String) -> bool {
@@ -531,8 +577,15 @@ mod command_summary_tests {
             &[
                 "/opt/homebrew/bin/colprof".to_string(),
                 "-v".to_string(),
+                "-D".to_string(),
+                "P900 Rag v3".to_string(),
+                "-A".to_string(),
+                "Studio P900".to_string(),
+                "-M".to_string(),
+                "SureColor P900".to_string(),
                 "-O".to_string(),
                 "/Users/tylermiller/Profiles/P900 Rag v3.icc".to_string(),
+                "/Users/tylermiller/Work/P900 Rag v3".to_string(),
             ],
             "succeeded",
             Some(0),
@@ -540,9 +593,15 @@ mod command_summary_tests {
 
         assert!(details.contains("\"command_kind\":\"colprof\""));
         assert!(
-            details.contains("\"argv\":[\"colprof\",\"-v\",\"-O\",\"$HOME/.../P900 Rag v3.icc\"]")
+            details.contains(
+                "\"argv\":[\"colprof\",\"-v\",\"-D\",\"[redacted value]\",\"-A\",\"[redacted value]\",\"-M\",\"[redacted value]\",\"-O\",\"[redacted value]\",\"[redacted value]\"]"
+            )
         );
+        assert!(!details.contains("P900 Rag v3"));
+        assert!(!details.contains("Studio P900"));
+        assert!(!details.contains("SureColor P900"));
         assert!(!details.contains("/Users/tylermiller/Profiles"));
+        assert!(!details.contains("/Users/tylermiller/Work"));
     }
 }
 
