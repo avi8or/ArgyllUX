@@ -4719,7 +4719,9 @@ mod tests {
 
         assert_eq!(record.level, DiagnosticLevel::Error);
         assert_eq!(record.privacy, DiagnosticPrivacy::SensitiveRedacted);
-        assert!(record.details_json.contains("$HOME/.../private"));
+        assert!(record.details_json.contains("$HOME/[redacted path]"));
+        assert!(!record.details_json.contains("/Users/tylermiller"));
+        assert!(!record.details_json.contains("private"));
         assert!(record.details_json.contains("\"stderr\":\"[redacted]\""));
         assert_eq!(record.job_id.as_deref(), Some("job-1"));
         assert_eq!(record.command_id.as_deref(), Some("command-1"));

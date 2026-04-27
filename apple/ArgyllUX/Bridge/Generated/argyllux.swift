@@ -352,7 +352,7 @@ private func uniffiTraitInterfaceCallWithError<T, E>(
         callStatus.pointee.errorBuf = FfiConverterString.lower(String(describing: error))
     }
 }
-// Initial value and increment amount for handles. 
+// Initial value and increment amount for handles.
 // These ensure that SWIFT handles always have the lowest bit set
 fileprivate let UNIFFI_HANDLEMAP_INITIAL: UInt64 = 1
 fileprivate let UNIFFI_HANDLEMAP_DELTA: UInt64 = 2
@@ -549,75 +549,75 @@ fileprivate struct FfiConverterString: FfiConverter {
 
 
 public protocol EngineProtocol: AnyObject, Sendable {
-    
+
     func bootstrap(config: EngineConfig)  -> BootstrapStatus
-    
+
     func createNewProfileDraft(input: CreateNewProfileDraftInput)  -> NewProfileJobDetail
-    
+
     func createPaper(input: CreatePaperInput)  -> PaperRecord
-    
+
     func createPrinter(input: CreatePrinterInput)  -> PrinterRecord
-    
+
     func createPrinterPaperPreset(input: CreatePrinterPaperPresetInput)  -> PrinterPaperPresetRecord
-    
+
     func deleteNewProfileJob(jobId: String)  -> DeleteResult
-    
+
     func deletePrinterProfile(profileId: String)  -> DeleteResult
-    
+
     func exportDiagnosticsBundle(options: DiagnosticsExportOptions)  -> DiagnosticsExportResult
 
     func getAppHealth()  -> AppHealth
-    
+
     func getDashboardSnapshot()  -> DashboardSnapshot
-    
+
     func getDiagnosticsSummary()  -> DiagnosticsSummary
-    
+
     func getNewProfileJobDetail(jobId: String)  -> NewProfileJobDetail
-    
+
     func getRecentLogs(limit: UInt32)  -> [LogEntry]
-    
+
     func getToolchainStatus()  -> ToolchainStatus
-    
+
     func listDiagnosticEvents(filter: DiagnosticEventFilter)  -> [DiagnosticEventRecord]
-    
+
     func listPapers()  -> [PaperRecord]
-    
+
     func listPrinterPaperPresets()  -> [PrinterPaperPresetRecord]
-    
+
     func listPrinterProfiles()  -> [PrinterProfileRecord]
-    
+
     func listPrinters()  -> [PrinterRecord]
-    
+
     func markNewProfilePrinted(jobId: String)  -> NewProfileJobDetail
-    
+
     func markNewProfileReadyToMeasure(jobId: String)  -> NewProfileJobDetail
-    
+
     func publishNewProfile(jobId: String)  -> NewProfileJobDetail
-    
+
     func recordDiagnosticEvent(input: DiagnosticEventInput)  -> DiagnosticEventRecord
-    
+
     func resolveNewProfileLaunch(input: CreateNewProfileDraftInput)  -> NewProfileJobDetail
-    
+
     func saveNewProfileContext(input: SaveNewProfileContextInput)  -> NewProfileJobDetail
-    
+
     func savePrintSettings(input: SavePrintSettingsInput)  -> NewProfileJobDetail
-    
+
     func saveTargetSettings(input: SaveTargetSettingsInput)  -> NewProfileJobDetail
-    
+
     func setToolchainPath(path: String?)  -> ToolchainStatus
-    
+
     func startBuildProfile(jobId: String)  -> NewProfileJobDetail
-    
+
     func startGenerateTarget(jobId: String)  -> NewProfileJobDetail
-    
+
     func startMeasurement(input: StartMeasurementInput)  -> NewProfileJobDetail
-    
+
     func updatePaper(input: UpdatePaperInput)  -> PaperRecord
-    
+
     func updatePrinter(input: UpdatePrinterInput)  -> PrinterRecord
-    
+
     func updatePrinterPaperPreset(input: UpdatePrinterPaperPresetInput)  -> PrinterPaperPresetRecord
-    
+
 }
 open class Engine: EngineProtocol, @unchecked Sendable {
     fileprivate let handle: UInt64
@@ -671,9 +671,9 @@ public convenience init() {
         try! rustCall { uniffi_argyllux_engine_fn_free_engine(handle, $0) }
     }
 
-    
 
-    
+
+
 open func bootstrap(config: EngineConfig) -> BootstrapStatus  {
     return try!  FfiConverterTypeBootstrapStatus_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_bootstrap(
@@ -682,7 +682,7 @@ open func bootstrap(config: EngineConfig) -> BootstrapStatus  {
     )
 })
 }
-    
+
 open func createNewProfileDraft(input: CreateNewProfileDraftInput) -> NewProfileJobDetail  {
     return try!  FfiConverterTypeNewProfileJobDetail_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_createnewprofiledraft(
@@ -691,7 +691,7 @@ open func createNewProfileDraft(input: CreateNewProfileDraftInput) -> NewProfile
     )
 })
 }
-    
+
 open func createPaper(input: CreatePaperInput) -> PaperRecord  {
     return try!  FfiConverterTypePaperRecord_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_createpaper(
@@ -700,7 +700,7 @@ open func createPaper(input: CreatePaperInput) -> PaperRecord  {
     )
 })
 }
-    
+
 open func createPrinter(input: CreatePrinterInput) -> PrinterRecord  {
     return try!  FfiConverterTypePrinterRecord_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_createprinter(
@@ -709,7 +709,7 @@ open func createPrinter(input: CreatePrinterInput) -> PrinterRecord  {
     )
 })
 }
-    
+
 open func createPrinterPaperPreset(input: CreatePrinterPaperPresetInput) -> PrinterPaperPresetRecord  {
     return try!  FfiConverterTypePrinterPaperPresetRecord_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_createprinterpaperpreset(
@@ -718,7 +718,7 @@ open func createPrinterPaperPreset(input: CreatePrinterPaperPresetInput) -> Prin
     )
 })
 }
-    
+
 open func deleteNewProfileJob(jobId: String) -> DeleteResult  {
     return try!  FfiConverterTypeDeleteResult_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_deletenewprofilejob(
@@ -727,7 +727,7 @@ open func deleteNewProfileJob(jobId: String) -> DeleteResult  {
     )
 })
 }
-    
+
 open func deletePrinterProfile(profileId: String) -> DeleteResult  {
     return try!  FfiConverterTypeDeleteResult_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_deleteprinterprofile(
@@ -736,7 +736,7 @@ open func deletePrinterProfile(profileId: String) -> DeleteResult  {
     )
 })
 }
-    
+
 open func exportDiagnosticsBundle(options: DiagnosticsExportOptions) -> DiagnosticsExportResult  {
     return try!  FfiConverterTypeDiagnosticsExportResult_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_exportdiagnosticsbundle(
@@ -753,7 +753,7 @@ open func getAppHealth() -> AppHealth  {
     )
 })
 }
-    
+
 open func getDashboardSnapshot() -> DashboardSnapshot  {
     return try!  FfiConverterTypeDashboardSnapshot_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_getdashboardsnapshot(
@@ -761,7 +761,7 @@ open func getDashboardSnapshot() -> DashboardSnapshot  {
     )
 })
 }
-    
+
 open func getDiagnosticsSummary() -> DiagnosticsSummary  {
     return try!  FfiConverterTypeDiagnosticsSummary_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_getdiagnosticssummary(
@@ -769,7 +769,7 @@ open func getDiagnosticsSummary() -> DiagnosticsSummary  {
     )
 })
 }
-    
+
 open func getNewProfileJobDetail(jobId: String) -> NewProfileJobDetail  {
     return try!  FfiConverterTypeNewProfileJobDetail_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_getnewprofilejobdetail(
@@ -778,7 +778,7 @@ open func getNewProfileJobDetail(jobId: String) -> NewProfileJobDetail  {
     )
 })
 }
-    
+
 open func getRecentLogs(limit: UInt32) -> [LogEntry]  {
     return try!  FfiConverterSequenceTypeLogEntry.lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_getrecentlogs(
@@ -787,7 +787,7 @@ open func getRecentLogs(limit: UInt32) -> [LogEntry]  {
     )
 })
 }
-    
+
 open func getToolchainStatus() -> ToolchainStatus  {
     return try!  FfiConverterTypeToolchainStatus_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_gettoolchainstatus(
@@ -795,7 +795,7 @@ open func getToolchainStatus() -> ToolchainStatus  {
     )
 })
 }
-    
+
 open func listDiagnosticEvents(filter: DiagnosticEventFilter) -> [DiagnosticEventRecord]  {
     return try!  FfiConverterSequenceTypeDiagnosticEventRecord.lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_listdiagnosticevents(
@@ -804,7 +804,7 @@ open func listDiagnosticEvents(filter: DiagnosticEventFilter) -> [DiagnosticEven
     )
 })
 }
-    
+
 open func listPapers() -> [PaperRecord]  {
     return try!  FfiConverterSequenceTypePaperRecord.lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_listpapers(
@@ -812,7 +812,7 @@ open func listPapers() -> [PaperRecord]  {
     )
 })
 }
-    
+
 open func listPrinterPaperPresets() -> [PrinterPaperPresetRecord]  {
     return try!  FfiConverterSequenceTypePrinterPaperPresetRecord.lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_listprinterpaperpresets(
@@ -820,7 +820,7 @@ open func listPrinterPaperPresets() -> [PrinterPaperPresetRecord]  {
     )
 })
 }
-    
+
 open func listPrinterProfiles() -> [PrinterProfileRecord]  {
     return try!  FfiConverterSequenceTypePrinterProfileRecord.lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_listprinterprofiles(
@@ -828,7 +828,7 @@ open func listPrinterProfiles() -> [PrinterProfileRecord]  {
     )
 })
 }
-    
+
 open func listPrinters() -> [PrinterRecord]  {
     return try!  FfiConverterSequenceTypePrinterRecord.lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_listprinters(
@@ -836,7 +836,7 @@ open func listPrinters() -> [PrinterRecord]  {
     )
 })
 }
-    
+
 open func markNewProfilePrinted(jobId: String) -> NewProfileJobDetail  {
     return try!  FfiConverterTypeNewProfileJobDetail_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_marknewprofileprinted(
@@ -845,7 +845,7 @@ open func markNewProfilePrinted(jobId: String) -> NewProfileJobDetail  {
     )
 })
 }
-    
+
 open func markNewProfileReadyToMeasure(jobId: String) -> NewProfileJobDetail  {
     return try!  FfiConverterTypeNewProfileJobDetail_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_marknewprofilereadytomeasure(
@@ -854,7 +854,7 @@ open func markNewProfileReadyToMeasure(jobId: String) -> NewProfileJobDetail  {
     )
 })
 }
-    
+
 open func publishNewProfile(jobId: String) -> NewProfileJobDetail  {
     return try!  FfiConverterTypeNewProfileJobDetail_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_publishnewprofile(
@@ -863,7 +863,7 @@ open func publishNewProfile(jobId: String) -> NewProfileJobDetail  {
     )
 })
 }
-    
+
 open func recordDiagnosticEvent(input: DiagnosticEventInput) -> DiagnosticEventRecord  {
     return try!  FfiConverterTypeDiagnosticEventRecord_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_recorddiagnosticevent(
@@ -872,7 +872,7 @@ open func recordDiagnosticEvent(input: DiagnosticEventInput) -> DiagnosticEventR
     )
 })
 }
-    
+
 open func resolveNewProfileLaunch(input: CreateNewProfileDraftInput) -> NewProfileJobDetail  {
     return try!  FfiConverterTypeNewProfileJobDetail_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_resolvenewprofilelaunch(
@@ -881,7 +881,7 @@ open func resolveNewProfileLaunch(input: CreateNewProfileDraftInput) -> NewProfi
     )
 })
 }
-    
+
 open func saveNewProfileContext(input: SaveNewProfileContextInput) -> NewProfileJobDetail  {
     return try!  FfiConverterTypeNewProfileJobDetail_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_savenewprofilecontext(
@@ -890,7 +890,7 @@ open func saveNewProfileContext(input: SaveNewProfileContextInput) -> NewProfile
     )
 })
 }
-    
+
 open func savePrintSettings(input: SavePrintSettingsInput) -> NewProfileJobDetail  {
     return try!  FfiConverterTypeNewProfileJobDetail_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_saveprintsettings(
@@ -899,7 +899,7 @@ open func savePrintSettings(input: SavePrintSettingsInput) -> NewProfileJobDetai
     )
 })
 }
-    
+
 open func saveTargetSettings(input: SaveTargetSettingsInput) -> NewProfileJobDetail  {
     return try!  FfiConverterTypeNewProfileJobDetail_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_savetargetsettings(
@@ -908,7 +908,7 @@ open func saveTargetSettings(input: SaveTargetSettingsInput) -> NewProfileJobDet
     )
 })
 }
-    
+
 open func setToolchainPath(path: String?) -> ToolchainStatus  {
     return try!  FfiConverterTypeToolchainStatus_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_settoolchainpath(
@@ -917,7 +917,7 @@ open func setToolchainPath(path: String?) -> ToolchainStatus  {
     )
 })
 }
-    
+
 open func startBuildProfile(jobId: String) -> NewProfileJobDetail  {
     return try!  FfiConverterTypeNewProfileJobDetail_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_startbuildprofile(
@@ -926,7 +926,7 @@ open func startBuildProfile(jobId: String) -> NewProfileJobDetail  {
     )
 })
 }
-    
+
 open func startGenerateTarget(jobId: String) -> NewProfileJobDetail  {
     return try!  FfiConverterTypeNewProfileJobDetail_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_startgeneratetarget(
@@ -935,7 +935,7 @@ open func startGenerateTarget(jobId: String) -> NewProfileJobDetail  {
     )
 })
 }
-    
+
 open func startMeasurement(input: StartMeasurementInput) -> NewProfileJobDetail  {
     return try!  FfiConverterTypeNewProfileJobDetail_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_startmeasurement(
@@ -944,7 +944,7 @@ open func startMeasurement(input: StartMeasurementInput) -> NewProfileJobDetail 
     )
 })
 }
-    
+
 open func updatePaper(input: UpdatePaperInput) -> PaperRecord  {
     return try!  FfiConverterTypePaperRecord_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_updatepaper(
@@ -953,7 +953,7 @@ open func updatePaper(input: UpdatePaperInput) -> PaperRecord  {
     )
 })
 }
-    
+
 open func updatePrinter(input: UpdatePrinterInput) -> PrinterRecord  {
     return try!  FfiConverterTypePrinterRecord_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_updateprinter(
@@ -962,7 +962,7 @@ open func updatePrinter(input: UpdatePrinterInput) -> PrinterRecord  {
     )
 })
 }
-    
+
 open func updatePrinterPaperPreset(input: UpdatePrinterPaperPresetInput) -> PrinterPaperPresetRecord  {
     return try!  FfiConverterTypePrinterPaperPresetRecord_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_updateprinterpaperpreset(
@@ -971,9 +971,9 @@ open func updatePrinterPaperPreset(input: UpdatePrinterPaperPresetInput) -> Prin
     )
 })
 }
-    
 
-    
+
+
 }
 
 
@@ -1045,7 +1045,7 @@ public struct ActiveWorkItem: Equatable, Hashable {
         self.status = status
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -1059,14 +1059,14 @@ public struct FfiConverterTypeActiveWorkItem: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ActiveWorkItem {
         return
             try ActiveWorkItem(
-                id: FfiConverterString.read(from: &buf), 
-                title: FfiConverterString.read(from: &buf), 
-                nextAction: FfiConverterString.read(from: &buf), 
-                kind: FfiConverterString.read(from: &buf), 
-                stage: FfiConverterTypeWorkflowStage.read(from: &buf), 
-                profileName: FfiConverterString.read(from: &buf), 
-                printerName: FfiConverterString.read(from: &buf), 
-                paperName: FfiConverterString.read(from: &buf), 
+                id: FfiConverterString.read(from: &buf),
+                title: FfiConverterString.read(from: &buf),
+                nextAction: FfiConverterString.read(from: &buf),
+                kind: FfiConverterString.read(from: &buf),
+                stage: FfiConverterTypeWorkflowStage.read(from: &buf),
+                profileName: FfiConverterString.read(from: &buf),
+                printerName: FfiConverterString.read(from: &buf),
+                paperName: FfiConverterString.read(from: &buf),
                 status: FfiConverterString.read(from: &buf)
         )
     }
@@ -1113,7 +1113,7 @@ public struct AppHealth: Equatable, Hashable {
         self.warnings = warnings
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -1127,8 +1127,8 @@ public struct FfiConverterTypeAppHealth: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> AppHealth {
         return
             try AppHealth(
-                readiness: FfiConverterString.read(from: &buf), 
-                blockingIssues: FfiConverterSequenceString.read(from: &buf), 
+                readiness: FfiConverterString.read(from: &buf),
+                blockingIssues: FfiConverterSequenceString.read(from: &buf),
                 warnings: FfiConverterSequenceString.read(from: &buf)
         )
     }
@@ -1171,7 +1171,7 @@ public struct BootstrapStatus: Equatable, Hashable {
         self.toolchainStatus = toolchainStatus
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -1185,9 +1185,9 @@ public struct FfiConverterTypeBootstrapStatus: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> BootstrapStatus {
         return
             try BootstrapStatus(
-                appSupportDirReady: FfiConverterBool.read(from: &buf), 
-                databaseInitialized: FfiConverterBool.read(from: &buf), 
-                migrationsApplied: FfiConverterBool.read(from: &buf), 
+                appSupportDirReady: FfiConverterBool.read(from: &buf),
+                databaseInitialized: FfiConverterBool.read(from: &buf),
+                migrationsApplied: FfiConverterBool.read(from: &buf),
                 toolchainStatus: FfiConverterTypeToolchainStatus.read(from: &buf)
         )
     }
@@ -1229,7 +1229,7 @@ public struct CreateNewProfileDraftInput: Equatable, Hashable {
         self.paperId = paperId
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -1243,8 +1243,8 @@ public struct FfiConverterTypeCreateNewProfileDraftInput: FfiConverterRustBuffer
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CreateNewProfileDraftInput {
         return
             try CreateNewProfileDraftInput(
-                profileName: FfiConverterOptionString.read(from: &buf), 
-                printerId: FfiConverterOptionString.read(from: &buf), 
+                profileName: FfiConverterOptionString.read(from: &buf),
+                printerId: FfiConverterOptionString.read(from: &buf),
                 paperId: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -1309,7 +1309,7 @@ public struct CreatePaperInput: Equatable, Hashable {
         self.notes = notes
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -1323,20 +1323,20 @@ public struct FfiConverterTypeCreatePaperInput: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CreatePaperInput {
         return
             try CreatePaperInput(
-                manufacturer: FfiConverterString.read(from: &buf), 
-                paperLine: FfiConverterString.read(from: &buf), 
-                surfaceClass: FfiConverterString.read(from: &buf), 
-                basisWeightValue: FfiConverterString.read(from: &buf), 
-                basisWeightUnit: FfiConverterTypePaperWeightUnit.read(from: &buf), 
-                thicknessValue: FfiConverterString.read(from: &buf), 
-                thicknessUnit: FfiConverterTypePaperThicknessUnit.read(from: &buf), 
-                surfaceTexture: FfiConverterString.read(from: &buf), 
-                baseMaterial: FfiConverterString.read(from: &buf), 
-                mediaColor: FfiConverterString.read(from: &buf), 
-                opacity: FfiConverterString.read(from: &buf), 
-                whiteness: FfiConverterString.read(from: &buf), 
-                obaContent: FfiConverterString.read(from: &buf), 
-                inkCompatibility: FfiConverterString.read(from: &buf), 
+                manufacturer: FfiConverterString.read(from: &buf),
+                paperLine: FfiConverterString.read(from: &buf),
+                surfaceClass: FfiConverterString.read(from: &buf),
+                basisWeightValue: FfiConverterString.read(from: &buf),
+                basisWeightUnit: FfiConverterTypePaperWeightUnit.read(from: &buf),
+                thicknessValue: FfiConverterString.read(from: &buf),
+                thicknessUnit: FfiConverterTypePaperThicknessUnit.read(from: &buf),
+                surfaceTexture: FfiConverterString.read(from: &buf),
+                baseMaterial: FfiConverterString.read(from: &buf),
+                mediaColor: FfiConverterString.read(from: &buf),
+                opacity: FfiConverterString.read(from: &buf),
+                whiteness: FfiConverterString.read(from: &buf),
+                obaContent: FfiConverterString.read(from: &buf),
+                inkCompatibility: FfiConverterString.read(from: &buf),
                 notes: FfiConverterString.read(from: &buf)
         )
     }
@@ -1405,7 +1405,7 @@ public struct CreatePrinterInput: Equatable, Hashable {
         self.notes = notes
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -1419,16 +1419,16 @@ public struct FfiConverterTypeCreatePrinterInput: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CreatePrinterInput {
         return
             try CreatePrinterInput(
-                manufacturer: FfiConverterString.read(from: &buf), 
-                model: FfiConverterString.read(from: &buf), 
-                nickname: FfiConverterString.read(from: &buf), 
-                transportStyle: FfiConverterString.read(from: &buf), 
-                colorantFamily: FfiConverterTypeColorantFamily.read(from: &buf), 
-                channelCount: FfiConverterUInt32.read(from: &buf), 
-                channelLabels: FfiConverterSequenceString.read(from: &buf), 
-                supportedMediaSettings: FfiConverterSequenceString.read(from: &buf), 
-                supportedQualityModes: FfiConverterSequenceString.read(from: &buf), 
-                monochromePathNotes: FfiConverterString.read(from: &buf), 
+                manufacturer: FfiConverterString.read(from: &buf),
+                model: FfiConverterString.read(from: &buf),
+                nickname: FfiConverterString.read(from: &buf),
+                transportStyle: FfiConverterString.read(from: &buf),
+                colorantFamily: FfiConverterTypeColorantFamily.read(from: &buf),
+                channelCount: FfiConverterUInt32.read(from: &buf),
+                channelLabels: FfiConverterSequenceString.read(from: &buf),
+                supportedMediaSettings: FfiConverterSequenceString.read(from: &buf),
+                supportedQualityModes: FfiConverterSequenceString.read(from: &buf),
+                monochromePathNotes: FfiConverterString.read(from: &buf),
                 notes: FfiConverterString.read(from: &buf)
         )
     }
@@ -1489,7 +1489,7 @@ public struct CreatePrinterPaperPresetInput: Equatable, Hashable {
         self.notes = notes
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -1503,14 +1503,14 @@ public struct FfiConverterTypeCreatePrinterPaperPresetInput: FfiConverterRustBuf
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CreatePrinterPaperPresetInput {
         return
             try CreatePrinterPaperPresetInput(
-                printerId: FfiConverterString.read(from: &buf), 
-                paperId: FfiConverterString.read(from: &buf), 
-                label: FfiConverterString.read(from: &buf), 
-                printPath: FfiConverterString.read(from: &buf), 
-                mediaSetting: FfiConverterString.read(from: &buf), 
-                qualityMode: FfiConverterString.read(from: &buf), 
-                totalInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf), 
-                blackInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf), 
+                printerId: FfiConverterString.read(from: &buf),
+                paperId: FfiConverterString.read(from: &buf),
+                label: FfiConverterString.read(from: &buf),
+                printPath: FfiConverterString.read(from: &buf),
+                mediaSetting: FfiConverterString.read(from: &buf),
+                qualityMode: FfiConverterString.read(from: &buf),
+                totalInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf),
+                blackInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf),
                 notes: FfiConverterString.read(from: &buf)
         )
     }
@@ -1559,7 +1559,7 @@ public struct DashboardSnapshot: Equatable, Hashable {
         self.instrumentStatus = instrumentStatus
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -1573,9 +1573,9 @@ public struct FfiConverterTypeDashboardSnapshot: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DashboardSnapshot {
         return
             try DashboardSnapshot(
-                activeWorkItems: FfiConverterSequenceTypeActiveWorkItem.read(from: &buf), 
-                jobsCount: FfiConverterUInt32.read(from: &buf), 
-                alertsCount: FfiConverterUInt32.read(from: &buf), 
+                activeWorkItems: FfiConverterSequenceTypeActiveWorkItem.read(from: &buf),
+                jobsCount: FfiConverterUInt32.read(from: &buf),
+                alertsCount: FfiConverterUInt32.read(from: &buf),
                 instrumentStatus: FfiConverterTypeInstrumentStatus.read(from: &buf)
         )
     }
@@ -1615,7 +1615,7 @@ public struct DeleteResult: Equatable, Hashable {
         self.message = message
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -1629,7 +1629,7 @@ public struct FfiConverterTypeDeleteResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DeleteResult {
         return
             try DeleteResult(
-                success: FfiConverterBool.read(from: &buf), 
+                success: FfiConverterBool.read(from: &buf),
                 message: FfiConverterString.read(from: &buf)
         )
     }
@@ -1681,7 +1681,7 @@ public struct DiagnosticEventFilter: Equatable, Hashable {
         self.limit = limit
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -1695,14 +1695,14 @@ public struct FfiConverterTypeDiagnosticEventFilter: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiagnosticEventFilter {
         return
             try DiagnosticEventFilter(
-                levels: FfiConverterSequenceTypeDiagnosticLevel.read(from: &buf), 
-                categories: FfiConverterSequenceTypeDiagnosticCategory.read(from: &buf), 
-                searchText: FfiConverterOptionString.read(from: &buf), 
-                jobId: FfiConverterOptionString.read(from: &buf), 
-                profileId: FfiConverterOptionString.read(from: &buf), 
-                sinceTimestamp: FfiConverterOptionString.read(from: &buf), 
-                untilTimestamp: FfiConverterOptionString.read(from: &buf), 
-                errorsOnly: FfiConverterBool.read(from: &buf), 
+                levels: FfiConverterSequenceTypeDiagnosticLevel.read(from: &buf),
+                categories: FfiConverterSequenceTypeDiagnosticCategory.read(from: &buf),
+                searchText: FfiConverterOptionString.read(from: &buf),
+                jobId: FfiConverterOptionString.read(from: &buf),
+                profileId: FfiConverterOptionString.read(from: &buf),
+                sinceTimestamp: FfiConverterOptionString.read(from: &buf),
+                untilTimestamp: FfiConverterOptionString.read(from: &buf),
+                errorsOnly: FfiConverterBool.read(from: &buf),
                 limit: FfiConverterUInt32.read(from: &buf)
         )
     }
@@ -1769,7 +1769,7 @@ public struct DiagnosticEventInput: Equatable, Hashable {
         self.parentOperationId = parentOperationId
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -1783,18 +1783,18 @@ public struct FfiConverterTypeDiagnosticEventInput: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiagnosticEventInput {
         return
             try DiagnosticEventInput(
-                level: FfiConverterTypeDiagnosticLevel.read(from: &buf), 
-                category: FfiConverterTypeDiagnosticCategory.read(from: &buf), 
-                source: FfiConverterString.read(from: &buf), 
-                message: FfiConverterString.read(from: &buf), 
-                detailsJson: FfiConverterString.read(from: &buf), 
-                privacy: FfiConverterTypeDiagnosticPrivacy.read(from: &buf), 
-                jobId: FfiConverterOptionString.read(from: &buf), 
-                commandId: FfiConverterOptionString.read(from: &buf), 
-                profileId: FfiConverterOptionString.read(from: &buf), 
-                issueCaseId: FfiConverterOptionString.read(from: &buf), 
-                durationMs: FfiConverterOptionUInt32.read(from: &buf), 
-                operationId: FfiConverterOptionString.read(from: &buf), 
+                level: FfiConverterTypeDiagnosticLevel.read(from: &buf),
+                category: FfiConverterTypeDiagnosticCategory.read(from: &buf),
+                source: FfiConverterString.read(from: &buf),
+                message: FfiConverterString.read(from: &buf),
+                detailsJson: FfiConverterString.read(from: &buf),
+                privacy: FfiConverterTypeDiagnosticPrivacy.read(from: &buf),
+                jobId: FfiConverterOptionString.read(from: &buf),
+                commandId: FfiConverterOptionString.read(from: &buf),
+                profileId: FfiConverterOptionString.read(from: &buf),
+                issueCaseId: FfiConverterOptionString.read(from: &buf),
+                durationMs: FfiConverterOptionUInt32.read(from: &buf),
+                operationId: FfiConverterOptionString.read(from: &buf),
                 parentOperationId: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -1869,7 +1869,7 @@ public struct DiagnosticEventRecord: Equatable, Hashable {
         self.parentOperationId = parentOperationId
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -1883,20 +1883,20 @@ public struct FfiConverterTypeDiagnosticEventRecord: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiagnosticEventRecord {
         return
             try DiagnosticEventRecord(
-                id: FfiConverterString.read(from: &buf), 
-                timestamp: FfiConverterString.read(from: &buf), 
-                level: FfiConverterTypeDiagnosticLevel.read(from: &buf), 
-                category: FfiConverterTypeDiagnosticCategory.read(from: &buf), 
-                source: FfiConverterString.read(from: &buf), 
-                message: FfiConverterString.read(from: &buf), 
-                detailsJson: FfiConverterString.read(from: &buf), 
-                privacy: FfiConverterTypeDiagnosticPrivacy.read(from: &buf), 
-                jobId: FfiConverterOptionString.read(from: &buf), 
-                commandId: FfiConverterOptionString.read(from: &buf), 
-                profileId: FfiConverterOptionString.read(from: &buf), 
-                issueCaseId: FfiConverterOptionString.read(from: &buf), 
-                durationMs: FfiConverterOptionUInt32.read(from: &buf), 
-                operationId: FfiConverterOptionString.read(from: &buf), 
+                id: FfiConverterString.read(from: &buf),
+                timestamp: FfiConverterString.read(from: &buf),
+                level: FfiConverterTypeDiagnosticLevel.read(from: &buf),
+                category: FfiConverterTypeDiagnosticCategory.read(from: &buf),
+                source: FfiConverterString.read(from: &buf),
+                message: FfiConverterString.read(from: &buf),
+                detailsJson: FfiConverterString.read(from: &buf),
+                privacy: FfiConverterTypeDiagnosticPrivacy.read(from: &buf),
+                jobId: FfiConverterOptionString.read(from: &buf),
+                commandId: FfiConverterOptionString.read(from: &buf),
+                profileId: FfiConverterOptionString.read(from: &buf),
+                issueCaseId: FfiConverterOptionString.read(from: &buf),
+                durationMs: FfiConverterOptionUInt32.read(from: &buf),
+                operationId: FfiConverterOptionString.read(from: &buf),
                 parentOperationId: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -1951,7 +1951,7 @@ public struct DiagnosticsExportOptions: Equatable, Hashable {
         self.jobIds = jobIds
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -1965,9 +1965,9 @@ public struct FfiConverterTypeDiagnosticsExportOptions: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiagnosticsExportOptions {
         return
             try DiagnosticsExportOptions(
-                outputDirectory: FfiConverterString.read(from: &buf), 
-                includeCliTranscripts: FfiConverterBool.read(from: &buf), 
-                includeLocalPaths: FfiConverterBool.read(from: &buf), 
+                outputDirectory: FfiConverterString.read(from: &buf),
+                includeCliTranscripts: FfiConverterBool.read(from: &buf),
+                includeLocalPaths: FfiConverterBool.read(from: &buf),
                 jobIds: FfiConverterSequenceString.read(from: &buf)
         )
     }
@@ -2015,7 +2015,7 @@ public struct DiagnosticsExportResult: Equatable, Hashable {
         self.redactedPathsCount = redactedPathsCount
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -2029,11 +2029,11 @@ public struct FfiConverterTypeDiagnosticsExportResult: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiagnosticsExportResult {
         return
             try DiagnosticsExportResult(
-                success: FfiConverterBool.read(from: &buf), 
-                bundlePath: FfiConverterString.read(from: &buf), 
-                message: FfiConverterString.read(from: &buf), 
-                includedEventCount: FfiConverterUInt32.read(from: &buf), 
-                includedTranscriptCount: FfiConverterUInt32.read(from: &buf), 
+                success: FfiConverterBool.read(from: &buf),
+                bundlePath: FfiConverterString.read(from: &buf),
+                message: FfiConverterString.read(from: &buf),
+                includedEventCount: FfiConverterUInt32.read(from: &buf),
+                includedTranscriptCount: FfiConverterUInt32.read(from: &buf),
                 redactedPathsCount: FfiConverterUInt32.read(from: &buf)
         )
     }
@@ -2083,7 +2083,7 @@ public struct DiagnosticsRetentionStatus: Equatable, Hashable {
         self.lastPrunedAt = lastPrunedAt
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -2097,11 +2097,11 @@ public struct FfiConverterTypeDiagnosticsRetentionStatus: FfiConverterRustBuffer
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiagnosticsRetentionStatus {
         return
             try DiagnosticsRetentionStatus(
-                retainedDays: FfiConverterUInt32.read(from: &buf), 
-                maxStorageMb: FfiConverterUInt32.read(from: &buf), 
-                maxPayloadBytes: FfiConverterUInt32.read(from: &buf), 
-                eventCount: FfiConverterUInt32.read(from: &buf), 
-                estimatedStorageBytes: FfiConverterUInt64.read(from: &buf), 
+                retainedDays: FfiConverterUInt32.read(from: &buf),
+                maxStorageMb: FfiConverterUInt32.read(from: &buf),
+                maxPayloadBytes: FfiConverterUInt32.read(from: &buf),
+                eventCount: FfiConverterUInt32.read(from: &buf),
+                estimatedStorageBytes: FfiConverterUInt64.read(from: &buf),
                 lastPrunedAt: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -2159,7 +2159,7 @@ public struct DiagnosticsSummary: Equatable, Hashable {
         self.retention = retention
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -2173,15 +2173,15 @@ public struct FfiConverterTypeDiagnosticsSummary: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiagnosticsSummary {
         return
             try DiagnosticsSummary(
-                totalCount: FfiConverterUInt32.read(from: &buf), 
-                warningCount: FfiConverterUInt32.read(from: &buf), 
-                errorCount: FfiConverterUInt32.read(from: &buf), 
-                criticalCount: FfiConverterUInt32.read(from: &buf), 
-                latestCriticalMessage: FfiConverterOptionString.read(from: &buf), 
-                latestEventTimestamp: FfiConverterOptionString.read(from: &buf), 
-                appReadiness: FfiConverterString.read(from: &buf), 
-                argyllVersion: FfiConverterString.read(from: &buf), 
-                argyllPathCategory: FfiConverterString.read(from: &buf), 
+                totalCount: FfiConverterUInt32.read(from: &buf),
+                warningCount: FfiConverterUInt32.read(from: &buf),
+                errorCount: FfiConverterUInt32.read(from: &buf),
+                criticalCount: FfiConverterUInt32.read(from: &buf),
+                latestCriticalMessage: FfiConverterOptionString.read(from: &buf),
+                latestEventTimestamp: FfiConverterOptionString.read(from: &buf),
+                appReadiness: FfiConverterString.read(from: &buf),
+                argyllVersion: FfiConverterString.read(from: &buf),
+                argyllPathCategory: FfiConverterString.read(from: &buf),
                 retention: FfiConverterTypeDiagnosticsRetentionStatus.read(from: &buf)
         )
     }
@@ -2233,7 +2233,7 @@ public struct EngineConfig: Equatable, Hashable {
         self.additionalSearchRoots = additionalSearchRoots
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -2247,10 +2247,10 @@ public struct FfiConverterTypeEngineConfig: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EngineConfig {
         return
             try EngineConfig(
-                appSupportPath: FfiConverterString.read(from: &buf), 
-                databasePath: FfiConverterString.read(from: &buf), 
-                logPath: FfiConverterString.read(from: &buf), 
-                argyllOverridePath: FfiConverterOptionString.read(from: &buf), 
+                appSupportPath: FfiConverterString.read(from: &buf),
+                databasePath: FfiConverterString.read(from: &buf),
+                logPath: FfiConverterString.read(from: &buf),
+                argyllOverridePath: FfiConverterOptionString.read(from: &buf),
                 additionalSearchRoots: FfiConverterSequenceString.read(from: &buf)
         )
     }
@@ -2293,7 +2293,7 @@ public struct InstrumentStatus: Equatable, Hashable {
         self.detail = detail
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -2307,8 +2307,8 @@ public struct FfiConverterTypeInstrumentStatus: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> InstrumentStatus {
         return
             try InstrumentStatus(
-                state: FfiConverterTypeInstrumentConnectionState.read(from: &buf), 
-                label: FfiConverterString.read(from: &buf), 
+                state: FfiConverterTypeInstrumentConnectionState.read(from: &buf),
+                label: FfiConverterString.read(from: &buf),
                 detail: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -2359,7 +2359,7 @@ public struct JobArtifactRecord: Equatable, Hashable {
         self.updatedAt = updatedAt
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -2373,13 +2373,13 @@ public struct FfiConverterTypeJobArtifactRecord: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> JobArtifactRecord {
         return
             try JobArtifactRecord(
-                id: FfiConverterString.read(from: &buf), 
-                stage: FfiConverterTypeWorkflowStage.read(from: &buf), 
-                kind: FfiConverterTypeArtifactKind.read(from: &buf), 
-                label: FfiConverterString.read(from: &buf), 
-                status: FfiConverterString.read(from: &buf), 
-                path: FfiConverterOptionString.read(from: &buf), 
-                createdAt: FfiConverterString.read(from: &buf), 
+                id: FfiConverterString.read(from: &buf),
+                stage: FfiConverterTypeWorkflowStage.read(from: &buf),
+                kind: FfiConverterTypeArtifactKind.read(from: &buf),
+                label: FfiConverterString.read(from: &buf),
+                status: FfiConverterString.read(from: &buf),
+                path: FfiConverterOptionString.read(from: &buf),
+                createdAt: FfiConverterString.read(from: &buf),
                 updatedAt: FfiConverterString.read(from: &buf)
         )
     }
@@ -2431,7 +2431,7 @@ public struct JobCommandEventRecord: Equatable, Hashable {
         self.timestamp = timestamp
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -2445,11 +2445,11 @@ public struct FfiConverterTypeJobCommandEventRecord: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> JobCommandEventRecord {
         return
             try JobCommandEventRecord(
-                id: FfiConverterString.read(from: &buf), 
-                commandId: FfiConverterString.read(from: &buf), 
-                stream: FfiConverterTypeCommandStream.read(from: &buf), 
-                lineNumber: FfiConverterUInt32.read(from: &buf), 
-                message: FfiConverterString.read(from: &buf), 
+                id: FfiConverterString.read(from: &buf),
+                commandId: FfiConverterString.read(from: &buf),
+                stream: FfiConverterTypeCommandStream.read(from: &buf),
+                lineNumber: FfiConverterUInt32.read(from: &buf),
+                message: FfiConverterString.read(from: &buf),
                 timestamp: FfiConverterString.read(from: &buf)
         )
     }
@@ -2505,7 +2505,7 @@ public struct JobCommandRecord: Equatable, Hashable {
         self.events = events
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -2519,14 +2519,14 @@ public struct FfiConverterTypeJobCommandRecord: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> JobCommandRecord {
         return
             try JobCommandRecord(
-                id: FfiConverterString.read(from: &buf), 
-                stage: FfiConverterTypeWorkflowStage.read(from: &buf), 
-                label: FfiConverterString.read(from: &buf), 
-                argv: FfiConverterSequenceString.read(from: &buf), 
-                state: FfiConverterTypeCommandRunState.read(from: &buf), 
-                exitCode: FfiConverterOptionInt32.read(from: &buf), 
-                startedAt: FfiConverterOptionString.read(from: &buf), 
-                finishedAt: FfiConverterOptionString.read(from: &buf), 
+                id: FfiConverterString.read(from: &buf),
+                stage: FfiConverterTypeWorkflowStage.read(from: &buf),
+                label: FfiConverterString.read(from: &buf),
+                argv: FfiConverterSequenceString.read(from: &buf),
+                state: FfiConverterTypeCommandRunState.read(from: &buf),
+                exitCode: FfiConverterOptionInt32.read(from: &buf),
+                startedAt: FfiConverterOptionString.read(from: &buf),
+                finishedAt: FfiConverterOptionString.read(from: &buf),
                 events: FfiConverterSequenceTypeJobCommandEventRecord.read(from: &buf)
         )
     }
@@ -2575,7 +2575,7 @@ public struct LogEntry: Equatable, Hashable {
         self.source = source
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -2589,9 +2589,9 @@ public struct FfiConverterTypeLogEntry: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> LogEntry {
         return
             try LogEntry(
-                timestamp: FfiConverterString.read(from: &buf), 
-                level: FfiConverterString.read(from: &buf), 
-                message: FfiConverterString.read(from: &buf), 
+                timestamp: FfiConverterString.read(from: &buf),
+                level: FfiConverterString.read(from: &buf),
+                message: FfiConverterString.read(from: &buf),
                 source: FfiConverterString.read(from: &buf)
         )
     }
@@ -2633,7 +2633,7 @@ public struct MeasurementStatusRecord: Equatable, Hashable {
         self.hasMeasurementCheckpoint = hasMeasurementCheckpoint
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -2647,8 +2647,8 @@ public struct FfiConverterTypeMeasurementStatusRecord: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MeasurementStatusRecord {
         return
             try MeasurementStatusRecord(
-                measurementSourcePath: FfiConverterOptionString.read(from: &buf), 
-                scanFilePath: FfiConverterOptionString.read(from: &buf), 
+                measurementSourcePath: FfiConverterOptionString.read(from: &buf),
+                scanFilePath: FfiConverterOptionString.read(from: &buf),
                 hasMeasurementCheckpoint: FfiConverterBool.read(from: &buf)
         )
     }
@@ -2711,7 +2711,7 @@ public struct NewProfileContextRecord: Equatable, Hashable {
         self.measurementMode = measurementMode
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -2725,19 +2725,19 @@ public struct FfiConverterTypeNewProfileContextRecord: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> NewProfileContextRecord {
         return
             try NewProfileContextRecord(
-                printerPaperPresetId: FfiConverterOptionString.read(from: &buf), 
-                printPath: FfiConverterString.read(from: &buf), 
-                mediaSetting: FfiConverterString.read(from: &buf), 
-                qualityMode: FfiConverterString.read(from: &buf), 
-                colorantFamily: FfiConverterTypeColorantFamily.read(from: &buf), 
-                channelCount: FfiConverterUInt32.read(from: &buf), 
-                channelLabels: FfiConverterSequenceString.read(from: &buf), 
-                totalInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf), 
-                blackInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf), 
-                printPathNotes: FfiConverterString.read(from: &buf), 
-                measurementNotes: FfiConverterString.read(from: &buf), 
-                measurementObserver: FfiConverterString.read(from: &buf), 
-                measurementIlluminant: FfiConverterString.read(from: &buf), 
+                printerPaperPresetId: FfiConverterOptionString.read(from: &buf),
+                printPath: FfiConverterString.read(from: &buf),
+                mediaSetting: FfiConverterString.read(from: &buf),
+                qualityMode: FfiConverterString.read(from: &buf),
+                colorantFamily: FfiConverterTypeColorantFamily.read(from: &buf),
+                channelCount: FfiConverterUInt32.read(from: &buf),
+                channelLabels: FfiConverterSequenceString.read(from: &buf),
+                totalInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf),
+                blackInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf),
+                printPathNotes: FfiConverterString.read(from: &buf),
+                measurementNotes: FfiConverterString.read(from: &buf),
+                measurementObserver: FfiConverterString.read(from: &buf),
+                measurementIlluminant: FfiConverterString.read(from: &buf),
                 measurementMode: FfiConverterTypeMeasurementMode.read(from: &buf)
         )
     }
@@ -2827,7 +2827,7 @@ public struct NewProfileJobDetail: Equatable, Hashable {
         self.isCommandRunning = isCommandRunning
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -2841,27 +2841,27 @@ public struct FfiConverterTypeNewProfileJobDetail: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> NewProfileJobDetail {
         return
             try NewProfileJobDetail(
-                id: FfiConverterString.read(from: &buf), 
-                title: FfiConverterString.read(from: &buf), 
-                status: FfiConverterString.read(from: &buf), 
-                stage: FfiConverterTypeWorkflowStage.read(from: &buf), 
-                nextAction: FfiConverterString.read(from: &buf), 
-                profileName: FfiConverterString.read(from: &buf), 
-                printerName: FfiConverterString.read(from: &buf), 
-                paperName: FfiConverterString.read(from: &buf), 
-                workspacePath: FfiConverterString.read(from: &buf), 
-                printer: FfiConverterOptionTypePrinterRecord.read(from: &buf), 
-                paper: FfiConverterOptionTypePaperRecord.read(from: &buf), 
-                context: FfiConverterTypeNewProfileContextRecord.read(from: &buf), 
-                targetSettings: FfiConverterTypeTargetSettingsRecord.read(from: &buf), 
-                printSettings: FfiConverterTypePrintSettingsRecord.read(from: &buf), 
-                measurement: FfiConverterTypeMeasurementStatusRecord.read(from: &buf), 
-                latestError: FfiConverterOptionString.read(from: &buf), 
-                publishedProfileId: FfiConverterOptionString.read(from: &buf), 
-                review: FfiConverterOptionTypeReviewSummaryRecord.read(from: &buf), 
-                stageTimeline: FfiConverterSequenceTypeWorkflowStageSummary.read(from: &buf), 
-                artifacts: FfiConverterSequenceTypeJobArtifactRecord.read(from: &buf), 
-                commands: FfiConverterSequenceTypeJobCommandRecord.read(from: &buf), 
+                id: FfiConverterString.read(from: &buf),
+                title: FfiConverterString.read(from: &buf),
+                status: FfiConverterString.read(from: &buf),
+                stage: FfiConverterTypeWorkflowStage.read(from: &buf),
+                nextAction: FfiConverterString.read(from: &buf),
+                profileName: FfiConverterString.read(from: &buf),
+                printerName: FfiConverterString.read(from: &buf),
+                paperName: FfiConverterString.read(from: &buf),
+                workspacePath: FfiConverterString.read(from: &buf),
+                printer: FfiConverterOptionTypePrinterRecord.read(from: &buf),
+                paper: FfiConverterOptionTypePaperRecord.read(from: &buf),
+                context: FfiConverterTypeNewProfileContextRecord.read(from: &buf),
+                targetSettings: FfiConverterTypeTargetSettingsRecord.read(from: &buf),
+                printSettings: FfiConverterTypePrintSettingsRecord.read(from: &buf),
+                measurement: FfiConverterTypeMeasurementStatusRecord.read(from: &buf),
+                latestError: FfiConverterOptionString.read(from: &buf),
+                publishedProfileId: FfiConverterOptionString.read(from: &buf),
+                review: FfiConverterOptionTypeReviewSummaryRecord.read(from: &buf),
+                stageTimeline: FfiConverterSequenceTypeWorkflowStageSummary.read(from: &buf),
+                artifacts: FfiConverterSequenceTypeJobArtifactRecord.read(from: &buf),
+                commands: FfiConverterSequenceTypeJobCommandRecord.read(from: &buf),
                 isCommandRunning: FfiConverterBool.read(from: &buf)
         )
     }
@@ -2953,7 +2953,7 @@ public struct PaperRecord: Equatable, Hashable {
         self.updatedAt = updatedAt
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -2967,24 +2967,24 @@ public struct FfiConverterTypePaperRecord: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PaperRecord {
         return
             try PaperRecord(
-                id: FfiConverterString.read(from: &buf), 
-                manufacturer: FfiConverterString.read(from: &buf), 
-                paperLine: FfiConverterString.read(from: &buf), 
-                surfaceClass: FfiConverterString.read(from: &buf), 
-                basisWeightValue: FfiConverterString.read(from: &buf), 
-                basisWeightUnit: FfiConverterTypePaperWeightUnit.read(from: &buf), 
-                thicknessValue: FfiConverterString.read(from: &buf), 
-                thicknessUnit: FfiConverterTypePaperThicknessUnit.read(from: &buf), 
-                surfaceTexture: FfiConverterString.read(from: &buf), 
-                baseMaterial: FfiConverterString.read(from: &buf), 
-                mediaColor: FfiConverterString.read(from: &buf), 
-                opacity: FfiConverterString.read(from: &buf), 
-                whiteness: FfiConverterString.read(from: &buf), 
-                obaContent: FfiConverterString.read(from: &buf), 
-                inkCompatibility: FfiConverterString.read(from: &buf), 
-                notes: FfiConverterString.read(from: &buf), 
-                displayName: FfiConverterString.read(from: &buf), 
-                createdAt: FfiConverterString.read(from: &buf), 
+                id: FfiConverterString.read(from: &buf),
+                manufacturer: FfiConverterString.read(from: &buf),
+                paperLine: FfiConverterString.read(from: &buf),
+                surfaceClass: FfiConverterString.read(from: &buf),
+                basisWeightValue: FfiConverterString.read(from: &buf),
+                basisWeightUnit: FfiConverterTypePaperWeightUnit.read(from: &buf),
+                thicknessValue: FfiConverterString.read(from: &buf),
+                thicknessUnit: FfiConverterTypePaperThicknessUnit.read(from: &buf),
+                surfaceTexture: FfiConverterString.read(from: &buf),
+                baseMaterial: FfiConverterString.read(from: &buf),
+                mediaColor: FfiConverterString.read(from: &buf),
+                opacity: FfiConverterString.read(from: &buf),
+                whiteness: FfiConverterString.read(from: &buf),
+                obaContent: FfiConverterString.read(from: &buf),
+                inkCompatibility: FfiConverterString.read(from: &buf),
+                notes: FfiConverterString.read(from: &buf),
+                displayName: FfiConverterString.read(from: &buf),
+                createdAt: FfiConverterString.read(from: &buf),
                 updatedAt: FfiConverterString.read(from: &buf)
         )
     }
@@ -3043,7 +3043,7 @@ public struct PrintSettingsRecord: Equatable, Hashable {
         self.dryingReadyAt = dryingReadyAt
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -3057,9 +3057,9 @@ public struct FfiConverterTypePrintSettingsRecord: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PrintSettingsRecord {
         return
             try PrintSettingsRecord(
-                printWithoutColorManagement: FfiConverterBool.read(from: &buf), 
-                dryingTimeMinutes: FfiConverterUInt32.read(from: &buf), 
-                printedAt: FfiConverterOptionString.read(from: &buf), 
+                printWithoutColorManagement: FfiConverterBool.read(from: &buf),
+                dryingTimeMinutes: FfiConverterUInt32.read(from: &buf),
+                printedAt: FfiConverterOptionString.read(from: &buf),
                 dryingReadyAt: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -3121,7 +3121,7 @@ public struct PrinterPaperPresetRecord: Equatable, Hashable {
         self.updatedAt = updatedAt
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -3135,18 +3135,18 @@ public struct FfiConverterTypePrinterPaperPresetRecord: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PrinterPaperPresetRecord {
         return
             try PrinterPaperPresetRecord(
-                id: FfiConverterString.read(from: &buf), 
-                printerId: FfiConverterString.read(from: &buf), 
-                paperId: FfiConverterString.read(from: &buf), 
-                label: FfiConverterString.read(from: &buf), 
-                printPath: FfiConverterString.read(from: &buf), 
-                mediaSetting: FfiConverterString.read(from: &buf), 
-                qualityMode: FfiConverterString.read(from: &buf), 
-                totalInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf), 
-                blackInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf), 
-                notes: FfiConverterString.read(from: &buf), 
-                displayName: FfiConverterString.read(from: &buf), 
-                createdAt: FfiConverterString.read(from: &buf), 
+                id: FfiConverterString.read(from: &buf),
+                printerId: FfiConverterString.read(from: &buf),
+                paperId: FfiConverterString.read(from: &buf),
+                label: FfiConverterString.read(from: &buf),
+                printPath: FfiConverterString.read(from: &buf),
+                mediaSetting: FfiConverterString.read(from: &buf),
+                qualityMode: FfiConverterString.read(from: &buf),
+                totalInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf),
+                blackInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf),
+                notes: FfiConverterString.read(from: &buf),
+                displayName: FfiConverterString.read(from: &buf),
+                createdAt: FfiConverterString.read(from: &buf),
                 updatedAt: FfiConverterString.read(from: &buf)
         )
     }
@@ -3219,7 +3219,7 @@ public struct PrinterProfileRecord: Equatable, Hashable {
         self.updatedAt = updatedAt
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -3233,19 +3233,19 @@ public struct FfiConverterTypePrinterProfileRecord: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PrinterProfileRecord {
         return
             try PrinterProfileRecord(
-                id: FfiConverterString.read(from: &buf), 
-                name: FfiConverterString.read(from: &buf), 
-                printerName: FfiConverterString.read(from: &buf), 
-                paperName: FfiConverterString.read(from: &buf), 
-                contextStatus: FfiConverterString.read(from: &buf), 
-                profilePath: FfiConverterString.read(from: &buf), 
-                measurementPath: FfiConverterString.read(from: &buf), 
-                printSettings: FfiConverterString.read(from: &buf), 
-                verifiedAgainstFile: FfiConverterString.read(from: &buf), 
-                result: FfiConverterString.read(from: &buf), 
-                lastVerificationDate: FfiConverterOptionString.read(from: &buf), 
-                createdFromJobId: FfiConverterString.read(from: &buf), 
-                createdAt: FfiConverterString.read(from: &buf), 
+                id: FfiConverterString.read(from: &buf),
+                name: FfiConverterString.read(from: &buf),
+                printerName: FfiConverterString.read(from: &buf),
+                paperName: FfiConverterString.read(from: &buf),
+                contextStatus: FfiConverterString.read(from: &buf),
+                profilePath: FfiConverterString.read(from: &buf),
+                measurementPath: FfiConverterString.read(from: &buf),
+                printSettings: FfiConverterString.read(from: &buf),
+                verifiedAgainstFile: FfiConverterString.read(from: &buf),
+                result: FfiConverterString.read(from: &buf),
+                lastVerificationDate: FfiConverterOptionString.read(from: &buf),
+                createdFromJobId: FfiConverterString.read(from: &buf),
+                createdAt: FfiConverterString.read(from: &buf),
                 updatedAt: FfiConverterString.read(from: &buf)
         )
     }
@@ -3321,7 +3321,7 @@ public struct PrinterRecord: Equatable, Hashable {
         self.updatedAt = updatedAt
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -3335,20 +3335,20 @@ public struct FfiConverterTypePrinterRecord: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PrinterRecord {
         return
             try PrinterRecord(
-                id: FfiConverterString.read(from: &buf), 
-                manufacturer: FfiConverterString.read(from: &buf), 
-                model: FfiConverterString.read(from: &buf), 
-                nickname: FfiConverterString.read(from: &buf), 
-                transportStyle: FfiConverterString.read(from: &buf), 
-                colorantFamily: FfiConverterTypeColorantFamily.read(from: &buf), 
-                channelCount: FfiConverterUInt32.read(from: &buf), 
-                channelLabels: FfiConverterSequenceString.read(from: &buf), 
-                supportedMediaSettings: FfiConverterSequenceString.read(from: &buf), 
-                supportedQualityModes: FfiConverterSequenceString.read(from: &buf), 
-                monochromePathNotes: FfiConverterString.read(from: &buf), 
-                notes: FfiConverterString.read(from: &buf), 
-                displayName: FfiConverterString.read(from: &buf), 
-                createdAt: FfiConverterString.read(from: &buf), 
+                id: FfiConverterString.read(from: &buf),
+                manufacturer: FfiConverterString.read(from: &buf),
+                model: FfiConverterString.read(from: &buf),
+                nickname: FfiConverterString.read(from: &buf),
+                transportStyle: FfiConverterString.read(from: &buf),
+                colorantFamily: FfiConverterTypeColorantFamily.read(from: &buf),
+                channelCount: FfiConverterUInt32.read(from: &buf),
+                channelLabels: FfiConverterSequenceString.read(from: &buf),
+                supportedMediaSettings: FfiConverterSequenceString.read(from: &buf),
+                supportedQualityModes: FfiConverterSequenceString.read(from: &buf),
+                monochromePathNotes: FfiConverterString.read(from: &buf),
+                notes: FfiConverterString.read(from: &buf),
+                displayName: FfiConverterString.read(from: &buf),
+                createdAt: FfiConverterString.read(from: &buf),
                 updatedAt: FfiConverterString.read(from: &buf)
         )
     }
@@ -3409,7 +3409,7 @@ public struct ReviewSummaryRecord: Equatable, Hashable {
         self.notes = notes
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -3423,12 +3423,12 @@ public struct FfiConverterTypeReviewSummaryRecord: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ReviewSummaryRecord {
         return
             try ReviewSummaryRecord(
-                result: FfiConverterString.read(from: &buf), 
-                verifiedAgainstFile: FfiConverterString.read(from: &buf), 
-                printSettings: FfiConverterString.read(from: &buf), 
-                lastVerificationDate: FfiConverterOptionString.read(from: &buf), 
-                averageDe00: FfiConverterOptionDouble.read(from: &buf), 
-                maximumDe00: FfiConverterOptionDouble.read(from: &buf), 
+                result: FfiConverterString.read(from: &buf),
+                verifiedAgainstFile: FfiConverterString.read(from: &buf),
+                printSettings: FfiConverterString.read(from: &buf),
+                lastVerificationDate: FfiConverterOptionString.read(from: &buf),
+                averageDe00: FfiConverterOptionDouble.read(from: &buf),
+                maximumDe00: FfiConverterOptionDouble.read(from: &buf),
                 notes: FfiConverterString.read(from: &buf)
         )
     }
@@ -3493,7 +3493,7 @@ public struct SaveNewProfileContextInput: Equatable, Hashable {
         self.measurementMode = measurementMode
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -3507,18 +3507,18 @@ public struct FfiConverterTypeSaveNewProfileContextInput: FfiConverterRustBuffer
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SaveNewProfileContextInput {
         return
             try SaveNewProfileContextInput(
-                jobId: FfiConverterString.read(from: &buf), 
-                profileName: FfiConverterString.read(from: &buf), 
-                printerId: FfiConverterOptionString.read(from: &buf), 
-                paperId: FfiConverterOptionString.read(from: &buf), 
-                printerPaperPresetId: FfiConverterOptionString.read(from: &buf), 
-                printPath: FfiConverterString.read(from: &buf), 
-                mediaSetting: FfiConverterString.read(from: &buf), 
-                qualityMode: FfiConverterString.read(from: &buf), 
-                printPathNotes: FfiConverterString.read(from: &buf), 
-                measurementNotes: FfiConverterString.read(from: &buf), 
-                measurementObserver: FfiConverterString.read(from: &buf), 
-                measurementIlluminant: FfiConverterString.read(from: &buf), 
+                jobId: FfiConverterString.read(from: &buf),
+                profileName: FfiConverterString.read(from: &buf),
+                printerId: FfiConverterOptionString.read(from: &buf),
+                paperId: FfiConverterOptionString.read(from: &buf),
+                printerPaperPresetId: FfiConverterOptionString.read(from: &buf),
+                printPath: FfiConverterString.read(from: &buf),
+                mediaSetting: FfiConverterString.read(from: &buf),
+                qualityMode: FfiConverterString.read(from: &buf),
+                printPathNotes: FfiConverterString.read(from: &buf),
+                measurementNotes: FfiConverterString.read(from: &buf),
+                measurementObserver: FfiConverterString.read(from: &buf),
+                measurementIlluminant: FfiConverterString.read(from: &buf),
                 measurementMode: FfiConverterTypeMeasurementMode.read(from: &buf)
         )
     }
@@ -3569,7 +3569,7 @@ public struct SavePrintSettingsInput: Equatable, Hashable {
         self.dryingTimeMinutes = dryingTimeMinutes
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -3583,8 +3583,8 @@ public struct FfiConverterTypeSavePrintSettingsInput: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SavePrintSettingsInput {
         return
             try SavePrintSettingsInput(
-                jobId: FfiConverterString.read(from: &buf), 
-                printWithoutColorManagement: FfiConverterBool.read(from: &buf), 
+                jobId: FfiConverterString.read(from: &buf),
+                printWithoutColorManagement: FfiConverterBool.read(from: &buf),
                 dryingTimeMinutes: FfiConverterUInt32.read(from: &buf)
         )
     }
@@ -3629,7 +3629,7 @@ public struct SaveTargetSettingsInput: Equatable, Hashable {
         self.planningProfileId = planningProfileId
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -3643,10 +3643,10 @@ public struct FfiConverterTypeSaveTargetSettingsInput: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SaveTargetSettingsInput {
         return
             try SaveTargetSettingsInput(
-                jobId: FfiConverterString.read(from: &buf), 
-                patchCount: FfiConverterUInt32.read(from: &buf), 
-                improveNeutrals: FfiConverterBool.read(from: &buf), 
-                useExistingProfileToHelpTargetPlanning: FfiConverterBool.read(from: &buf), 
+                jobId: FfiConverterString.read(from: &buf),
+                patchCount: FfiConverterUInt32.read(from: &buf),
+                improveNeutrals: FfiConverterBool.read(from: &buf),
+                useExistingProfileToHelpTargetPlanning: FfiConverterBool.read(from: &buf),
                 planningProfileId: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -3687,7 +3687,7 @@ public struct StartMeasurementInput: Equatable, Hashable {
         self.scanFilePath = scanFilePath
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -3701,7 +3701,7 @@ public struct FfiConverterTypeStartMeasurementInput: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> StartMeasurementInput {
         return
             try StartMeasurementInput(
-                jobId: FfiConverterString.read(from: &buf), 
+                jobId: FfiConverterString.read(from: &buf),
                 scanFilePath: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -3745,7 +3745,7 @@ public struct TargetSettingsRecord: Equatable, Hashable {
         self.planningProfileName = planningProfileName
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -3759,10 +3759,10 @@ public struct FfiConverterTypeTargetSettingsRecord: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> TargetSettingsRecord {
         return
             try TargetSettingsRecord(
-                patchCount: FfiConverterUInt32.read(from: &buf), 
-                improveNeutrals: FfiConverterBool.read(from: &buf), 
-                useExistingProfileToHelpTargetPlanning: FfiConverterBool.read(from: &buf), 
-                planningProfileId: FfiConverterOptionString.read(from: &buf), 
+                patchCount: FfiConverterUInt32.read(from: &buf),
+                improveNeutrals: FfiConverterBool.read(from: &buf),
+                useExistingProfileToHelpTargetPlanning: FfiConverterBool.read(from: &buf),
+                planningProfileId: FfiConverterOptionString.read(from: &buf),
                 planningProfileName: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -3811,7 +3811,7 @@ public struct ToolchainStatus: Equatable, Hashable {
         self.lastValidationTime = lastValidationTime
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -3825,11 +3825,11 @@ public struct FfiConverterTypeToolchainStatus: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ToolchainStatus {
         return
             try ToolchainStatus(
-                state: FfiConverterTypeToolchainState.read(from: &buf), 
-                resolvedInstallPath: FfiConverterOptionString.read(from: &buf), 
-                discoveredExecutables: FfiConverterSequenceString.read(from: &buf), 
-                missingExecutables: FfiConverterSequenceString.read(from: &buf), 
-                argyllVersion: FfiConverterOptionString.read(from: &buf), 
+                state: FfiConverterTypeToolchainState.read(from: &buf),
+                resolvedInstallPath: FfiConverterOptionString.read(from: &buf),
+                discoveredExecutables: FfiConverterSequenceString.read(from: &buf),
+                missingExecutables: FfiConverterSequenceString.read(from: &buf),
+                argyllVersion: FfiConverterOptionString.read(from: &buf),
                 lastValidationTime: FfiConverterOptionString.read(from: &buf)
         )
     }
@@ -3899,7 +3899,7 @@ public struct UpdatePaperInput: Equatable, Hashable {
         self.notes = notes
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -3913,21 +3913,21 @@ public struct FfiConverterTypeUpdatePaperInput: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UpdatePaperInput {
         return
             try UpdatePaperInput(
-                id: FfiConverterString.read(from: &buf), 
-                manufacturer: FfiConverterString.read(from: &buf), 
-                paperLine: FfiConverterString.read(from: &buf), 
-                surfaceClass: FfiConverterString.read(from: &buf), 
-                basisWeightValue: FfiConverterString.read(from: &buf), 
-                basisWeightUnit: FfiConverterTypePaperWeightUnit.read(from: &buf), 
-                thicknessValue: FfiConverterString.read(from: &buf), 
-                thicknessUnit: FfiConverterTypePaperThicknessUnit.read(from: &buf), 
-                surfaceTexture: FfiConverterString.read(from: &buf), 
-                baseMaterial: FfiConverterString.read(from: &buf), 
-                mediaColor: FfiConverterString.read(from: &buf), 
-                opacity: FfiConverterString.read(from: &buf), 
-                whiteness: FfiConverterString.read(from: &buf), 
-                obaContent: FfiConverterString.read(from: &buf), 
-                inkCompatibility: FfiConverterString.read(from: &buf), 
+                id: FfiConverterString.read(from: &buf),
+                manufacturer: FfiConverterString.read(from: &buf),
+                paperLine: FfiConverterString.read(from: &buf),
+                surfaceClass: FfiConverterString.read(from: &buf),
+                basisWeightValue: FfiConverterString.read(from: &buf),
+                basisWeightUnit: FfiConverterTypePaperWeightUnit.read(from: &buf),
+                thicknessValue: FfiConverterString.read(from: &buf),
+                thicknessUnit: FfiConverterTypePaperThicknessUnit.read(from: &buf),
+                surfaceTexture: FfiConverterString.read(from: &buf),
+                baseMaterial: FfiConverterString.read(from: &buf),
+                mediaColor: FfiConverterString.read(from: &buf),
+                opacity: FfiConverterString.read(from: &buf),
+                whiteness: FfiConverterString.read(from: &buf),
+                obaContent: FfiConverterString.read(from: &buf),
+                inkCompatibility: FfiConverterString.read(from: &buf),
                 notes: FfiConverterString.read(from: &buf)
         )
     }
@@ -3999,7 +3999,7 @@ public struct UpdatePrinterInput: Equatable, Hashable {
         self.notes = notes
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -4013,17 +4013,17 @@ public struct FfiConverterTypeUpdatePrinterInput: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UpdatePrinterInput {
         return
             try UpdatePrinterInput(
-                id: FfiConverterString.read(from: &buf), 
-                manufacturer: FfiConverterString.read(from: &buf), 
-                model: FfiConverterString.read(from: &buf), 
-                nickname: FfiConverterString.read(from: &buf), 
-                transportStyle: FfiConverterString.read(from: &buf), 
-                colorantFamily: FfiConverterTypeColorantFamily.read(from: &buf), 
-                channelCount: FfiConverterUInt32.read(from: &buf), 
-                channelLabels: FfiConverterSequenceString.read(from: &buf), 
-                supportedMediaSettings: FfiConverterSequenceString.read(from: &buf), 
-                supportedQualityModes: FfiConverterSequenceString.read(from: &buf), 
-                monochromePathNotes: FfiConverterString.read(from: &buf), 
+                id: FfiConverterString.read(from: &buf),
+                manufacturer: FfiConverterString.read(from: &buf),
+                model: FfiConverterString.read(from: &buf),
+                nickname: FfiConverterString.read(from: &buf),
+                transportStyle: FfiConverterString.read(from: &buf),
+                colorantFamily: FfiConverterTypeColorantFamily.read(from: &buf),
+                channelCount: FfiConverterUInt32.read(from: &buf),
+                channelLabels: FfiConverterSequenceString.read(from: &buf),
+                supportedMediaSettings: FfiConverterSequenceString.read(from: &buf),
+                supportedQualityModes: FfiConverterSequenceString.read(from: &buf),
+                monochromePathNotes: FfiConverterString.read(from: &buf),
                 notes: FfiConverterString.read(from: &buf)
         )
     }
@@ -4087,7 +4087,7 @@ public struct UpdatePrinterPaperPresetInput: Equatable, Hashable {
         self.notes = notes
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -4101,15 +4101,15 @@ public struct FfiConverterTypeUpdatePrinterPaperPresetInput: FfiConverterRustBuf
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UpdatePrinterPaperPresetInput {
         return
             try UpdatePrinterPaperPresetInput(
-                id: FfiConverterString.read(from: &buf), 
-                printerId: FfiConverterString.read(from: &buf), 
-                paperId: FfiConverterString.read(from: &buf), 
-                label: FfiConverterString.read(from: &buf), 
-                printPath: FfiConverterString.read(from: &buf), 
-                mediaSetting: FfiConverterString.read(from: &buf), 
-                qualityMode: FfiConverterString.read(from: &buf), 
-                totalInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf), 
-                blackInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf), 
+                id: FfiConverterString.read(from: &buf),
+                printerId: FfiConverterString.read(from: &buf),
+                paperId: FfiConverterString.read(from: &buf),
+                label: FfiConverterString.read(from: &buf),
+                printPath: FfiConverterString.read(from: &buf),
+                mediaSetting: FfiConverterString.read(from: &buf),
+                qualityMode: FfiConverterString.read(from: &buf),
+                totalInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf),
+                blackInkLimitPercent: FfiConverterOptionUInt32.read(from: &buf),
                 notes: FfiConverterString.read(from: &buf)
         )
     }
@@ -4157,7 +4157,7 @@ public struct WorkflowStageSummary: Equatable, Hashable {
         self.state = state
     }
 
-    
+
 }
 
 #if compiler(>=6)
@@ -4171,8 +4171,8 @@ public struct FfiConverterTypeWorkflowStageSummary: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> WorkflowStageSummary {
         return
             try WorkflowStageSummary(
-                stage: FfiConverterTypeWorkflowStage.read(from: &buf), 
-                title: FfiConverterString.read(from: &buf), 
+                stage: FfiConverterTypeWorkflowStage.read(from: &buf),
+                title: FfiConverterString.read(from: &buf),
                 state: FfiConverterTypeWorkflowStageState.read(from: &buf)
         )
     }
@@ -4203,7 +4203,7 @@ public func FfiConverterTypeWorkflowStageSummary_lower(_ value: WorkflowStageSum
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum ArtifactKind: Equatable, Hashable {
-    
+
     case ti1
     case ti2
     case printableChart
@@ -4231,68 +4231,68 @@ public struct FfiConverterTypeArtifactKind: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ArtifactKind {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .ti1
-        
+
         case 2: return .ti2
-        
+
         case 3: return .printableChart
-        
+
         case 4: return .chartTemplate
-        
+
         case 5: return .measurement
-        
+
         case 6: return .iccProfile
-        
+
         case 7: return .verification
-        
+
         case 8: return .diagnostic
-        
+
         case 9: return .working
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: ArtifactKind, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .ti1:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .ti2:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .printableChart:
             writeInt(&buf, Int32(3))
-        
-        
+
+
         case .chartTemplate:
             writeInt(&buf, Int32(4))
-        
-        
+
+
         case .measurement:
             writeInt(&buf, Int32(5))
-        
-        
+
+
         case .iccProfile:
             writeInt(&buf, Int32(6))
-        
-        
+
+
         case .verification:
             writeInt(&buf, Int32(7))
-        
-        
+
+
         case .diagnostic:
             writeInt(&buf, Int32(8))
-        
-        
+
+
         case .working:
             writeInt(&buf, Int32(9))
-        
+
         }
     }
 }
@@ -4317,7 +4317,7 @@ public func FfiConverterTypeArtifactKind_lower(_ value: ArtifactKind) -> RustBuf
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum ColorantFamily: Equatable, Hashable {
-    
+
     case grayK
     case rgb
     case cmy
@@ -4341,44 +4341,44 @@ public struct FfiConverterTypeColorantFamily: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ColorantFamily {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .grayK
-        
+
         case 2: return .rgb
-        
+
         case 3: return .cmy
-        
+
         case 4: return .cmyk
-        
+
         case 5: return .extendedN
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: ColorantFamily, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .grayK:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .rgb:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .cmy:
             writeInt(&buf, Int32(3))
-        
-        
+
+
         case .cmyk:
             writeInt(&buf, Int32(4))
-        
-        
+
+
         case .extendedN:
             writeInt(&buf, Int32(5))
-        
+
         }
     }
 }
@@ -4403,7 +4403,7 @@ public func FfiConverterTypeColorantFamily_lower(_ value: ColorantFamily) -> Rus
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum CommandRunState: Equatable, Hashable {
-    
+
     case running
     case succeeded
     case failed
@@ -4425,32 +4425,32 @@ public struct FfiConverterTypeCommandRunState: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CommandRunState {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .running
-        
+
         case 2: return .succeeded
-        
+
         case 3: return .failed
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: CommandRunState, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .running:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .succeeded:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .failed:
             writeInt(&buf, Int32(3))
-        
+
         }
     }
 }
@@ -4475,7 +4475,7 @@ public func FfiConverterTypeCommandRunState_lower(_ value: CommandRunState) -> R
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum CommandStream: Equatable, Hashable {
-    
+
     case stdout
     case stderr
     case system
@@ -4497,32 +4497,32 @@ public struct FfiConverterTypeCommandStream: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CommandStream {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .stdout
-        
+
         case 2: return .stderr
-        
+
         case 3: return .system
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: CommandStream, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .stdout:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .stderr:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .system:
             writeInt(&buf, Int32(3))
-        
+
         }
     }
 }
@@ -4547,7 +4547,7 @@ public func FfiConverterTypeCommandStream_lower(_ value: CommandStream) -> RustB
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum DiagnosticCategory: Equatable, Hashable {
-    
+
     case app
     case ui
     case workflow
@@ -4575,68 +4575,68 @@ public struct FfiConverterTypeDiagnosticCategory: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiagnosticCategory {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .app
-        
+
         case 2: return .ui
-        
+
         case 3: return .workflow
-        
+
         case 4: return .engine
-        
+
         case 5: return .cli
-        
+
         case 6: return .database
-        
+
         case 7: return .toolchain
-        
+
         case 8: return .performance
-        
+
         case 9: return .environment
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: DiagnosticCategory, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .app:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .ui:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .workflow:
             writeInt(&buf, Int32(3))
-        
-        
+
+
         case .engine:
             writeInt(&buf, Int32(4))
-        
-        
+
+
         case .cli:
             writeInt(&buf, Int32(5))
-        
-        
+
+
         case .database:
             writeInt(&buf, Int32(6))
-        
-        
+
+
         case .toolchain:
             writeInt(&buf, Int32(7))
-        
-        
+
+
         case .performance:
             writeInt(&buf, Int32(8))
-        
-        
+
+
         case .environment:
             writeInt(&buf, Int32(9))
-        
+
         }
     }
 }
@@ -4661,7 +4661,7 @@ public func FfiConverterTypeDiagnosticCategory_lower(_ value: DiagnosticCategory
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum DiagnosticLevel: Equatable, Hashable {
-    
+
     case debug
     case info
     case warning
@@ -4685,44 +4685,44 @@ public struct FfiConverterTypeDiagnosticLevel: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiagnosticLevel {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .debug
-        
+
         case 2: return .info
-        
+
         case 3: return .warning
-        
+
         case 4: return .error
-        
+
         case 5: return .critical
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: DiagnosticLevel, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .debug:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .info:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .warning:
             writeInt(&buf, Int32(3))
-        
-        
+
+
         case .error:
             writeInt(&buf, Int32(4))
-        
-        
+
+
         case .critical:
             writeInt(&buf, Int32(5))
-        
+
         }
     }
 }
@@ -4747,7 +4747,7 @@ public func FfiConverterTypeDiagnosticLevel_lower(_ value: DiagnosticLevel) -> R
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum DiagnosticPrivacy: Equatable, Hashable {
-    
+
     case `public`
     case `internal`
     case sensitiveRedacted
@@ -4769,32 +4769,32 @@ public struct FfiConverterTypeDiagnosticPrivacy: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DiagnosticPrivacy {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .`public`
-        
+
         case 2: return .`internal`
-        
+
         case 3: return .sensitiveRedacted
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: DiagnosticPrivacy, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .`public`:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .`internal`:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .sensitiveRedacted:
             writeInt(&buf, Int32(3))
-        
+
         }
     }
 }
@@ -4819,7 +4819,7 @@ public func FfiConverterTypeDiagnosticPrivacy_lower(_ value: DiagnosticPrivacy) 
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum InstrumentConnectionState: Equatable, Hashable {
-    
+
     case connected
     case disconnected
     case attention
@@ -4841,32 +4841,32 @@ public struct FfiConverterTypeInstrumentConnectionState: FfiConverterRustBuffer 
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> InstrumentConnectionState {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .connected
-        
+
         case 2: return .disconnected
-        
+
         case 3: return .attention
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: InstrumentConnectionState, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .connected:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .disconnected:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .attention:
             writeInt(&buf, Int32(3))
-        
+
         }
     }
 }
@@ -4891,7 +4891,7 @@ public func FfiConverterTypeInstrumentConnectionState_lower(_ value: InstrumentC
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum MeasurementMode: Equatable, Hashable {
-    
+
     case strip
     case patch
     case scanFile
@@ -4913,32 +4913,32 @@ public struct FfiConverterTypeMeasurementMode: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MeasurementMode {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .strip
-        
+
         case 2: return .patch
-        
+
         case 3: return .scanFile
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: MeasurementMode, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .strip:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .patch:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .scanFile:
             writeInt(&buf, Int32(3))
-        
+
         }
     }
 }
@@ -4963,7 +4963,7 @@ public func FfiConverterTypeMeasurementMode_lower(_ value: MeasurementMode) -> R
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum PaperThicknessUnit: Equatable, Hashable {
-    
+
     case unspecified
     case mil
     case mm
@@ -4986,38 +4986,38 @@ public struct FfiConverterTypePaperThicknessUnit: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PaperThicknessUnit {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .unspecified
-        
+
         case 2: return .mil
-        
+
         case 3: return .mm
-        
+
         case 4: return .micron
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: PaperThicknessUnit, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .unspecified:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .mil:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .mm:
             writeInt(&buf, Int32(3))
-        
-        
+
+
         case .micron:
             writeInt(&buf, Int32(4))
-        
+
         }
     }
 }
@@ -5042,7 +5042,7 @@ public func FfiConverterTypePaperThicknessUnit_lower(_ value: PaperThicknessUnit
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum PaperWeightUnit: Equatable, Hashable {
-    
+
     case unspecified
     case gsm
     case lb
@@ -5064,32 +5064,32 @@ public struct FfiConverterTypePaperWeightUnit: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> PaperWeightUnit {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .unspecified
-        
+
         case 2: return .gsm
-        
+
         case 3: return .lb
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: PaperWeightUnit, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .unspecified:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .gsm:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .lb:
             writeInt(&buf, Int32(3))
-        
+
         }
     }
 }
@@ -5114,7 +5114,7 @@ public func FfiConverterTypePaperWeightUnit_lower(_ value: PaperWeightUnit) -> R
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum ToolchainState: Equatable, Hashable {
-    
+
     case ready
     case partial
     case notFound
@@ -5136,32 +5136,32 @@ public struct FfiConverterTypeToolchainState: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ToolchainState {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .ready
-        
+
         case 2: return .partial
-        
+
         case 3: return .notFound
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: ToolchainState, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .ready:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .partial:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .notFound:
             writeInt(&buf, Int32(3))
-        
+
         }
     }
 }
@@ -5186,7 +5186,7 @@ public func FfiConverterTypeToolchainState_lower(_ value: ToolchainState) -> Rus
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum WorkflowStage: Equatable, Hashable {
-    
+
     case context
     case target
     case print
@@ -5216,80 +5216,80 @@ public struct FfiConverterTypeWorkflowStage: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> WorkflowStage {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .context
-        
+
         case 2: return .target
-        
+
         case 3: return .print
-        
+
         case 4: return .drying
-        
+
         case 5: return .measure
-        
+
         case 6: return .build
-        
+
         case 7: return .review
-        
+
         case 8: return .publish
-        
+
         case 9: return .completed
-        
+
         case 10: return .blocked
-        
+
         case 11: return .failed
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: WorkflowStage, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .context:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .target:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .print:
             writeInt(&buf, Int32(3))
-        
-        
+
+
         case .drying:
             writeInt(&buf, Int32(4))
-        
-        
+
+
         case .measure:
             writeInt(&buf, Int32(5))
-        
-        
+
+
         case .build:
             writeInt(&buf, Int32(6))
-        
-        
+
+
         case .review:
             writeInt(&buf, Int32(7))
-        
-        
+
+
         case .publish:
             writeInt(&buf, Int32(8))
-        
-        
+
+
         case .completed:
             writeInt(&buf, Int32(9))
-        
-        
+
+
         case .blocked:
             writeInt(&buf, Int32(10))
-        
-        
+
+
         case .failed:
             writeInt(&buf, Int32(11))
-        
+
         }
     }
 }
@@ -5314,7 +5314,7 @@ public func FfiConverterTypeWorkflowStage_lower(_ value: WorkflowStage) -> RustB
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
 public enum WorkflowStageState: Equatable, Hashable {
-    
+
     case completed
     case current
     case upcoming
@@ -5337,38 +5337,38 @@ public struct FfiConverterTypeWorkflowStageState: FfiConverterRustBuffer {
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> WorkflowStageState {
         let variant: Int32 = try readInt(&buf)
         switch variant {
-        
+
         case 1: return .completed
-        
+
         case 2: return .current
-        
+
         case 3: return .upcoming
-        
+
         case 4: return .blocked
-        
+
         default: throw UniffiInternalError.unexpectedEnumCase
         }
     }
 
     public static func write(_ value: WorkflowStageState, into buf: inout [UInt8]) {
         switch value {
-        
-        
+
+
         case .completed:
             writeInt(&buf, Int32(1))
-        
-        
+
+
         case .current:
             writeInt(&buf, Int32(2))
-        
-        
+
+
         case .upcoming:
             writeInt(&buf, Int32(3))
-        
-        
+
+
         case .blocked:
             writeInt(&buf, Int32(4))
-        
+
         }
     }
 }

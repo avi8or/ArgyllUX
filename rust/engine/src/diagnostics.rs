@@ -518,9 +518,9 @@ fn free_text_may_contain_private_payload(value: &str) -> bool {
 
 fn redact_path(path: &str) -> String {
     if path.starts_with("/Users/") {
-        redacted_home_path(path)
+        redacted_private_path("$HOME", path)
     } else if path.starts_with("/var/folders/") || path.starts_with("/private/var/") {
-        redacted_path("$TEMP", path)
+        redacted_private_path("$TEMP", path)
     } else if path.starts_with("/Applications/") {
         redacted_path("/Applications", path)
     } else if path.starts_with("/opt/homebrew/") || path.starts_with("/usr/local/") {
@@ -550,7 +550,7 @@ fn redacted_path(prefix: &str, path: &str) -> String {
     format!("{prefix}/.../{filename}")
 }
 
-fn redacted_home_path(path: &str) -> String {
+fn redacted_private_path(prefix: &str, path: &str) -> String {
     let components: Vec<&str> = path
         .trim_end_matches('/')
         .split('/')
@@ -558,9 +558,9 @@ fn redacted_home_path(path: &str) -> String {
         .collect();
 
     if components.len() <= 2 {
-        "$HOME".to_string()
+        prefix.to_string()
     } else {
-        format!("$HOME/.../{}", components[components.len() - 1])
+        format!("{prefix}/[redacted path]")
     }
 }
 
@@ -684,13 +684,14 @@ mod tests {
         assert!(
             sanitized
                 .details_json
-                .contains("\"path\":\"$HOME/.../P900 Rag v3.icc\"")
+                .contains("\"path\":\"$HOME/[redacted path]\"")
         );
+        assert!(!sanitized.details_json.contains("P900 Rag v3.icc"));
         assert!(sanitized.details_json.contains("\"stdout\":\"[redacted]\""));
         assert!(
             sanitized
                 .details_json
-                .contains("\"argv\":[\"targen\",\"-v\",\"$HOME/.../p900\"]")
+                .contains("\"argv\":[\"targen\",\"-v\",\"$HOME/[redacted path]\"]")
         );
         assert_eq!(sanitized.privacy, DiagnosticPrivacy::SensitiveRedacted);
     }
@@ -855,14 +856,20 @@ mod tests {
             }"#,
         ));
 
-        assert!(sanitized.details_json.contains("\"$HOME/.../First.icc\""));
+        assert!(
+            sanitized
+                .details_json
+                .contains("\"$HOME/[redacted path]\"")
+        );
         assert!(sanitized.details_json.contains("\"stdout\":\"[redacted]\""));
         assert!(
             sanitized
                 .details_json
-                .contains("\"path\":\"$HOME/.../Third.icc\"")
+                .contains("\"path\":\"$HOME/[redacted path]\"")
         );
         assert!(!sanitized.details_json.contains("/Users/tylermiller"));
+        assert!(!sanitized.details_json.contains("First.icc"));
+        assert!(!sanitized.details_json.contains("Third.icc"));
         assert!(!sanitized.details_json.contains("second secret"));
         assert_eq!(sanitized.privacy, DiagnosticPrivacy::SensitiveRedacted);
     }
