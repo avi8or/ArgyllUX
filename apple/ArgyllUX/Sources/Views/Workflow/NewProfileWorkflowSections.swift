@@ -8,58 +8,61 @@ struct NewProfileWorkflowHeaderView: View {
     let actions: NewProfileWorkflowActions
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("New Profile")
-                    .font(.largeTitle.weight(.semibold))
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 14) {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text("New Profile")
+                            .font(.title2.weight(.semibold))
 
-                Text(workflowNextActionDisplayTitle(detail))
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
+                        StatusBadgeView(title: workflowStageTitle(workflow.effectiveWorkflowStage), tone: stageTone(for: detail))
 
-                HStack(spacing: 10) {
-                    StatusBadgeView(title: workflowStageTitle(workflow.effectiveWorkflowStage), tone: stageTone(for: detail))
+                        Text(detail.status)
+                            .font(AppTypography.shellUtility)
+                            .foregroundStyle(.secondary)
 
-                    Text(detail.status)
-                        .font(AppTypography.shellUtility)
+                        if detail.isCommandRunning {
+                            ProgressView()
+                                .controlSize(.small)
+                                .help("Command running")
+                                .accessibilityLabel("Command running")
+                        }
+                    }
+
+                    Text(commandSubtitle)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
-
-                    if detail.isCommandRunning {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
+                        .lineLimit(2)
                 }
 
-                Text(detail.title)
-                    .font(.headline)
+                Spacer(minLength: 16)
+
+                NewProfilePrimaryActionButton(
+                    presentation: workflow.workflowPrimaryActionPresentation,
+                    action: actions.performPrimaryAction
+                )
+
+                NewProfileSecondaryActionsMenu(
+                    workflow: workflow,
+                    detail: detail,
+                    actions: actions
+                )
             }
 
-            Spacer()
-
-            HStack(spacing: 10) {
-                Button(workflow.workflowPrimaryActionTitle, action: actions.performPrimaryAction)
-                    .disabled(!workflow.canRunWorkflowPrimaryAction)
-                    .buttonStyle(.borderedProminent)
-
-                Menu {
-                    Button("Open Output Folder") {
-                        workflow.revealPathInFinder(detail.workspacePath)
-                    }
-
-                    Button("Open CLI Transcript") {
-                        actions.openCliTranscript(detail.id)
-                    }
-
-                    if let deletionTitle = workflow.currentWorkflowDeletionActionTitle {
-                        Divider()
-                        Button(deletionTitle, role: .destructive, action: actions.requestWorkflowDeletion)
-                    }
-                } label: {
-                    Label("More", systemImage: "ellipsis.circle")
-                }
-            }
+            WorkflowProgressRibbon(items: workflowProgressItems(for: detail))
         }
-        .padding(24)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+    }
+
+    private var commandSubtitle: String {
+        let presentation = workflow.workflowPrimaryActionPresentation
+
+        if let disabledReason = presentation.disabledReason {
+            return disabledReason
+        }
+
+        return "\(detail.title) - Next: \(presentation.title)"
     }
 
     private func stageTone(for detail: NewProfileJobDetail) -> StatusBadgeView.Tone {
@@ -70,6 +73,163 @@ struct NewProfileWorkflowHeaderView: View {
             .blocked
         case .review, .publish, .target, .print, .drying, .measure, .build, .context:
             .attention
+        }
+    }
+}
+
+private struct NewProfilePrimaryActionButton: View {
+    let presentation: WorkflowPrimaryActionPresentation
+    let action: () -> Void
+
+    var body: some View {
+        Button(presentation.title, action: action)
+            .disabled(!presentation.isEnabled)
+            .buttonStyle(.borderedProminent)
+            .help(presentation.disabledReason ?? presentation.title)
+            .accessibilityHint(presentation.disabledReason ?? "Runs the next step for this New Profile job.")
+    }
+}
+
+private struct NewProfileSecondaryActionsMenu: View {
+    @ObservedObject var workflow: NewProfileWorkflowModel
+    let detail: NewProfileJobDetail
+    let actions: NewProfileWorkflowActions
+
+    var body: some View {
+        Menu {
+            Button("Open Output Folder") {
+                workflow.revealPathInFinder(detail.workspacePath)
+            }
+
+            Button("Open CLI Transcript") {
+                actions.openCliTranscript(detail.id)
+            }
+
+            if let deletionTitle = workflow.currentWorkflowDeletionActionTitle {
+                Divider()
+                Button(deletionTitle, role: .destructive, action: actions.requestWorkflowDeletion)
+            }
+        } label: {
+            Label("More", systemImage: "ellipsis.circle")
+        }
+        .menuStyle(.button)
+        .help("Job actions")
+    }
+}
+
+private struct WorkflowProgressRibbon: View {
+    let items: [WorkflowProgressItem]
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            fullProgressRow
+            compactProgressSummary
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+    }
+
+    private var fullProgressRow: some View {
+        HStack(spacing: 6) {
+            ForEach(items) { item in
+                WorkflowProgressPill(item: item)
+            }
+        }
+    }
+
+    private var compactProgressSummary: some View {
+        HStack(spacing: 8) {
+            if let currentItem {
+                WorkflowCompactProgressPill(item: currentItem)
+            }
+
+            Text("\(completedCount)/\(items.count) done")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    private var currentItem: WorkflowProgressItem? {
+        items.first { $0.state == .current }
+            ?? items.first { $0.state == .blocked }
+            ?? items.last { $0.state == .completed }
+            ?? items.first
+    }
+
+    private var completedCount: Int {
+        items.filter { $0.state == .completed }.count
+    }
+}
+
+private struct WorkflowProgressPill: View {
+    let item: WorkflowProgressItem
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(progressColor)
+                .frame(width: 7, height: 7)
+
+            Text(item.title)
+                .font(.caption.weight(item.state == .current ? .semibold : .regular))
+                .lineLimit(1)
+
+            Text(item.status)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(progressBackground, in: Capsule())
+        .accessibilityLabel("\(item.title). \(item.status).")
+    }
+
+    private var progressColor: Color {
+        stageSummaryColor(item.state)
+    }
+
+    private var progressBackground: Color {
+        switch item.state {
+        case .current:
+            Color.accentColor.opacity(0.12)
+        case .blocked:
+            Color.red.opacity(0.10)
+        case .completed, .upcoming:
+            Color.secondary.opacity(0.06)
+        }
+    }
+}
+
+private struct WorkflowCompactProgressPill: View {
+    let item: WorkflowProgressItem
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(stageSummaryColor(item.state))
+                .frame(width: 7, height: 7)
+
+            Text("\(item.title): \(item.status)")
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(compactBackground, in: Capsule())
+        .accessibilityLabel("\(item.title). \(item.status).")
+    }
+
+    private var compactBackground: Color {
+        switch item.state {
+        case .current:
+            Color.accentColor.opacity(0.12)
+        case .blocked:
+            Color.red.opacity(0.10)
+        case .completed, .upcoming:
+            Color.secondary.opacity(0.06)
         }
     }
 }
