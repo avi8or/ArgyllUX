@@ -4,11 +4,16 @@ set -euo pipefail
 base_ref="${1:-HEAD}"
 missing_files=()
 
+if ! git rev-parse --verify --quiet "$base_ref" >/dev/null; then
+  printf 'Invalid base ref: %s\n' "$base_ref" >&2
+  exit 1
+fi
+
 while IFS= read -r file; do
   [[ -z "$file" ]] && continue
   [[ -f "$file" ]] || continue
 
-  if grep -Eiq "(workflow|bridge|command|persistence|export|failure|public path|diagnostics|privacy|observability)" "$file"; then
+  if grep -Eiq "(workflow|bridge|command|persistence|export|failure|public[ -]path|diagnostics|privacy|observability)" "$file"; then
     if ! grep -q "^## Diagnostics, Privacy, And Observability$" "$file"; then
       missing_files+=("$file")
     fi
