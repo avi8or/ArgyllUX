@@ -129,6 +129,16 @@ Decide ownership before editing cross-boundary features.
 - Keep the bridge coarse-grained. Do not move durable logic into Swift just because the UI needs it.
 - Do not introduce `SwiftData`, `Core Data`, or ad hoc JSON state stores for product data that belongs in the Rust engine.
 
+## Diagnostics, Privacy, And Observability
+
+For durable workflows, bridge calls, command execution, persistence, export, user-visible failures, or public-path behavior changes, plans and implementation must explicitly address diagnostics.
+
+- Emit structured diagnostics through the Rust-owned diagnostics store for normal operation, warnings, errors, performance timings, and sanitized environment context.
+- Do not record private user data in global diagnostics: file contents, measurement contents, ICC/profile bytes, CGATS rows, user notes, arbitrary stdout/stderr, hostnames, usernames, serial numbers, device identifiers, network information, full filesystem inventories, or user-entered profile/printer/paper/Issue Case names.
+- Keep full command output in the job-scoped CLI Transcript. Diagnostics may store command kind, sanitized argument shape, status, duration, exit code, and correlation IDs.
+- Exported diagnostics must be redacted by default and suitable for a public GitHub issue unless the user explicitly includes CLI transcripts or local paths.
+- When adding diagnostics to one public path, check neighboring same-class public paths and either instrument them or state what remains.
+
 ## Bridge And Generated Code Rules
 
 - Do not hand-edit files in `apple/ArgyllUX/Bridge/Generated/`.
