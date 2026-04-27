@@ -5,6 +5,47 @@ import Testing
 @MainActor
 struct NewProfileWorkflowModelTests {
     @Test
+    func primaryActionPresentationExplainsDisabledProfileSetup() async {
+        let fakeEngine = FakeEngine()
+        let detail = makeJobDetail(stage: .context, nextAction: "Save Context")
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [makeActiveWorkItem(id: detail.id)])
+        fakeEngine.loadedJobDetails[detail.id] = detail
+
+        let model = makeWorkflowModel(fakeEngine: fakeEngine)
+        await model.openNewProfileWorkflow()
+
+        model.workflowProfileName = ""
+        model.workflowSelectedPrinterID = nil
+        model.workflowSelectedPaperID = nil
+
+        let presentation = model.workflowPrimaryActionPresentation
+
+        #expect(presentation.title == "Continue")
+        #expect(presentation.isEnabled == false)
+        #expect(presentation.disabledReason == "Name the profile, choose a printer and paper, and choose printer and paper settings to continue.")
+    }
+
+    @Test
+    func primaryActionPresentationExplainsMissingScanFile() async {
+        let fakeEngine = FakeEngine()
+        let detail = makeJobDetail(stage: .measure, nextAction: "Measure")
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [makeActiveWorkItem(id: detail.id)])
+        fakeEngine.loadedJobDetails[detail.id] = detail
+
+        let model = makeWorkflowModel(fakeEngine: fakeEngine)
+        await model.openNewProfileWorkflow()
+
+        model.workflowMeasurementMode = .scanFile
+        model.workflowScanFilePath = ""
+
+        let presentation = model.workflowPrimaryActionPresentation
+
+        #expect(presentation.title == "Measure")
+        #expect(presentation.isEnabled == false)
+        #expect(presentation.disabledReason == "Choose a scan file before measuring from a file.")
+    }
+
+    @Test
     func openNewProfileWorkflowSettingsHandoffResumesExistingActiveJobWithoutCreatingDuplicate() async {
         let printer = makePrinter()
         let paper = makePaper()

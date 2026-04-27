@@ -34,6 +34,40 @@ struct AppModelShellTests {
     }
 
     @Test
+    func workflowProgressItemsUseUserFacingLabels() {
+        let detail = makeJobDetail(stage: .target, nextAction: "Generate Target")
+
+        let items = workflowProgressItems(for: detail)
+
+        #expect(items.map(\.title) == [
+            "Profile Setup",
+            "Target Planning",
+            "Print Target",
+            "Measure Target",
+            "Review",
+        ])
+        #expect(items.first(where: { $0.stage == .target })?.state == .current)
+        #expect(items.first(where: { $0.stage == .context })?.state == .completed)
+    }
+
+    @Test
+    func plannedActionDescriptorMakesUnavailableStateExplicit() {
+        let action = LauncherAction(
+            title: "Verify Output",
+            detail: "Check whether current output is still trustworthy.",
+            status: "Planned",
+            kind: .planned
+        )
+
+        let descriptor = action.plannedDescriptor
+
+        #expect(descriptor?.title == "Verify Output")
+        #expect(descriptor?.status == "Planned")
+        #expect(descriptor?.message == "Check whether current output is still trustworthy. Not runnable in this build.")
+        #expect(descriptor?.accessibilityLabel == "Verify Output. Planned. Check whether current output is still trustworthy. Not runnable in this build.")
+    }
+
+    @Test
     func jumpItemsIncludeRoutesAndLoadedRecords() async {
         let printer = makePrinter()
         let paper = makePaper()
