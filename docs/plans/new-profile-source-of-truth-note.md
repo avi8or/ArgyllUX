@@ -14,6 +14,23 @@ Do not treat repo-local plugin guidance as a license to override the consolidate
 
 ## Current Slice Decisions
 
+## New Profile Layout Override
+
+The current New Profile route uses a job-cockpit model, not a wizard sidebar.
+
+- Do not place the workflow timeline in a narrow route-owned left sidebar.
+- Do not wrap a timeline card in its own scroller inside the sidebar.
+- Keep job identity, current stage, status, progress, and the primary next action in a compact top command surface.
+- Show workflow progress as a read-only horizontal ribbon near the command surface.
+- Use the left route-owned rail for job context only when it reduces main-workspace clutter.
+- Keep the current-stage workspace focused on the task controls for that stage.
+- Keep detailed command history in the CLI transcript window and technical inspector surfaces.
+- If a control looks clickable, it must either call a real wired action or be replaced with explicit unavailable copy.
+- Planned actions are not buttons in this slice.
+- Sheet, modal, and chooser save/cancel/close/done actions must be outside scrollable content and visible at all times.
+- Escape-key shortcuts may supplement visible controls, but they do not replace visible cancel or close actions.
+- Settings sidebar rows are navigation controls. Each row must be clickable across its full visible width and must visibly reflect selection.
+
 For the current `New Profile` and transcript slice:
 
 - The top-level shell routes are `Home`, `Printer Profiles`, `Troubleshoot`, `Inspect`, `B&W Tuning`, and `Settings`.
