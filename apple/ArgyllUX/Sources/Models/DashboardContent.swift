@@ -23,6 +23,19 @@ struct LauncherAction: Identifiable, Hashable {
     }
 }
 
+extension LauncherAction {
+    var plannedDescriptor: PlannedActionDescriptor? {
+        guard case .planned = kind else { return nil }
+
+        let trimmedDetail = detail.trimmingCharacters(in: .whitespacesAndNewlines)
+        let message = trimmedDetail.isEmpty
+            ? "Not runnable in this build."
+            : "\(trimmedDetail) Not runnable in this build."
+
+        return PlannedActionDescriptor(title: title, message: message)
+    }
+}
+
 enum ShellJumpDestination: Hashable {
     case route(AppRoute)
     case newProfileJob(String)
@@ -38,6 +51,66 @@ struct ShellJumpItem: Identifiable, Hashable {
 
     var id: String {
         "\(title)|\(subtitle)|\(systemImage)|\(destination)"
+    }
+}
+
+struct PlannedActionDescriptor: Identifiable, Hashable {
+    let title: String
+    let message: String
+
+    var id: String {
+        "\(title)|\(message)"
+    }
+
+    var status: String {
+        "Planned"
+    }
+
+    var accessibilityLabel: String {
+        "\(title). Planned. \(message)"
+    }
+
+    var help: String {
+        message
+    }
+}
+
+struct WorkflowProgressItem: Identifiable, Hashable {
+    let stage: WorkflowStage
+    let title: String
+    let state: WorkflowStageState
+
+    var id: WorkflowStage {
+        stage
+    }
+
+    var status: String {
+        switch state {
+        case .completed:
+            "Done"
+        case .current:
+            "Current"
+        case .upcoming:
+            "Not started"
+        case .blocked:
+            "Blocked"
+        }
+    }
+}
+
+struct WorkflowPrimaryActionPresentation: Equatable {
+    let title: String
+    let isEnabled: Bool
+    let disabledReason: String?
+}
+
+func workflowProgressItems(for detail: NewProfileJobDetail) -> [WorkflowProgressItem] {
+    detail.stageTimeline.map { item in
+        WorkflowProgressItem(
+            stage: item.stage,
+            title: workflowStageDisplayTitle(item.stage),
+            state: item.state
+        )
     }
 }
 
