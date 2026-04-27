@@ -595,24 +595,24 @@ struct NewProfileTargetWorkspaceView: View {
             WorkflowColumns {
                 TextField("Patch Count", text: $workflow.workflowPatchCount)
                     .textFieldStyle(.roundedBorder)
-                    .help("Controls how many color patches will be printed and measured.")
+                    .help("Default patch count balances paper use, measurement time, and profile quality.")
 
                 Toggle("Improve Neutrals", isOn: $workflow.workflowImproveNeutrals)
-                    .help("Gives extra attention to grays and near-grays.")
+                    .help("Adds extra attention to grays and near-grays.")
             }
 
             InlineGuidance(
                 title: "Patch count",
-                message: "The default is usually the best balance of effort and accuracy. More patches do not compensate for a bad media setting or weak measurements."
+                message: "The default is usually the best balance of effort and accuracy. More patches do not compensate for the wrong media setting or weak measurements."
             )
 
             InlineGuidance(
                 title: "Improve Neutrals",
-                message: "Use this when smooth neutrals and neutral ramps matter, not just because more sounds better."
+                message: "Use this when smooth gray balance matters. It adds attention to grays and near-grays; it is not a general quality boost."
             )
 
             Toggle("Use Existing Profile to Help Target Planning", isOn: $workflow.workflowUsePlanningProfile)
-                .help("Uses a prior profile to place new patches more intelligently.")
+                .help("Use only when the older profile is trustworthy enough to guide target placement.")
 
             if workflow.workflowUsePlanningProfile {
                 Picker(
@@ -632,7 +632,7 @@ struct NewProfileTargetWorkspaceView: View {
 
             InlineGuidance(
                 title: "Planning profile",
-                message: "Helpful when you already have a decent profile. It helps target planning; it does not repair a broken print path."
+                message: "Use a planning profile only when the older profile was trustworthy. It helps target placement; it does not repair a bad print path."
             )
 
             HStack(spacing: 10) {
@@ -656,21 +656,21 @@ struct NewProfilePrintWorkspaceView: View {
             workflowSection("Print Target") {
                 WorkflowColumns {
                     Toggle("Print Without Color Management", isOn: $workflow.workflowPrintWithoutColorManagement)
-                        .help("Ensures the target prints as raw target values.")
+                        .help("Profiling targets must print without color management.")
 
                     TextField("Drying Time", text: $workflow.workflowDryingTimeMinutes)
                         .textFieldStyle(.roundedBorder)
-                        .help("Wait time before measurement.")
+                        .help("Wait time before measurement; unstable prints can create misleading measurements.")
                 }
 
                 InlineGuidance(
                     title: "Unmanaged target printing",
-                    message: "Targets used for profiling must print unmanaged. If the target prints with color management, the resulting profile will be wrong."
+                    message: "Profiling targets must print unmanaged. If the app or driver changes the target colors, the profile will be built from the wrong data."
                 )
 
                 InlineGuidance(
                     title: "Drying time",
-                    message: "Fine-art and high-ink papers often need more time to stabilize. Measuring too soon can lock transient color into the profile."
+                    message: "Fine-art and high-ink papers often need more time to stabilize. Measuring too soon can bake temporary color into the profile."
                 )
 
                 HStack(spacing: 10) {
@@ -724,6 +724,7 @@ struct NewProfileMeasurementWorkspaceView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .help("Choose how the target will be measured.")
 
                     if workflow.workflowMeasurementMode == .scanFile {
                         HStack(spacing: 10) {
@@ -741,6 +742,11 @@ struct NewProfileMeasurementWorkspaceView: View {
                         }
                     }
                 }
+
+                InlineGuidance(
+                    title: "Measurement mode",
+                    message: "Use strip mode when reads are reliable. Switch to patch mode or scan-file measurement when strip detection creates bad data."
+                )
 
                 if workflow.workflowMeasurementMode == .scanFile && (workflow.effectiveScanFilePath?.isEmpty ?? true) {
                     InlineGuidance(
