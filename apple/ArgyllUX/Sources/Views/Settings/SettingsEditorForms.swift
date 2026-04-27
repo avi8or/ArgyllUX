@@ -1,5 +1,6 @@
 import SwiftUI
 
+// Shared modal editor forms for Settings catalog records and New Profile context creation.
 private let paperWeightUnits: [PaperWeightUnit] = [.unspecified, .gsm, .lb]
 private let paperThicknessUnits: [PaperThicknessUnit] = [.unspecified, .mil, .mm, .micron]
 
@@ -51,7 +52,7 @@ struct PrinterEditorForm: View {
             }
 
             SettingsEditorSection("Ink And Channel Setup") {
-                Picker("Argyll profiling setup", selection: $draft.colorantFamily) {
+                Picker("Argyll profiling setup", selection: colorantFamilyBinding) {
                     ForEach(ColorantFamily.structuredCases, id: \.self) { family in
                         Text(family.displayLabel).tag(family)
                     }
@@ -59,12 +60,7 @@ struct PrinterEditorForm: View {
                 .pickerStyle(.menu)
 
                 if draft.colorantFamily == .extendedN {
-                    Picker("Channel count", selection: $draft.channelCount) {
-                        ForEach(6 ... 15, id: \.self) { count in
-                            Text("\(count) channels").tag(UInt32(count))
-                        }
-                    }
-                    .pickerStyle(.segmented)
+                    ChannelCountPicker(channelCount: $draft.channelCount)
 
                     CatalogListEditor(
                         title: "Channel labels",
@@ -101,6 +97,18 @@ struct PrinterEditorForm: View {
                     .lineLimit(3 ... 6)
             }
         }
+    }
+
+    private var colorantFamilyBinding: Binding<ColorantFamily> {
+        Binding(
+            get: { draft.colorantFamily },
+            set: { family in
+                draft.colorantFamily = family
+                if family == .extendedN {
+                    draft.channelCount = containedExtendedChannelCount(draft.channelCount)
+                }
+            }
+        )
     }
 }
 
@@ -423,6 +431,7 @@ private struct SettingsEditorScaffold<Content: View>: View {
             .padding(24)
         }
         .frame(minWidth: 700, minHeight: 520)
+        .frame(idealWidth: 760, maxWidth: 820, idealHeight: 680, maxHeight: 760)
     }
 }
 
@@ -455,10 +464,53 @@ private struct SettingsEditorColumns<Content: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            content()
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 12) {
+                content()
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                content()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct ChannelCountPicker: View {
+    @Binding var channelCount: UInt32
+
+    private let counts = Array(UInt32(6) ... UInt32(15))
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Channel count")
+                .font(AppTypography.detailLabel)
+                .foregroundStyle(.secondary)
+
+            Picker("Channel count", selection: $channelCount) {
+                ForEach(counts, id: \.self) { count in
+                    Text("\(count) channels").tag(count)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(maxWidth: 220, alignment: .leading)
+
+            Text("Use Extended N-color only when the printer has more than the fixed Gray, RGB, CMY, or CMYK channel sets.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear {
+            channelCount = containedExtendedChannelCount(channelCount)
         }
     }
+}
+
+private func containedExtendedChannelCount(_ count: UInt32) -> UInt32 {
+    min(max(count, 6), 15)
 }
 
 struct CatalogListEditor: View {
