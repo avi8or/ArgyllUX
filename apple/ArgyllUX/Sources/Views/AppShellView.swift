@@ -340,6 +340,7 @@ struct AppShellView: View {
 private struct ShellJumpSheetView: View {
     let items: [ShellJumpItem]
     let onSelect: (ShellJumpItem) -> Void
+    @Environment(\.dismiss) private var dismiss
     @State private var query = ""
 
     private var filteredItems: [ShellJumpItem] {
@@ -352,22 +353,28 @@ private struct ShellJumpSheetView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Jump")
-                    .font(.title2.weight(.semibold))
-                Text("Open a route, active job, profile, printer, or paper.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Jump")
+                        .font(.title2.weight(.semibold))
+                    Text("Open a route, active job, profile, printer, or paper.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
 
-            TextField("Search", text: $query)
-                .textFieldStyle(.roundedBorder)
+                TextField("Search", text: $query)
+                    .textFieldStyle(.roundedBorder)
+            }
+            .padding(24)
+
+            Divider()
 
             if filteredItems.isEmpty {
                 Text("No matching destinations.")
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 220, alignment: .center)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .padding(24)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
@@ -396,10 +403,23 @@ private struct ShellJumpSheetView: View {
                             .buttonStyle(SurfaceRowButtonStyle(cornerRadius: 8))
                         }
                     }
+                    .padding(24)
                 }
             }
+
+            Divider()
+
+            HStack {
+                Spacer()
+                Button("Close") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 14)
+            .background(.regularMaterial)
         }
-        .padding(24)
         .frame(minWidth: 560, minHeight: 520)
     }
 }

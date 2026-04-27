@@ -411,24 +411,43 @@ private struct SettingsEditorScaffold<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(title)
                     .font(.title2.weight(.semibold))
-
-                content()
-
-                HStack(spacing: 10) {
-                    Spacer()
-
-                    Button(secondaryTitle, action: onSecondary)
-
-                    Button(saveTitle, action: onSave)
-                        .disabled(isSaveDisabled)
-                        .keyboardShortcut(.defaultAction)
-                }
+                Text("Changes are not saved until you use the button below.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
-            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 18)
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                content()
+                }
+                .padding(24)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+
+            Divider()
+
+            HStack(spacing: 10) {
+                Spacer()
+
+                Button(secondaryTitle, action: onSecondary)
+                    .keyboardShortcut(.cancelAction)
+
+                Button(saveTitle, action: onSave)
+                    .disabled(isSaveDisabled)
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 14)
+            .background(.regularMaterial)
         }
         .frame(minWidth: 700, minHeight: 520)
         .frame(idealWidth: 760, maxWidth: 820, idealHeight: 680, maxHeight: 760)

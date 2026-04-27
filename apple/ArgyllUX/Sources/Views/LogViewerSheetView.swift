@@ -20,7 +20,7 @@ struct LogViewerSheetView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(kind.title)
@@ -33,17 +33,13 @@ struct LogViewerSheetView: View {
 
                 Spacer()
 
-                HStack(spacing: 10) {
-                    Button("Refresh") {
-                        Task { await model.refreshLogs(limit: 200) }
-                    }
-
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .keyboardShortcut(.cancelAction)
+                Button("Refresh") {
+                    Task { await model.refreshLogs(limit: 200) }
                 }
             }
+            .padding(20)
+
+            Divider()
 
             if filteredEntries.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
@@ -54,6 +50,7 @@ struct LogViewerSheetView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(20)
             } else {
                 List(filteredEntries, id: \.timestamp) { entry in
                     VStack(alignment: .leading, spacing: 4) {
@@ -71,8 +68,20 @@ struct LogViewerSheetView: View {
                 }
                 .listStyle(.plain)
             }
+
+            Divider()
+
+            HStack {
+                Spacer()
+                Button("Done") {
+                    dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .background(.regularMaterial)
         }
-        .padding(20)
         .frame(minWidth: 760, minHeight: 420)
         .task {
             await model.refreshLogs(limit: 200)

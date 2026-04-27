@@ -718,28 +718,49 @@ private struct WorkflowCatalogChooserSheet<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(title)
-                .font(.title2.weight(.semibold))
-
-            if isEmpty {
-                Text(emptyMessage)
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(.title2.weight(.semibold))
+                Text("Choose an existing item or create a new one.")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        content()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 18)
+
+            Divider()
+
+            Group {
+                if isEmpty {
+                    Text(emptyMessage)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(24)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 10) {
+                            content()
+                        }
+                        .padding(24)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
                 }
             }
+
+            Divider()
 
             HStack(spacing: 10) {
                 Button("New", action: onCreate)
                 Spacer()
                 Button("Cancel", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
             }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 14)
+            .background(.regularMaterial)
         }
-        .padding(24)
         .frame(minWidth: 520, minHeight: 420)
     }
 }
