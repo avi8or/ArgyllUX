@@ -568,9 +568,6 @@ struct NewProfileContextWorkspaceView: View {
                     title: "Measurement quality matters",
                     message: "Switch modes when strip reading is unreliable instead of forcing bad data through."
                 )
-
-                Button("Continue", action: actions.saveContext)
-                    .disabled(!workflow.canSaveWorkflowContext)
             }
         }
     }
@@ -639,10 +636,11 @@ struct NewProfileTargetWorkspaceView: View {
             )
 
             HStack(spacing: 10) {
-                Button("Save Target Settings", action: actions.saveTargetSettings)
+                Text("Secondary")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
 
-                Button("Generate Target", action: actions.generateTarget)
-                    .disabled(detail.isCommandRunning)
+                Button("Save Target Settings", action: actions.saveTargetSettings)
             }
         }
     }
@@ -676,10 +674,11 @@ struct NewProfilePrintWorkspaceView: View {
                 )
 
                 HStack(spacing: 10) {
-                    Button("Save Print Settings", action: actions.savePrintSettings)
+                    Text("Secondary")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
 
-                    Button("Mark Chart as Printed", action: actions.markChartPrinted)
-                        .disabled(detail.isCommandRunning)
+                    Button("Save Print Settings", action: actions.savePrintSettings)
                 }
             }
 
@@ -706,9 +705,6 @@ struct NewProfileDryingWorkspaceView: View {
                 OperationalDetailRow(title: "Ready at", value: detail.printSettings.dryingReadyAt ?? "Waiting")
                 OperationalDetailRow(title: "Countdown", value: dryingCountdown(detail))
             }
-
-            Button("Mark Ready to Measure", action: actions.markReadyToMeasure)
-                .disabled(detail.isCommandRunning)
         }
     }
 }
@@ -746,6 +742,13 @@ struct NewProfileMeasurementWorkspaceView: View {
                     }
                 }
 
+                if workflow.workflowMeasurementMode == .scanFile && (workflow.effectiveScanFilePath?.isEmpty ?? true) {
+                    InlineGuidance(
+                        title: "Scan file required",
+                        message: "Choose the scanned chart file before running measurement from a file."
+                    )
+                }
+
                 OperationalDetailRow(
                     title: "Measurement source",
                     value: detail.measurement.measurementSourcePath ?? "Not measured yet"
@@ -758,10 +761,11 @@ struct NewProfileMeasurementWorkspaceView: View {
                 }
 
                 HStack(spacing: 10) {
-                    Button("Update Measurement Setup", action: actions.saveContext)
+                    Text("Secondary")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
 
-                    Button(detail.measurement.hasMeasurementCheckpoint ? "Resume Measurement" : "Measure", action: actions.startMeasurement)
-                        .disabled(detail.isCommandRunning || !workflow.canRunWorkflowPrimaryAction)
+                    Button("Update Measurement Setup", action: actions.saveContext)
                 }
             }
 
@@ -786,8 +790,12 @@ struct NewProfileReviewWorkspaceView: View {
                         value: detail.measurement.measurementSourcePath ?? "Not available"
                     )
 
-                    Button("Build Profile", action: actions.buildProfile)
-                        .disabled(detail.isCommandRunning || detail.measurement.measurementSourcePath == nil)
+                    if detail.measurement.measurementSourcePath == nil {
+                        InlineGuidance(
+                            title: "Measurement required",
+                            message: "Measure the target before building the profile."
+                        )
+                    }
                 }
             }
 
@@ -835,13 +843,8 @@ struct NewProfileReviewWorkspaceView: View {
 
                 workflowArtifactsList(workflow: workflow, artifacts: detail.artifacts)
 
-                HStack(spacing: 10) {
-                    Button("Publish", action: actions.publishProfile)
-                        .disabled(detail.review == nil || detail.isCommandRunning || detail.publishedProfileId != nil)
-
-                    if detail.publishedProfileId != nil {
-                        Button("Open in Printer Profiles", action: actions.openPublishedProfileLibrary)
-                    }
+                if detail.publishedProfileId != nil {
+                    Button("Open in Printer Profiles", action: actions.openPublishedProfileLibrary)
                 }
             }
         }
