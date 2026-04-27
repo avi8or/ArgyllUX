@@ -5,6 +5,111 @@ import Testing
 @MainActor
 struct AppModelShellTests {
     @Test
+    func launcherActionsSeparateAvailableEntriesFromPlannedWorkflows() {
+        let model = makeAppModel()
+
+        #expect(model.availableLauncherActions.map(\.title) == ["New Profile", "Troubleshoot", "Inspect", "B&W Tuning"])
+        #expect(model.plannedLauncherActions.map(\.title) == [
+            "Improve Profile",
+            "Import Profile",
+            "Import Measurements",
+            "Match a Reference",
+            "Verify Output",
+            "Recalibrate",
+            "Rebuild",
+            "Spot Measure",
+            "Compare Measurements",
+        ])
+        #expect(model.launcherActions.allSatisfy { !$0.detail.localizedCaseInsensitiveContains("comes next") })
+        #expect(model.launcherActions.allSatisfy { !$0.detail.localizedCaseInsensitiveContains("locked into the shell") })
+    }
+
+    @Test
+    func workflowStageDisplayLabelsHideInternalContextTerminology() {
+        #expect(workflowStageDisplayTitle(.context) == "Profile Setup")
+        #expect(workflowStageDisplayTitle(.target) == "Target Planning")
+        #expect(workflowStageDisplayTitle(.print) == "Print Target")
+        #expect(workflowStageDisplayTitle(.measure) == "Measure Target")
+        #expect(workflowNextActionDisplayTitle(stage: .context, rawTitle: "Save Context") == "Continue")
+    }
+
+    @Test
+    func workflowProgressItemsUseUserFacingLabels() {
+        let detail = makeJobDetail(stage: .target, nextAction: "Generate Target")
+
+        let items = workflowProgressItems(for: detail)
+
+        #expect(items.map(\.title) == [
+            "Profile Setup",
+            "Target Planning",
+            "Print Target",
+            "Measure Target",
+            "Review",
+        ])
+        #expect(items.first(where: { $0.stage == .target })?.state == .current)
+        #expect(items.first(where: { $0.stage == .context })?.state == .completed)
+    }
+
+    @Test
+    func plannedActionDescriptorMakesUnavailableStateExplicit() {
+        let action = LauncherAction(
+            title: "Verify Output",
+            detail: "Check whether current output is still trustworthy.",
+            status: "Planned",
+            kind: .planned
+        )
+
+        let descriptor = action.plannedDescriptor
+
+        #expect(descriptor?.title == "Verify Output")
+        #expect(descriptor?.status == "Planned")
+        #expect(descriptor?.message == "Check whether current output is still trustworthy. Not runnable in this build.")
+        #expect(descriptor?.accessibilityLabel == "Verify Output. Planned. Check whether current output is still trustworthy. Not runnable in this build.")
+    }
+
+    @Test
+    func jumpItemsIncludeRoutesAndLoadedRecords() async {
+        let printer = makePrinter()
+        let paper = makePaper()
+        let profile = makePrinterProfile()
+        let activeWork = makeActiveWorkItem(id: "job-1", title: "P900 Rag v1")
+
+        let fakeEngine = FakeEngine()
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [activeWork])
+        fakeEngine.printersCurrent = [printer]
+        fakeEngine.papersCurrent = [paper]
+        fakeEngine.printerProfilesCurrent = [profile]
+
+        let model = makeAppModel(fakeEngine: fakeEngine)
+        await model.bootstrapIfNeeded()
+
+        let jumpTitles = model.shellJumpItems.map(\.title)
+        #expect(jumpTitles.contains("Home"))
+        #expect(jumpTitles.contains(activeWork.title))
+        #expect(jumpTitles.contains(profile.name))
+        #expect(jumpTitles.contains(printer.displayName))
+        #expect(jumpTitles.contains(paper.displayName))
+
+        guard let profileJump = model.shellJumpItems.first(where: { $0.destination == .printerProfile(profile.id) }) else {
+            Issue.record("Expected a Printer Profile jump item.")
+            return
+        }
+        model.openJumpItem(profileJump)
+
+        #expect(model.selectedRoute == .printerProfiles)
+        #expect(model.selectedPrinterProfileID == profile.id)
+
+        guard let paperJump = model.shellJumpItems.first(where: { $0.destination == .settings(.paper(paper.id)) }) else {
+            Issue.record("Expected a paper settings jump item.")
+            return
+        }
+        model.openJumpItem(paperJump)
+
+        #expect(model.selectedRoute == .settings)
+        #expect(model.settings.selection == .paper(paper.id))
+    }
+
+    @Test
     func bootstrapLoadsToolchainHealthAndDashboardSnapshot() async {
         let root = makeTemporaryRoot()
         let fakeEngine = FakeEngine()

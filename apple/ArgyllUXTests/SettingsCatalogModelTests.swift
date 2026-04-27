@@ -82,6 +82,66 @@ struct SettingsCatalogModelTests {
     }
 
     @Test
+    func settingsSidebarSelectionsUpdateTheSelectedCatalogItem() {
+        let model = makeSettingsModel()
+        let printer = makePrinter()
+        let paper = makePaper()
+        let preset = makePreset(printerId: printer.id, paperId: paper.id)
+
+        model.applyReferenceData(
+            AppReferenceData(
+                printers: [printer],
+                papers: [paper],
+                printerPaperPresets: [preset],
+                printerProfiles: []
+            )
+        )
+
+        model.select(.storage)
+        #expect(model.selection == .storage)
+
+        model.select(.printer(printer.id))
+        #expect(model.selection == .printer(printer.id))
+        #expect(model.selectedPrinter?.id == printer.id)
+
+        model.select(.paper(paper.id))
+        #expect(model.selection == .paper(paper.id))
+        #expect(model.selectedPaper?.id == paper.id)
+
+        model.select(.printerPaperSetting(preset.id))
+        #expect(model.selection == .printerPaperSetting(preset.id))
+        #expect(model.selectedPrinterPaperPreset?.id == preset.id)
+    }
+
+    @Test
+    func settingsSidebarSelectionFallsBackWhenRecordDisappears() {
+        let model = makeSettingsModel()
+        let printer = makePrinter()
+
+        model.applyReferenceData(
+            AppReferenceData(
+                printers: [printer],
+                papers: [],
+                printerPaperPresets: [],
+                printerProfiles: []
+            )
+        )
+        model.select(.printer(printer.id))
+        #expect(model.selection == .printer(printer.id))
+
+        model.applyReferenceData(
+            AppReferenceData(
+                printers: [],
+                papers: [],
+                printerPaperPresets: [],
+                printerProfiles: []
+            )
+        )
+
+        #expect(model.selection == .printers)
+    }
+
+    @Test
     func applyToolchainPathPassesTrimmedOverride() async {
         let root = makeTemporaryRoot()
         let fakeEngine = FakeEngine()

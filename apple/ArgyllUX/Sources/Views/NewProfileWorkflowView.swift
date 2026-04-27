@@ -32,26 +32,32 @@ struct NewProfileWorkflowView: View {
 
                     Divider()
 
-                    HStack(spacing: 0) {
-                        ScrollView {
-                            NewProfileWorkflowSidebarView(workflow: workflow, detail: detail)
-                                .frame(maxWidth: .infinity, alignment: .topLeading)
-                        }
-                        .frame(minWidth: 300, maxWidth: 300, maxHeight: .infinity, alignment: .topLeading)
-                        .background(Color.secondary.opacity(0.04))
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 0) {
+                            ScrollView {
+                                NewProfileJobContextRail(workflow: workflow, detail: detail)
+                                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                            }
+                            .frame(width: 280, alignment: .topLeading)
+                            .frame(maxHeight: .infinity, alignment: .topLeading)
+                            .background(Color.secondary.opacity(0.035))
 
-                        Divider()
+                            Divider()
 
-                        ScrollView {
-                            NewProfileWorkflowWorkspaceView(
-                                workflow: workflow,
-                                detail: detail,
-                                actions: actions
-                            )
-                            .padding(24)
-                            .frame(maxWidth: .infinity, alignment: .topLeading)
+                            workspaceScroll(detail: detail, padding: 22)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                        VStack(spacing: 0) {
+                            NewProfileJobContextStrip(workflow: workflow, detail: detail)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.secondary.opacity(0.035))
+
+                            Divider()
+
+                            workspaceScroll(detail: detail, padding: 18)
+                        }
                     }
                 }
                 .sheet(item: $workflow.workflowContextSheet) { sheet in
@@ -62,6 +68,19 @@ struct NewProfileWorkflowView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+    }
+
+    private func workspaceScroll(detail: NewProfileJobDetail, padding: CGFloat) -> some View {
+        ScrollView {
+            NewProfileWorkflowWorkspaceView(
+                workflow: workflow,
+                detail: detail,
+                actions: actions
+            )
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     @ViewBuilder

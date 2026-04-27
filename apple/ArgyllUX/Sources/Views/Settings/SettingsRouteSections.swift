@@ -4,47 +4,108 @@ struct SettingsSidebarView: View {
     @ObservedObject var settings: SettingsCatalogModel
 
     var body: some View {
-        List(selection: $settings.selection) {
-            Section("General") {
-                sidebarRow("Toolchain", systemImage: "hammer", selection: .toolchain)
-                sidebarRow("Storage", systemImage: "internaldrive", selection: .storage)
-                sidebarRow("Defaults", systemImage: "slider.horizontal.3", selection: .defaults)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                sidebarSection("General") {
+                    sidebarButton("Argyll", systemImage: "hammer", selection: .toolchain)
+                    sidebarButton("Storage", systemImage: "internaldrive", selection: .storage)
+                    sidebarButton("Defaults", systemImage: "slider.horizontal.3", selection: .defaults)
+                }
+
+                sidebarSection("Catalog") {
+                    sidebarButton("Printers", systemImage: "printer", selection: .printers)
+                    ForEach(settings.printers, id: \.id) { printer in
+                        sidebarChildButton(printer.displayName, selection: .printer(printer.id))
+                    }
+
+                    sidebarButton("Papers", systemImage: "doc.text", selection: .papers)
+                    ForEach(settings.papers, id: \.id) { paper in
+                        sidebarChildButton(paper.displayName, selection: .paper(paper.id))
+                    }
+
+                    sidebarButton(
+                        "Printer and Paper Settings",
+                        systemImage: "slider.horizontal.below.rectangle",
+                        selection: .printerPaperSettings
+                    )
+                    ForEach(settings.printerPaperPresets, id: \.id) { preset in
+                        sidebarChildButton(preset.displayName, selection: .printerPaperSetting(preset.id))
+                    }
+                }
             }
-
-            Section("Catalog") {
-                sidebarRow("Printers", systemImage: "printer", selection: .printers)
-                ForEach(settings.printers, id: \.id) { printer in
-                    sidebarChildRow(printer.displayName, selection: .printer(printer.id))
-                }
-
-                sidebarRow("Papers", systemImage: "doc.text", selection: .papers)
-                ForEach(settings.papers, id: \.id) { paper in
-                    sidebarChildRow(paper.displayName, selection: .paper(paper.id))
-                }
-
-                sidebarRow("Printer and Paper Settings", systemImage: "slider.horizontal.below.rectangle", selection: .printerPaperSettings)
-                ForEach(settings.printerPaperPresets, id: \.id) { preset in
-                    sidebarChildRow(preset.displayName, selection: .printerPaperSetting(preset.id))
-                }
-            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .listStyle(.sidebar)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color.secondary.opacity(0.035))
     }
 
-    private func sidebarRow(_ title: String, systemImage: String, selection: SettingsCatalogSelection) -> some View {
-        Label(title, systemImage: systemImage)
-            .tag(Optional(selection))
-    }
-
-    private func sidebarChildRow(_ title: String, selection: SettingsCatalogSelection) -> some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(Color.secondary.opacity(0.6))
-                .frame(width: 6, height: 6)
+    private func sidebarSection<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+
+            content()
         }
-        .padding(.leading, 18)
-        .tag(Optional(selection))
+    }
+
+    private func sidebarButton(
+        _ title: String,
+        systemImage: String,
+        selection: SettingsCatalogSelection
+    ) -> some View {
+        Button {
+            settings.select(selection)
+        } label: {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(sidebarButtonStyle(for: selection))
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isSelected(selection) ? .isSelected : [])
+    }
+
+    private func sidebarChildButton(
+        _ title: String,
+        selection: SettingsCatalogSelection
+    ) -> some View {
+        Button {
+            settings.select(selection)
+        } label: {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(isSelected(selection) ? Color.accentColor : Color.secondary.opacity(0.6))
+                    .frame(width: 6, height: 6)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 22)
+        }
+        .buttonStyle(sidebarButtonStyle(for: selection))
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isSelected(selection) ? .isSelected : [])
+    }
+
+    private func sidebarButtonStyle(for selection: SettingsCatalogSelection) -> SurfaceRowButtonStyle {
+        SurfaceRowButtonStyle(
+            isSelected: isSelected(selection),
+            cornerRadius: 8,
+            horizontalPadding: 10,
+            verticalPadding: 8,
+            minHeight: 38
+        )
+    }
+
+    private func isSelected(_ selection: SettingsCatalogSelection) -> Bool {
+        settings.selection == selection
     }
 }
 
@@ -160,8 +221,8 @@ private struct ToolchainSettingsDetailPane: View {
 
     var body: some View {
         SettingsDetailScaffold(
-            title: "Toolchain",
-            subtitle: "Toolchain status stays persistent in the footer, but Settings is where you correct the actual Argyll path and inspect readiness details."
+            title: "Argyll",
+            subtitle: "Argyll status stays persistent in the footer, but Settings is where you correct the install path and inspect readiness details."
         ) {
             SettingsDetailCard("Status") {
                 HStack(spacing: 10) {

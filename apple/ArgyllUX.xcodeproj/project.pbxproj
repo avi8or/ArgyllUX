@@ -50,6 +50,7 @@
 		A10000000000000000000029 /* ProfileLibraryModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002B /* ProfileLibraryModelTests.swift */; };
 		A1000000000000000000002A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002C /* Assets.xcassets */; };
 		A1000000000000000000002B /* HitTargetButtonStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002D /* HitTargetButtonStyles.swift */; };
+		A1000000000000000000002C /* PlannedActionSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002E /* PlannedActionSurface.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -108,6 +109,7 @@
 		A2000000000000000000002B /* ProfileLibraryModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileLibraryModelTests.swift; sourceTree = "<group>"; };
 		A2000000000000000000002C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A2000000000000000000002D /* HitTargetButtonStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HitTargetButtonStyles.swift; sourceTree = "<group>"; };
+		A2000000000000000000002E /* PlannedActionSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannedActionSurface.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -218,6 +220,7 @@
 			children = (
 				A20000000000000000000008 /* StatusBadgeView.swift */,
 				A2000000000000000000002D /* HitTargetButtonStyles.swift */,
+				A2000000000000000000002E /* PlannedActionSurface.swift */,
 				A20000000000000000000009 /* ActiveWorkDockView.swift */,
 				A2000000000000000000000A /* InspectorView.swift */,
 				A2000000000000000000000B /* PlaceholderRouteView.swift */,
@@ -456,6 +459,7 @@
 				A1000000000000000000001A /* CatalogFormatting.swift in Sources */,
 				A10000000000000000000008 /* StatusBadgeView.swift in Sources */,
 				A1000000000000000000002B /* HitTargetButtonStyles.swift in Sources */,
+				A1000000000000000000002C /* PlannedActionSurface.swift in Sources */,
 				A10000000000000000000009 /* ActiveWorkDockView.swift in Sources */,
 				A1000000000000000000000A /* InspectorView.swift in Sources */,
 				A1000000000000000000000B /* PlaceholderRouteView.swift in Sources */,

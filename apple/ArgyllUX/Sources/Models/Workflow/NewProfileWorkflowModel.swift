@@ -107,7 +107,7 @@ final class NewProfileWorkflowModel: ObservableObject {
 
         switch effectiveWorkflowStage {
         case .context:
-            return "Save Context"
+            return "Continue"
         case .target:
             return "Generate Target"
         case .print:
@@ -124,6 +124,51 @@ final class NewProfileWorkflowModel: ObservableObject {
             return detail.publishedProfileId == nil ? "Completed" : "Open in Printer Profiles"
         case .blocked, .failed:
             return detail.nextAction
+        }
+    }
+
+    var workflowPrimaryActionPresentation: WorkflowPrimaryActionPresentation {
+        WorkflowPrimaryActionPresentation(
+            title: workflowPrimaryActionTitle,
+            isEnabled: canRunWorkflowPrimaryAction,
+            disabledReason: canRunWorkflowPrimaryAction ? nil : workflowPrimaryActionDisabledReason
+        )
+    }
+
+    private var workflowPrimaryActionDisabledReason: String? {
+        guard let detail = activeNewProfileDetail else {
+            return "Open a New Profile job first."
+        }
+
+        if detail.isCommandRunning {
+            return "A command is already running for this job."
+        }
+
+        switch effectiveWorkflowStage {
+        case .context:
+            return "Name the profile, choose a printer and paper, and choose printer and paper settings to continue."
+        case .target:
+            return parsedPatchCount > 0 ? nil : "Enter a patch count greater than 0."
+        case .print, .drying:
+            return nil
+        case .measure:
+            if workflowMeasurementMode == .scanFile,
+               effectiveScanFilePath?.isEmpty ?? true {
+                return "Choose a scan file before measuring from a file."
+            }
+            return nil
+        case .build:
+            return detail.measurement.measurementSourcePath == nil
+                ? "Measure the target before building the profile."
+                : nil
+        case .review, .publish:
+            return detail.review == nil ? "Build the profile before publishing." : nil
+        case .completed:
+            return detail.publishedProfileId == nil
+                ? "This job is complete but has no published Printer Profile to open."
+                : nil
+        case .blocked, .failed:
+            return "Review the blocking error before continuing."
         }
     }
 

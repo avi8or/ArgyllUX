@@ -144,7 +144,7 @@ struct CliTranscriptWindowView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("No Argyll commands have run for this job yet.")
                 .font(.subheadline)
-            Text("Argyll command output appears here after the first command starts. Bootstrap and toolchain logs are not shown in this window.")
+            Text("Argyll command output appears here after the first command starts. Bootstrap and validation logs are not shown in this window.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }

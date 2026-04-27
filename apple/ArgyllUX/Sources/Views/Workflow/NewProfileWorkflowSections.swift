@@ -8,57 +8,61 @@ struct NewProfileWorkflowHeaderView: View {
     let actions: NewProfileWorkflowActions
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("New Profile")
-                    .font(.largeTitle.weight(.semibold))
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 14) {
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text("New Profile")
+                            .font(.title2.weight(.semibold))
 
-                Text(detail.nextAction)
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
+                        StatusBadgeView(title: workflowStageTitle(workflow.effectiveWorkflowStage), tone: stageTone(for: detail))
 
-                HStack(spacing: 10) {
-                    StatusBadgeView(title: workflowStageTitle(workflow.effectiveWorkflowStage), tone: stageTone(for: detail))
+                        Text(detail.status)
+                            .font(AppTypography.shellUtility)
+                            .foregroundStyle(.secondary)
 
-                    Text(detail.status)
-                        .font(AppTypography.shellUtility)
-                        .foregroundStyle(.secondary)
-
-                    if detail.isCommandRunning {
-                        ProgressView()
-                            .controlSize(.small)
+                        if detail.isCommandRunning {
+                            ProgressView()
+                                .controlSize(.small)
+                                .help("Command running")
+                                .accessibilityLabel("Command running")
+                        }
                     }
+
+                    Text(commandSubtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
                 }
 
-                Text(detail.title)
-                    .font(.headline)
+                Spacer(minLength: 16)
 
-                Text("Job ID: \(detail.id)")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
+                NewProfilePrimaryActionButton(
+                    presentation: workflow.workflowPrimaryActionPresentation,
+                    action: actions.performPrimaryAction
+                )
+
+                NewProfileSecondaryActionsMenu(
+                    workflow: workflow,
+                    detail: detail,
+                    actions: actions
+                )
             }
 
-            Spacer()
-
-            HStack(spacing: 10) {
-                Button(workflow.workflowPrimaryActionTitle, action: actions.performPrimaryAction)
-                    .disabled(!workflow.canRunWorkflowPrimaryAction)
-
-                if let deletionTitle = workflow.currentWorkflowDeletionActionTitle {
-                    Button(deletionTitle, role: .destructive, action: actions.requestWorkflowDeletion)
-                }
-
-                Button("Open Output Folder") {
-                    workflow.revealPathInFinder(detail.workspacePath)
-                }
-
-                Button("Open CLI Transcript") {
-                    actions.openCliTranscript(detail.id)
-                }
-            }
+            WorkflowProgressRibbon(items: workflowProgressItems(for: detail))
         }
-        .padding(24)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+    }
+
+    private var commandSubtitle: String {
+        let presentation = workflow.workflowPrimaryActionPresentation
+
+        if let disabledReason = presentation.disabledReason {
+            return disabledReason
+        }
+
+        return "\(detail.title) - Next: \(presentation.title)"
     }
 
     private func stageTone(for detail: NewProfileJobDetail) -> StatusBadgeView.Tone {
@@ -73,48 +77,272 @@ struct NewProfileWorkflowHeaderView: View {
     }
 }
 
-struct NewProfileWorkflowSidebarView: View {
+private struct NewProfilePrimaryActionButton: View {
+    let presentation: WorkflowPrimaryActionPresentation
+    let action: () -> Void
+
+    var body: some View {
+        Button(presentation.title, action: action)
+            .disabled(!presentation.isEnabled)
+            .buttonStyle(.borderedProminent)
+            .help(presentation.disabledReason ?? presentation.title)
+            .accessibilityHint(presentation.disabledReason ?? "Runs the next step for this New Profile job.")
+    }
+}
+
+private struct NewProfileSecondaryActionsMenu: View {
+    @ObservedObject var workflow: NewProfileWorkflowModel
+    let detail: NewProfileJobDetail
+    let actions: NewProfileWorkflowActions
+
+    var body: some View {
+        Menu {
+            Button("Open Output Folder") {
+                workflow.revealPathInFinder(detail.workspacePath)
+            }
+
+            Button("Open CLI Transcript") {
+                actions.openCliTranscript(detail.id)
+            }
+
+            if let deletionTitle = workflow.currentWorkflowDeletionActionTitle {
+                Divider()
+                Button(deletionTitle, role: .destructive, action: actions.requestWorkflowDeletion)
+            }
+        } label: {
+            Label("More", systemImage: "ellipsis.circle")
+        }
+        .menuStyle(.button)
+        .help("Job actions")
+    }
+}
+
+private struct WorkflowProgressRibbon: View {
+    let items: [WorkflowProgressItem]
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            fullProgressRow
+            compactProgressSummary
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+    }
+
+    private var fullProgressRow: some View {
+        HStack(spacing: 6) {
+            ForEach(items) { item in
+                WorkflowProgressPill(item: item)
+            }
+        }
+    }
+
+    private var compactProgressSummary: some View {
+        HStack(spacing: 8) {
+            if let currentItem {
+                WorkflowCompactProgressPill(item: currentItem)
+            }
+
+            Text("\(completedCount)/\(items.count) done")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    private var currentItem: WorkflowProgressItem? {
+        items.first { $0.state == .current }
+            ?? items.first { $0.state == .blocked }
+            ?? items.last { $0.state == .completed }
+            ?? items.first
+    }
+
+    private var completedCount: Int {
+        items.filter { $0.state == .completed }.count
+    }
+}
+
+private struct WorkflowProgressPill: View {
+    let item: WorkflowProgressItem
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(progressColor)
+                .frame(width: 7, height: 7)
+
+            Text(item.title)
+                .font(.caption.weight(item.state == .current ? .semibold : .regular))
+                .lineLimit(1)
+
+            Text(item.status)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(progressBackground, in: Capsule())
+        .accessibilityLabel("\(item.title). \(item.status).")
+    }
+
+    private var progressColor: Color {
+        stageSummaryColor(item.state)
+    }
+
+    private var progressBackground: Color {
+        switch item.state {
+        case .current:
+            Color.accentColor.opacity(0.12)
+        case .blocked:
+            Color.red.opacity(0.10)
+        case .completed, .upcoming:
+            Color.secondary.opacity(0.06)
+        }
+    }
+}
+
+private struct WorkflowCompactProgressPill: View {
+    let item: WorkflowProgressItem
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(stageSummaryColor(item.state))
+                .frame(width: 7, height: 7)
+
+            Text("\(item.title): \(item.status)")
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(compactBackground, in: Capsule())
+        .accessibilityLabel("\(item.title). \(item.status).")
+    }
+
+    private var compactBackground: Color {
+        switch item.state {
+        case .current:
+            Color.accentColor.opacity(0.12)
+        case .blocked:
+            Color.red.opacity(0.10)
+        case .completed, .upcoming:
+            Color.secondary.opacity(0.06)
+        }
+    }
+}
+
+struct NewProfileJobContextRail: View {
     @ObservedObject var workflow: NewProfileWorkflowModel
     let detail: NewProfileJobDetail
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            NewProfileWorkflowTimelineView(detail: detail)
+        VStack(alignment: .leading, spacing: 16) {
+            jobContextHeader
 
-            workflowSection("Current Job") {
+            workflowSection("Job Context") {
                 VStack(alignment: .leading, spacing: 10) {
                     OperationalDetailRow(title: "Profile", value: detail.title)
                     OperationalDetailRow(title: "Stage", value: workflowStageTitle(workflow.effectiveWorkflowStage))
                     OperationalDetailRow(title: "Status", value: detail.status)
                 }
             }
-        }
-        .padding(20)
-    }
-}
 
-struct NewProfileWorkflowTimelineView: View {
-    let detail: NewProfileJobDetail
+            workflowSection("Printer and Paper") {
+                VStack(alignment: .leading, spacing: 10) {
+                    OperationalDetailRow(title: "Printer", value: printerName)
+                    OperationalDetailRow(title: "Paper", value: paperName)
+                    OperationalDetailRow(title: "Settings", value: currentSettingsSummary)
+                }
+            }
 
-    var body: some View {
-        workflowSection("Timeline") {
-            ForEach(detail.stageTimeline, id: \.stage) { item in
-                HStack(alignment: .top, spacing: 10) {
-                    Circle()
-                        .fill(stageSummaryColor(item.state))
-                        .frame(width: 10, height: 10)
-                        .padding(.top, 5)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.title)
-                            .font(.headline)
-                        Text(stageSummarySubtitle(item.state))
-                            .font(AppTypography.trustSummarySupporting)
-                            .foregroundStyle(.secondary)
-                    }
+            workflowSection("Evidence") {
+                VStack(alignment: .leading, spacing: 10) {
+                    OperationalDetailRow(title: "Measurement", value: detail.measurement.measurementSourcePath?.nonEmpty ?? "Not measured yet")
+                    OperationalDetailRow(title: "Artifacts", value: "\(detail.artifacts.count)")
                 }
             }
         }
+        .padding(16)
+    }
+
+    private var jobContextHeader: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Job Ticket")
+                .font(.headline)
+
+            Text("Reference only. Use the main workspace for current-stage controls.")
+                .font(AppTypography.trustSummarySupporting)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var printerName: String {
+        workflow.workflowSelectedPrinter?.displayName.nonEmpty
+            ?? detail.printer?.displayName.nonEmpty
+            ?? detail.printerName.nonEmpty
+            ?? "Not selected"
+    }
+
+    private var paperName: String {
+        workflow.workflowSelectedPaper?.displayName.nonEmpty
+            ?? detail.paper?.displayName.nonEmpty
+            ?? detail.paperName.nonEmpty
+            ?? "Not selected"
+    }
+
+    private var currentSettingsSummary: String {
+        let mediaSetting = workflow.workflowMediaSetting.nonEmpty ?? detail.context.mediaSetting.nonEmpty
+        let qualityMode = workflow.workflowQualityMode.nonEmpty ?? detail.context.qualityMode.nonEmpty
+        let parts = [mediaSetting, qualityMode].compactMap { $0 }
+        return parts.isEmpty ? "Not set" : parts.joined(separator: " / ")
+    }
+}
+
+struct NewProfileJobContextStrip: View {
+    @ObservedObject var workflow: NewProfileWorkflowModel
+    let detail: NewProfileJobDetail
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text("Job Ticket")
+                .font(.headline)
+
+            Text(detail.title)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Spacer(minLength: 12)
+
+            Text(printerName)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Text(paperName)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var printerName: String {
+        workflow.workflowSelectedPrinter?.displayName.nonEmpty
+            ?? detail.printer?.displayName.nonEmpty
+            ?? detail.printerName.nonEmpty
+            ?? "Not selected"
+    }
+
+    private var paperName: String {
+        workflow.workflowSelectedPaper?.displayName.nonEmpty
+            ?? detail.paper?.displayName.nonEmpty
+            ?? detail.paperName.nonEmpty
+            ?? "Not selected"
     }
 }
 
@@ -164,9 +392,10 @@ struct NewProfileContextWorkspaceView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            workflowSection("Context") {
+            workflowSection("Profile Setup") {
                 TextField("Profile name", text: $workflow.workflowProfileName)
                     .textFieldStyle(.roundedBorder)
+                    .help("Name the profile so it is recognizable in Printer Profiles.")
 
                 WorkflowColumns {
                     WorkflowContextSelectionCard(
@@ -314,7 +543,7 @@ struct NewProfileContextWorkspaceView: View {
                 }
             }
 
-            workflowSection("Measurement assumptions") {
+            workflowSection("Measurement Setup") {
                 WorkflowColumns {
                     Picker("Measurement Mode", selection: $workflow.workflowMeasurementMode) {
                         ForEach(measurementModes, id: \.self) { mode in
@@ -322,6 +551,7 @@ struct NewProfileContextWorkspaceView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .help("Strip mode is faster. Patch mode is slower but more robust on difficult media.")
 
                     TextField("Observer", text: $workflow.workflowMeasurementObserver)
                         .textFieldStyle(.roundedBorder)
@@ -330,12 +560,14 @@ struct NewProfileContextWorkspaceView: View {
                         .textFieldStyle(.roundedBorder)
                 }
 
-                TextField("Measurement assumptions", text: $workflow.workflowMeasurementNotes, axis: .vertical)
+                TextField("Measurement notes", text: $workflow.workflowMeasurementNotes, axis: .vertical)
                     .textFieldStyle(.roundedBorder)
                     .lineLimit(3 ... 5)
 
-                Button("Save Context", action: actions.saveContext)
-                    .disabled(!workflow.canSaveWorkflowContext)
+                InlineGuidance(
+                    title: "Measurement quality matters",
+                    message: "Switch modes when strip reading is unreliable instead of forcing bad data through."
+                )
             }
         }
     }
@@ -359,15 +591,28 @@ struct NewProfileTargetWorkspaceView: View {
     let actions: NewProfileWorkflowActions
 
     var body: some View {
-        workflowSection("Target") {
+        workflowSection("Target Planning") {
             WorkflowColumns {
                 TextField("Patch Count", text: $workflow.workflowPatchCount)
                     .textFieldStyle(.roundedBorder)
+                    .help("Default patch count balances paper use, measurement time, and profile quality.")
 
                 Toggle("Improve Neutrals", isOn: $workflow.workflowImproveNeutrals)
+                    .help("Adds extra attention to grays and near-grays.")
             }
 
+            InlineGuidance(
+                title: "Patch count",
+                message: "The default is usually the best balance of effort and accuracy. More patches do not compensate for the wrong media setting or weak measurements."
+            )
+
+            InlineGuidance(
+                title: "Improve Neutrals",
+                message: "Use this when smooth gray balance matters. It adds attention to grays and near-grays; it is not a general quality boost."
+            )
+
             Toggle("Use Existing Profile to Help Target Planning", isOn: $workflow.workflowUsePlanningProfile)
+                .help("Use only when the older profile is trustworthy enough to guide target placement.")
 
             if workflow.workflowUsePlanningProfile {
                 Picker(
@@ -385,11 +630,17 @@ struct NewProfileTargetWorkspaceView: View {
                 .pickerStyle(.menu)
             }
 
-            HStack(spacing: 10) {
-                Button("Save Target Settings", action: actions.saveTargetSettings)
+            InlineGuidance(
+                title: "Planning profile",
+                message: "Use a planning profile only when the older profile was trustworthy. It helps target placement; it does not repair a bad print path."
+            )
 
-                Button("Generate Target", action: actions.generateTarget)
-                    .disabled(detail.isCommandRunning)
+            HStack(spacing: 10) {
+                Text("Secondary")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Button("Save Target Settings", action: actions.saveTargetSettings)
             }
         }
     }
@@ -402,19 +653,32 @@ struct NewProfilePrintWorkspaceView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            workflowSection("Print") {
+            workflowSection("Print Target") {
                 WorkflowColumns {
                     Toggle("Print Without Color Management", isOn: $workflow.workflowPrintWithoutColorManagement)
+                        .help("Profiling targets must print without color management.")
 
                     TextField("Drying Time", text: $workflow.workflowDryingTimeMinutes)
                         .textFieldStyle(.roundedBorder)
+                        .help("Wait time before measurement; unstable prints can create misleading measurements.")
                 }
 
-                HStack(spacing: 10) {
-                    Button("Save Print Settings", action: actions.savePrintSettings)
+                InlineGuidance(
+                    title: "Unmanaged target printing",
+                    message: "Profiling targets must print unmanaged. If the app or driver changes the target colors, the profile will be built from the wrong data."
+                )
 
-                    Button("Mark Chart as Printed", action: actions.markChartPrinted)
-                        .disabled(detail.isCommandRunning)
+                InlineGuidance(
+                    title: "Drying time",
+                    message: "Fine-art and high-ink papers often need more time to stabilize. Measuring too soon can bake temporary color into the profile."
+                )
+
+                HStack(spacing: 10) {
+                    Text("Secondary")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Button("Save Print Settings", action: actions.savePrintSettings)
                 }
             }
 
@@ -441,9 +705,6 @@ struct NewProfileDryingWorkspaceView: View {
                 OperationalDetailRow(title: "Ready at", value: detail.printSettings.dryingReadyAt ?? "Waiting")
                 OperationalDetailRow(title: "Countdown", value: dryingCountdown(detail))
             }
-
-            Button("Mark Ready to Measure", action: actions.markReadyToMeasure)
-                .disabled(detail.isCommandRunning)
         }
     }
 }
@@ -455,7 +716,7 @@ struct NewProfileMeasurementWorkspaceView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            workflowSection("Measure") {
+            workflowSection("Measure Target") {
                 WorkflowColumns {
                     Picker("Measurement Mode", selection: $workflow.workflowMeasurementMode) {
                         ForEach(measurementModes, id: \.self) { mode in
@@ -463,6 +724,7 @@ struct NewProfileMeasurementWorkspaceView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .help("Choose how the target will be measured.")
 
                     if workflow.workflowMeasurementMode == .scanFile {
                         HStack(spacing: 10) {
@@ -481,6 +743,18 @@ struct NewProfileMeasurementWorkspaceView: View {
                     }
                 }
 
+                InlineGuidance(
+                    title: "Measurement mode",
+                    message: "Use strip mode when reads are reliable. Switch to patch mode or scan-file measurement when strip detection creates bad data."
+                )
+
+                if workflow.workflowMeasurementMode == .scanFile && (workflow.effectiveScanFilePath?.isEmpty ?? true) {
+                    InlineGuidance(
+                        title: "Scan file required",
+                        message: "Choose the scanned chart file before running measurement from a file."
+                    )
+                }
+
                 OperationalDetailRow(
                     title: "Measurement source",
                     value: detail.measurement.measurementSourcePath ?? "Not measured yet"
@@ -493,10 +767,11 @@ struct NewProfileMeasurementWorkspaceView: View {
                 }
 
                 HStack(spacing: 10) {
-                    Button("Save Context", action: actions.saveContext)
+                    Text("Secondary")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
 
-                    Button(detail.measurement.hasMeasurementCheckpoint ? "Resume Measurement" : "Measure", action: actions.startMeasurement)
-                        .disabled(detail.isCommandRunning || !workflow.canRunWorkflowPrimaryAction)
+                    Button("Update Measurement Setup", action: actions.saveContext)
                 }
             }
 
@@ -521,8 +796,12 @@ struct NewProfileReviewWorkspaceView: View {
                         value: detail.measurement.measurementSourcePath ?? "Not available"
                     )
 
-                    Button("Build Profile", action: actions.buildProfile)
-                        .disabled(detail.isCommandRunning || detail.measurement.measurementSourcePath == nil)
+                    if detail.measurement.measurementSourcePath == nil {
+                        InlineGuidance(
+                            title: "Measurement required",
+                            message: "Measure the target before building the profile."
+                        )
+                    }
                 }
             }
 
@@ -570,13 +849,8 @@ struct NewProfileReviewWorkspaceView: View {
 
                 workflowArtifactsList(workflow: workflow, artifacts: detail.artifacts)
 
-                HStack(spacing: 10) {
-                    Button("Publish", action: actions.publishProfile)
-                        .disabled(detail.review == nil || detail.isCommandRunning || detail.publishedProfileId != nil)
-
-                    if detail.publishedProfileId != nil {
-                        Button("Open in Printer Profiles", action: actions.openPublishedProfileLibrary)
-                    }
+                if detail.publishedProfileId != nil {
+                    Button("Open in Printer Profiles", action: actions.openPublishedProfileLibrary)
                 }
             }
         }
@@ -680,28 +954,49 @@ private struct WorkflowCatalogChooserSheet<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(title)
-                .font(.title2.weight(.semibold))
-
-            if isEmpty {
-                Text(emptyMessage)
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(.title2.weight(.semibold))
+                Text("Choose an existing item or create a new one.")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        content()
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 18)
+
+            Divider()
+
+            Group {
+                if isEmpty {
+                    Text(emptyMessage)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(24)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 10) {
+                            content()
+                        }
+                        .padding(24)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
                 }
             }
+
+            Divider()
 
             HStack(spacing: 10) {
                 Button("New", action: onCreate)
                 Spacer()
                 Button("Cancel", action: onCancel)
+                    .keyboardShortcut(.cancelAction)
             }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 14)
+            .background(.regularMaterial)
         }
-        .padding(24)
         .frame(minWidth: 520, minHeight: 420)
     }
 }
@@ -750,6 +1045,31 @@ private struct WorkflowSummaryCard<Content: View>: View {
         }
         .padding(14)
         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+private struct InlineGuidance: View {
+    let title: String
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "info.circle")
+                .foregroundStyle(Color.accentColor)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -817,30 +1137,7 @@ private var workflowSectionBackground: some ShapeStyle {
 }
 
 func workflowStageTitle(_ stage: WorkflowStage) -> String {
-    switch stage {
-    case .context:
-        "Context"
-    case .target:
-        "Target"
-    case .print:
-        "Print"
-    case .drying:
-        "Drying"
-    case .measure:
-        "Measure"
-    case .build:
-        "Build"
-    case .review:
-        "Review"
-    case .publish:
-        "Publish"
-    case .completed:
-        "Completed"
-    case .blocked:
-        "Blocked"
-    case .failed:
-        "Failed"
-    }
+    workflowStageDisplayTitle(stage)
 }
 
 func workflowMeasurementModeLabel(_ mode: MeasurementMode) -> String {
@@ -936,4 +1233,11 @@ func currentWorkflowChannelSummary(workflow: NewProfileWorkflowModel, detail: Ne
         detail.context.channelCount,
         detail.context.channelLabels
     )
+}
+
+private extension String {
+    var nonEmpty: String? {
+        let value = trimmed
+        return value.isEmpty ? nil : value
+    }
 }
