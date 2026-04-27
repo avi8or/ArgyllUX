@@ -43,6 +43,10 @@ actor EngineBridge {
         engine.getDiagnosticsSummary()
     }
 
+    func exportDiagnosticsBundle(options: DiagnosticsExportOptions) -> DiagnosticsExportResult {
+        engine.exportDiagnosticsBundle(options: options)
+    }
+
     func listPrinters() -> [PrinterRecord] {
         engine.listPrinters()
     }

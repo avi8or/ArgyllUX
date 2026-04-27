@@ -340,6 +340,26 @@ impl Engine {
         })
     }
 
+    #[uniffi::method(name = "exportDiagnosticsBundle")]
+    pub fn export_diagnostics_bundle(
+        &self,
+        options: DiagnosticsExportOptions,
+    ) -> DiagnosticsExportResult {
+        let config = {
+            let state = self.state.read().expect("engine state lock poisoned");
+            let Some(config) = state.config.clone() else {
+                return failed_diagnostics_export(
+                    "Start ArgyllUX before exporting diagnostics.".to_string(),
+                );
+            };
+            config
+        };
+
+        db::export_diagnostics_bundle(&config.database_path, options).unwrap_or_else(|_| {
+            failed_diagnostics_export("Could not export diagnostics bundle.".to_string())
+        })
+    }
+
     #[uniffi::method(name = "getDashboardSnapshot")]
     pub fn get_dashboard_snapshot(&self) -> DashboardSnapshot {
         let config = self
@@ -1109,6 +1129,17 @@ fn fallback_diagnostics_summary(
         argyll_version: argyll_version.to_string(),
         argyll_path_category: argyll_path_category.to_string(),
         retention: diagnostics::retention_status(1, 0, None),
+    }
+}
+
+fn failed_diagnostics_export(message: String) -> DiagnosticsExportResult {
+    DiagnosticsExportResult {
+        success: false,
+        bundle_path: String::new(),
+        message,
+        included_event_count: 0,
+        included_transcript_count: 0,
+        redacted_paths_count: 0,
     }
 }
 

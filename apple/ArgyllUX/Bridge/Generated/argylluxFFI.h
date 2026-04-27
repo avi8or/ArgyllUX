@@ -294,6 +294,11 @@ RustBuffer uniffi_argyllux_engine_fn_method_engine_deletenewprofilejob(uint64_t 
 RustBuffer uniffi_argyllux_engine_fn_method_engine_deleteprinterprofile(uint64_t ptr, RustBuffer profile_id, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ARGYLLUX_ENGINE_FN_METHOD_ENGINE_EXPORTDIAGNOSTICSBUNDLE
+#define UNIFFI_FFIDEF_UNIFFI_ARGYLLUX_ENGINE_FN_METHOD_ENGINE_EXPORTDIAGNOSTICSBUNDLE
+RustBuffer uniffi_argyllux_engine_fn_method_engine_exportdiagnosticsbundle(uint64_t ptr, RustBuffer options, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ARGYLLUX_ENGINE_FN_METHOD_ENGINE_GETAPPHEALTH
 #define UNIFFI_FFIDEF_UNIFFI_ARGYLLUX_ENGINE_FN_METHOD_ENGINE_GETAPPHEALTH
 RustBuffer uniffi_argyllux_engine_fn_method_engine_getapphealth(uint64_t ptr, RustCallStatus *_Nonnull out_status
@@ -726,6 +731,12 @@ uint16_t uniffi_argyllux_engine_checksum_method_engine_deleteprinterprofile(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_ARGYLLUX_ENGINE_CHECKSUM_METHOD_ENGINE_EXPORTDIAGNOSTICSBUNDLE
+#define UNIFFI_FFIDEF_UNIFFI_ARGYLLUX_ENGINE_CHECKSUM_METHOD_ENGINE_EXPORTDIAGNOSTICSBUNDLE
+uint16_t uniffi_argyllux_engine_checksum_method_engine_exportdiagnosticsbundle(void
+
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_ARGYLLUX_ENGINE_CHECKSUM_METHOD_ENGINE_GETAPPHEALTH
 #define UNIFFI_FFIDEF_UNIFFI_ARGYLLUX_ENGINE_CHECKSUM_METHOD_ENGINE_GETAPPHEALTH
 uint16_t uniffi_argyllux_engine_checksum_method_engine_getapphealth(void
@@ -894,4 +905,3 @@ uint32_t ffi_argyllux_engine_uniffi_contract_version(void
     
 );
 #endif
-

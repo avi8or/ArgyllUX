@@ -564,6 +564,8 @@ public protocol EngineProtocol: AnyObject, Sendable {
     
     func deletePrinterProfile(profileId: String)  -> DeleteResult
     
+    func exportDiagnosticsBundle(options: DiagnosticsExportOptions)  -> DiagnosticsExportResult
+
     func getAppHealth()  -> AppHealth
     
     func getDashboardSnapshot()  -> DashboardSnapshot
@@ -735,6 +737,15 @@ open func deletePrinterProfile(profileId: String) -> DeleteResult  {
 })
 }
     
+open func exportDiagnosticsBundle(options: DiagnosticsExportOptions) -> DiagnosticsExportResult  {
+    return try!  FfiConverterTypeDiagnosticsExportResult_lift(try! rustCall() {
+    uniffi_argyllux_engine_fn_method_engine_exportdiagnosticsbundle(
+            self.uniffiCloneHandle(),
+        FfiConverterTypeDiagnosticsExportOptions_lower(options),$0
+    )
+})
+}
+
 open func getAppHealth() -> AppHealth  {
     return try!  FfiConverterTypeAppHealth_lift(try! rustCall() {
     uniffi_argyllux_engine_fn_method_engine_getapphealth(
@@ -5930,6 +5941,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_argyllux_engine_checksum_method_engine_deleteprinterprofile() != 27628) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_argyllux_engine_checksum_method_engine_exportdiagnosticsbundle() != 26048) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_argyllux_engine_checksum_method_engine_getapphealth() != 9556) {

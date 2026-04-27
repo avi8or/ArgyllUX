@@ -72,6 +72,7 @@ final class FakeEngine: EngineProtocol, @unchecked Sendable {
     private(set) var lastUpdatedPresetInput: UpdatePrinterPaperPresetInput?
     private(set) var recordedDiagnosticInputs: [DiagnosticEventInput] = []
     private(set) var lastDiagnosticFilter: DiagnosticEventFilter?
+    private(set) var lastExportDiagnosticsOptions: DiagnosticsExportOptions?
 
     var bootstrapStatusValue = BootstrapStatus(
         appSupportDirReady: true,
@@ -109,6 +110,14 @@ final class FakeEngine: EngineProtocol, @unchecked Sendable {
     var loadedJobDetails: [String: NewProfileJobDetail] = [:]
     var diagnosticEventsValue: [DiagnosticEventRecord] = []
     var diagnosticsSummaryValue = makeDiagnosticsSummary()
+    var exportDiagnosticsBundleResult = DiagnosticsExportResult(
+        success: true,
+        bundlePath: "",
+        message: "",
+        includedEventCount: 0,
+        includedTranscriptCount: 0,
+        redactedPathsCount: 0
+    )
 
     func bootstrap(config: EngineConfig) -> BootstrapStatus {
         bootstrapCallCount += 1
@@ -210,6 +219,11 @@ final class FakeEngine: EngineProtocol, @unchecked Sendable {
 
     func getDiagnosticsSummary() -> DiagnosticsSummary {
         diagnosticsSummaryValue
+    }
+
+    func exportDiagnosticsBundle(options: DiagnosticsExportOptions) -> DiagnosticsExportResult {
+        lastExportDiagnosticsOptions = options
+        return exportDiagnosticsBundleResult
     }
 
     func createPaper(input: CreatePaperInput) -> PaperRecord {

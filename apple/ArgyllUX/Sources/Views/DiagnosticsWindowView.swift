@@ -28,6 +28,13 @@ struct DiagnosticsWindowView: View {
         .task {
             await diagnostics.refresh()
         }
+        .alert("Diagnostics Export", isPresented: exportAlertIsPresented) {
+            Button("OK") {
+                diagnostics.clearExportMessage()
+            }
+        } message: {
+            Text(diagnostics.exportMessage ?? "")
+        }
     }
 
     private var header: some View {
@@ -48,12 +55,40 @@ struct DiagnosticsWindowView: View {
                     .accessibilityLabel("Refreshing diagnostics")
             }
 
+            if diagnostics.isExporting {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Exporting diagnostics")
+            }
+
+            Button("Export") {
+                Task {
+                    await diagnostics.exportBundle(
+                        to: NSTemporaryDirectory(),
+                        includeCliTranscripts: false,
+                        includeLocalPaths: false
+                    )
+                }
+            }
+            .disabled(diagnostics.isExporting)
+
             Button("Refresh") {
                 Task { await diagnostics.refresh() }
             }
             .disabled(diagnostics.isLoading)
         }
         .padding(20)
+    }
+
+    private var exportAlertIsPresented: Binding<Bool> {
+        Binding(
+            get: { diagnostics.exportMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    diagnostics.clearExportMessage()
+                }
+            }
+        )
     }
 
     private var filters: some View {

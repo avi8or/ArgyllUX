@@ -90,6 +90,39 @@ struct DiagnosticsModelTests {
 
         #expect(openedJobID == "job-1")
     }
+
+    @Test
+    func exportReportsBridgeResultMessage() async {
+        let fakeEngine = FakeEngine()
+        fakeEngine.exportDiagnosticsBundleResult = DiagnosticsExportResult(
+            success: true,
+            bundlePath: "/tmp/ArgyllUX-diagnostics-test",
+            message: "Diagnostics bundle exported.",
+            includedEventCount: 2,
+            includedTranscriptCount: 0,
+            redactedPathsCount: 1
+        )
+        fakeEngine.diagnosticEventsValue = [
+            makeDiagnosticEvent(category: .cli, message: "Command finished.", jobId: "job-1"),
+            makeDiagnosticEvent(category: .cli, message: "Command repeated.", jobId: "job-1"),
+            makeDiagnosticEvent(category: .database, message: "Database path captured.", jobId: "job-2"),
+            makeDiagnosticEvent(category: .app, message: "App event.")
+        ]
+        let model = DiagnosticsModel(bridge: EngineBridge(engine: fakeEngine))
+
+        await model.refresh()
+        await model.exportBundle(
+            to: "/tmp",
+            includeCliTranscripts: false,
+            includeLocalPaths: false
+        )
+
+        #expect(model.exportMessage == "Diagnostics bundle exported.")
+        #expect(fakeEngine.lastExportDiagnosticsOptions?.outputDirectory == "/tmp")
+        #expect(fakeEngine.lastExportDiagnosticsOptions?.includeCliTranscripts == false)
+        #expect(fakeEngine.lastExportDiagnosticsOptions?.includeLocalPaths == false)
+        #expect(fakeEngine.lastExportDiagnosticsOptions?.jobIds == ["job-1", "job-2"])
+    }
 }
 
 @MainActor

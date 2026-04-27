@@ -92,6 +92,7 @@ final class DiagnosticsModel: ObservableObject {
     @Published private(set) var visibleEvents: [DiagnosticEventRecord] = []
     @Published private(set) var selectedEventID: String?
     @Published private(set) var isLoading = false
+    @Published private(set) var isExporting = false
     @Published private(set) var exportMessage: String?
     @Published var levelFilter: DiagnosticsLevelFilter = .all
     @Published var categoryFilter: DiagnosticsCategoryFilter = .all
@@ -157,6 +158,22 @@ final class DiagnosticsModel: ObservableObject {
         openCliTranscriptRequested?(jobID)
     }
 
+    func exportBundle(
+        to outputDirectory: String,
+        includeCliTranscripts: Bool,
+        includeLocalPaths: Bool
+    ) async {
+        isExporting = true
+        let result = await bridge.exportDiagnosticsBundle(options: DiagnosticsExportOptions(
+            outputDirectory: outputDirectory,
+            includeCliTranscripts: includeCliTranscripts,
+            includeLocalPaths: includeLocalPaths,
+            jobIds: uniqueVisibleJobIDs()
+        ))
+        exportMessage = result.message
+        isExporting = false
+    }
+
     func recordUiEvent(source: String, message: String, details: [String: String] = [:], jobID: String? = nil) async {
         let detailsData = (try? JSONSerialization.data(withJSONObject: details, options: [.sortedKeys])) ?? Data("{}".utf8)
         let detailsJSON = String(data: detailsData, encoding: .utf8) ?? "{}"
@@ -179,5 +196,16 @@ final class DiagnosticsModel: ObservableObject {
 
     func clearExportMessage() {
         exportMessage = nil
+    }
+
+    private func uniqueVisibleJobIDs() -> [String] {
+        var seen = Set<String>()
+        var jobIDs: [String] = []
+
+        for jobID in visibleEvents.compactMap(\.jobId) where seen.insert(jobID).inserted {
+            jobIDs.append(jobID)
+        }
+
+        return jobIDs
     }
 }

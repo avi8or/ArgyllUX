@@ -4,18 +4,21 @@ use crate::model::{
     CreateNewProfileDraftInput, CreatePaperInput, CreatePrinterInput,
     CreatePrinterPaperPresetInput, DashboardSnapshot, DeleteResult, DiagnosticCategory,
     DiagnosticEventFilter, DiagnosticEventInput, DiagnosticEventRecord, DiagnosticLevel,
-    DiagnosticPrivacy, DiagnosticsSummary, EngineConfig, InstrumentStatus, JobArtifactRecord,
-    JobCommandEventRecord, JobCommandRecord, MeasurementMode, MeasurementStatusRecord,
-    NewProfileContextRecord, NewProfileJobDetail, PaperRecord, PaperThicknessUnit, PaperWeightUnit,
-    PrintSettingsRecord, PrinterPaperPresetRecord, PrinterProfileRecord, PrinterRecord,
-    ReviewSummaryRecord, SaveNewProfileContextInput, SavePrintSettingsInput,
-    SaveTargetSettingsInput, StartMeasurementInput, TargetSettingsRecord, ToolchainState,
-    ToolchainStatus, UpdatePaperInput, UpdatePrinterInput, UpdatePrinterPaperPresetInput,
-    WorkflowStage, WorkflowStageState, WorkflowStageSummary,
+    DiagnosticPrivacy, DiagnosticsExportOptions, DiagnosticsExportResult, DiagnosticsSummary,
+    EngineConfig, InstrumentStatus, JobArtifactRecord, JobCommandEventRecord, JobCommandRecord,
+    MeasurementMode, MeasurementStatusRecord, NewProfileContextRecord, NewProfileJobDetail,
+    PaperRecord, PaperThicknessUnit, PaperWeightUnit, PrintSettingsRecord,
+    PrinterPaperPresetRecord, PrinterProfileRecord, PrinterRecord, ReviewSummaryRecord,
+    SaveNewProfileContextInput, SavePrintSettingsInput, SaveTargetSettingsInput,
+    StartMeasurementInput, TargetSettingsRecord, ToolchainState, ToolchainStatus, UpdatePaperInput,
+    UpdatePrinterInput, UpdatePrinterPaperPresetInput, WorkflowStage, WorkflowStageState,
+    WorkflowStageSummary,
 };
 use crate::support::{EngineResult, ensure_directory, iso_timestamp};
 use chrono::{Duration, Utc};
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter, types::Value};
+use std::collections::HashSet;
+use std::io::Write;
 use std::path::Path;
 
 const TOOLCHAIN_OVERRIDE_KEY: &str = "toolchain.override_path";
@@ -253,6 +256,220 @@ pub fn prune_diagnostic_events(database_path: &str) -> EngineResult<u32> {
         params![cutoff],
     )?;
     Ok(deleted as u32)
+}
+
+/// Assembles a shareable diagnostics bundle from the durable diagnostics store.
+/// CLI transcripts are only exported when explicitly requested for selected jobs.
+pub fn export_diagnostics_bundle(
+    database_path: &str,
+    options: DiagnosticsExportOptions,
+) -> EngineResult<DiagnosticsExportResult> {
+    let output_directory = options.output_directory.trim();
+    if output_directory.is_empty() {
+        return Err("Diagnostics export output directory is required.".into());
+    }
+
+    ensure_directory(Path::new(output_directory))?;
+    let bundle_path = unique_diagnostics_bundle_path(Path::new(output_directory))?;
+    ensure_directory(&bundle_path)?;
+
+    let events = list_diagnostic_events(
+        database_path,
+        &DiagnosticEventFilter {
+            levels: Vec::new(),
+            categories: Vec::new(),
+            search_text: None,
+            job_id: None,
+            profile_id: None,
+            since_timestamp: None,
+            until_timestamp: None,
+            errors_only: false,
+            limit: 500,
+        },
+    )?;
+
+    let mut redacted_paths_count = 0;
+    let export_events = events
+        .into_iter()
+        .map(|event| {
+            if options.include_local_paths {
+                event
+            } else {
+                let (event, count) = redact_event_for_export(event);
+                redacted_paths_count += count;
+                event
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let mut diagnostics_file = std::fs::File::create(bundle_path.join("diagnostics.jsonl"))?;
+    for event in &export_events {
+        writeln!(diagnostics_file, "{}", serde_json::to_string(event)?)?;
+    }
+
+    let included_transcript_count = if options.include_cli_transcripts {
+        export_cli_transcripts(database_path, &bundle_path, &options.job_ids)?
+    } else {
+        0
+    };
+
+    diagnostics::write_json_file(
+        &bundle_path.join("environment.json"),
+        &serde_json::json!({
+            "schema_version": DATABASE_VERSION,
+            "event_count": export_events.len(),
+            "exported_at": iso_timestamp(),
+            "local_paths_included": options.include_local_paths,
+            "cli_transcripts_included": options.include_cli_transcripts,
+            "included_transcript_count": included_transcript_count,
+        }),
+    )?;
+
+    std::fs::write(
+        bundle_path.join("README.md"),
+        diagnostics::export_readme(
+            export_events.len() as u32,
+            included_transcript_count,
+            redacted_paths_count,
+        ),
+    )?;
+
+    Ok(DiagnosticsExportResult {
+        success: true,
+        bundle_path: bundle_path.to_string_lossy().to_string(),
+        message: "Diagnostics bundle exported.".to_string(),
+        included_event_count: export_events.len() as u32,
+        included_transcript_count,
+        redacted_paths_count,
+    })
+}
+
+fn unique_diagnostics_bundle_path(output_directory: &Path) -> EngineResult<std::path::PathBuf> {
+    let timestamp = Utc::now().format("%Y%m%dT%H%M%SZ");
+    let base_name = format!("argyllux-diagnostics-{timestamp}");
+
+    for suffix in 0..100 {
+        let candidate = if suffix == 0 {
+            output_directory.join(&base_name)
+        } else {
+            output_directory.join(format!("{base_name}-{suffix}"))
+        };
+
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err("Could not allocate diagnostics export bundle directory.".into())
+}
+
+fn redact_event_for_export(mut event: DiagnosticEventRecord) -> (DiagnosticEventRecord, u32) {
+    let mut redacted_paths = 0;
+
+    event.source = redact_export_field(event.source, &mut redacted_paths);
+    event.message = redact_export_field(event.message, &mut redacted_paths);
+    event.details_json = redact_export_field(event.details_json, &mut redacted_paths);
+
+    if redacted_paths > 0 {
+        event.privacy = DiagnosticPrivacy::SensitiveRedacted;
+    }
+
+    (event, redacted_paths)
+}
+
+fn redact_export_field(value: String, redacted_paths: &mut u32) -> String {
+    let (redacted, count) = diagnostics::redact_export_text(&value);
+    *redacted_paths += count;
+    redacted
+}
+
+fn export_cli_transcripts(
+    database_path: &str,
+    bundle_path: &Path,
+    job_ids: &[String],
+) -> EngineResult<u32> {
+    let connection = open_connection(database_path)?;
+    let mut seen = HashSet::new();
+    let mut included_count = 0;
+
+    for job_id in job_ids.iter().filter_map(|job_id| {
+        let trimmed = job_id.trim();
+        (!trimmed.is_empty()).then_some(trimmed)
+    }) {
+        if !seen.insert(job_id.to_string()) {
+            continue;
+        }
+
+        let transcript = load_cli_transcript_for_export(&connection, job_id)?;
+        if transcript.trim().is_empty() {
+            continue;
+        }
+
+        let transcript_dir = bundle_path.join("cli-transcripts");
+        ensure_directory(&transcript_dir)?;
+        std::fs::write(
+            transcript_dir.join(format!("{}.txt", safe_transcript_filename(job_id))),
+            transcript,
+        )?;
+        included_count += 1;
+    }
+
+    Ok(included_count)
+}
+
+fn load_cli_transcript_for_export(connection: &Connection, job_id: &str) -> EngineResult<String> {
+    let commands = load_job_commands(connection, job_id)?;
+    let mut lines = Vec::new();
+
+    for command in commands.iter().rev() {
+        lines.push(format!(
+            "## {} ({})",
+            command.label,
+            encode_workflow_stage(&command.stage)
+        ));
+        lines.push(format!("Command ID: {}", command.id));
+        lines.push(format!(
+            "State: {}",
+            encode_command_run_state(&command.state)
+        ));
+        if let Some(exit_code) = command.exit_code {
+            lines.push(format!("Exit code: {exit_code}"));
+        }
+        if !command.argv.is_empty() {
+            lines.push(format!("Argv: {}", command.argv.join(" ")));
+        }
+
+        for event in &command.events {
+            lines.push(format!(
+                "[{}] {}",
+                encode_command_stream(&event.stream),
+                event.message
+            ));
+        }
+
+        lines.push(String::new());
+    }
+
+    Ok(lines.join("\n"))
+}
+
+fn safe_transcript_filename(job_id: &str) -> String {
+    let sanitized = job_id
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>();
+
+    if sanitized.is_empty() {
+        "job".to_string()
+    } else {
+        sanitized
+    }
 }
 
 fn diagnostic_event_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<DiagnosticEventRecord> {
@@ -3991,6 +4208,14 @@ fn decode_command_run_state(value: &str) -> CommandRunState {
     }
 }
 
+fn encode_command_run_state(state: &CommandRunState) -> &'static str {
+    match state {
+        CommandRunState::Running => "running",
+        CommandRunState::Succeeded => "succeeded",
+        CommandRunState::Failed => "failed",
+    }
+}
+
 fn encode_command_stream(stream: &CommandStream) -> &'static str {
     match stream {
         CommandStream::Stdout => "stdout",
@@ -4500,6 +4725,62 @@ mod tests {
 
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].id, record.id);
+    }
+
+    #[test]
+    fn export_bundle_writes_redacted_files_without_transcripts_by_default() {
+        let temp = tempdir().unwrap();
+        let config = build_config(temp.path());
+        std::fs::create_dir_all(temp.path().join("app-support")).unwrap();
+        initialize_database(&config).unwrap();
+
+        record_diagnostic_event(
+            &config.database_path,
+            &DiagnosticEventInput {
+                level: DiagnosticLevel::Info,
+                category: DiagnosticCategory::Database,
+                source: "engine.database".to_string(),
+                message: "Database path captured.".to_string(),
+                details_json: serde_json::json!({
+                    "database_path": "/Users/tylermiller/Library/Application Support/ArgyllUX/argyllux.sqlite"
+                })
+                .to_string(),
+                privacy: DiagnosticPrivacy::Internal,
+                job_id: Some("job-1".to_string()),
+                command_id: None,
+                profile_id: None,
+                issue_case_id: None,
+                duration_ms: None,
+                operation_id: Some("engine.database".to_string()),
+                parent_operation_id: None,
+            },
+        )
+        .unwrap();
+
+        let result = export_diagnostics_bundle(
+            &config.database_path,
+            crate::model::DiagnosticsExportOptions {
+                output_directory: temp.path().join("exports").to_string_lossy().to_string(),
+                include_cli_transcripts: false,
+                include_local_paths: false,
+                job_ids: vec!["job-1".to_string()],
+            },
+        )
+        .unwrap();
+
+        assert!(result.success);
+        let bundle_path = Path::new(&result.bundle_path);
+        assert!(bundle_path.join("diagnostics.jsonl").exists());
+        assert!(bundle_path.join("README.md").exists());
+
+        let diagnostics_jsonl =
+            std::fs::read_to_string(bundle_path.join("diagnostics.jsonl")).unwrap();
+        assert!(diagnostics_jsonl.contains("$HOME"));
+        assert!(!diagnostics_jsonl.contains("/Users/tylermiller"));
+
+        let readme = std::fs::read_to_string(bundle_path.join("README.md")).unwrap();
+        assert!(readme.contains("Included CLI transcripts: 0"));
+        assert!(!bundle_path.join("cli-transcripts").exists());
     }
 
     #[test]
