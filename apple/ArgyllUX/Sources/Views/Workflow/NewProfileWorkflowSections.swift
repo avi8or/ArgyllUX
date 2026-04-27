@@ -234,48 +234,115 @@ private struct WorkflowCompactProgressPill: View {
     }
 }
 
-struct NewProfileWorkflowSidebarView: View {
+struct NewProfileJobContextRail: View {
     @ObservedObject var workflow: NewProfileWorkflowModel
     let detail: NewProfileJobDetail
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            NewProfileWorkflowTimelineView(detail: detail)
+        VStack(alignment: .leading, spacing: 16) {
+            jobContextHeader
 
-            workflowSection("Current Job") {
+            workflowSection("Job Context") {
                 VStack(alignment: .leading, spacing: 10) {
                     OperationalDetailRow(title: "Profile", value: detail.title)
                     OperationalDetailRow(title: "Stage", value: workflowStageTitle(workflow.effectiveWorkflowStage))
                     OperationalDetailRow(title: "Status", value: detail.status)
                 }
             }
-        }
-        .padding(20)
-    }
-}
 
-struct NewProfileWorkflowTimelineView: View {
-    let detail: NewProfileJobDetail
+            workflowSection("Printer and Paper") {
+                VStack(alignment: .leading, spacing: 10) {
+                    OperationalDetailRow(title: "Printer", value: printerName)
+                    OperationalDetailRow(title: "Paper", value: paperName)
+                    OperationalDetailRow(title: "Settings", value: currentSettingsSummary)
+                }
+            }
 
-    var body: some View {
-        workflowSection("Timeline") {
-            ForEach(detail.stageTimeline, id: \.stage) { item in
-                HStack(alignment: .top, spacing: 10) {
-                    Circle()
-                        .fill(stageSummaryColor(item.state))
-                        .frame(width: 10, height: 10)
-                        .padding(.top, 5)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(workflowStageTitle(item.stage))
-                            .font(.headline)
-                        Text(stageSummarySubtitle(item.state))
-                            .font(AppTypography.trustSummarySupporting)
-                            .foregroundStyle(.secondary)
-                    }
+            workflowSection("Evidence") {
+                VStack(alignment: .leading, spacing: 10) {
+                    OperationalDetailRow(title: "Measurement", value: detail.measurement.measurementSourcePath?.nonEmpty ?? "Not measured yet")
+                    OperationalDetailRow(title: "Artifacts", value: "\(detail.artifacts.count)")
                 }
             }
         }
+        .padding(16)
+    }
+
+    private var jobContextHeader: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Job Ticket")
+                .font(.headline)
+
+            Text("Reference only. Use the main workspace for current-stage controls.")
+                .font(AppTypography.trustSummarySupporting)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var printerName: String {
+        workflow.workflowSelectedPrinter?.displayName.nonEmpty
+            ?? detail.printer?.displayName.nonEmpty
+            ?? detail.printerName.nonEmpty
+            ?? "Not selected"
+    }
+
+    private var paperName: String {
+        workflow.workflowSelectedPaper?.displayName.nonEmpty
+            ?? detail.paper?.displayName.nonEmpty
+            ?? detail.paperName.nonEmpty
+            ?? "Not selected"
+    }
+
+    private var currentSettingsSummary: String {
+        let mediaSetting = workflow.workflowMediaSetting.nonEmpty ?? detail.context.mediaSetting.nonEmpty
+        let qualityMode = workflow.workflowQualityMode.nonEmpty ?? detail.context.qualityMode.nonEmpty
+        let parts = [mediaSetting, qualityMode].compactMap { $0 }
+        return parts.isEmpty ? "Not set" : parts.joined(separator: " / ")
+    }
+}
+
+struct NewProfileJobContextStrip: View {
+    @ObservedObject var workflow: NewProfileWorkflowModel
+    let detail: NewProfileJobDetail
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text("Job Ticket")
+                .font(.headline)
+
+            Text(detail.title)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Spacer(minLength: 12)
+
+            Text(printerName)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+
+            Text(paperName)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var printerName: String {
+        workflow.workflowSelectedPrinter?.displayName.nonEmpty
+            ?? detail.printer?.displayName.nonEmpty
+            ?? detail.printerName.nonEmpty
+            ?? "Not selected"
+    }
+
+    private var paperName: String {
+        workflow.workflowSelectedPaper?.displayName.nonEmpty
+            ?? detail.paper?.displayName.nonEmpty
+            ?? detail.paperName.nonEmpty
+            ?? "Not selected"
     }
 }
 
@@ -1157,4 +1224,11 @@ func currentWorkflowChannelSummary(workflow: NewProfileWorkflowModel, detail: Ne
         detail.context.channelCount,
         detail.context.channelLabels
     )
+}
+
+private extension String {
+    var nonEmpty: String? {
+        let value = trimmed
+        return value.isEmpty ? nil : value
+    }
 }
