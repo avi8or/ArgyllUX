@@ -18,7 +18,7 @@ use crate::support::{EngineResult, ensure_directory, iso_timestamp};
 use chrono::{Duration, Utc};
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter, types::Value};
 use std::collections::HashSet;
-use std::io::Write;
+use std::io::{ErrorKind, Write};
 use std::path::Path;
 
 const TOOLCHAIN_OVERRIDE_KEY: &str = "toolchain.override_path";
@@ -204,7 +204,7 @@ pub fn list_diagnostic_events(
         query.push_str(&where_clause);
     }
 
-    query.push_str(" ORDER BY timestamp DESC LIMIT ?");
+    query.push_str(" ORDER BY timestamp DESC, id DESC LIMIT ?");
     query_params.push(Value::Integer(i64::from(limit)));
 
     let rows = connection
@@ -270,8 +270,7 @@ pub fn export_diagnostics_bundle(
     }
 
     ensure_directory(Path::new(output_directory))?;
-    let bundle_path = unique_diagnostics_bundle_path(Path::new(output_directory))?;
-    ensure_directory(&bundle_path)?;
+    let bundle_path = create_unique_diagnostics_bundle_directory(Path::new(output_directory))?;
 
     let events = list_diagnostic_events(
         database_path,
@@ -307,11 +306,18 @@ pub fn export_diagnostics_bundle(
         writeln!(diagnostics_file, "{}", serde_json::to_string(event)?)?;
     }
 
-    let included_transcript_count = if options.include_cli_transcripts {
-        export_cli_transcripts(database_path, &bundle_path, &options.job_ids)?
-    } else {
-        0
-    };
+    let (included_transcript_count, transcript_redacted_paths_count) =
+        if options.include_cli_transcripts {
+            export_cli_transcripts(
+                database_path,
+                &bundle_path,
+                &options.job_ids,
+                options.include_local_paths,
+            )?
+        } else {
+            (0, 0)
+        };
+    redacted_paths_count += transcript_redacted_paths_count;
 
     diagnostics::write_json_file(
         &bundle_path.join("environment.json"),
@@ -344,7 +350,10 @@ pub fn export_diagnostics_bundle(
     })
 }
 
-fn unique_diagnostics_bundle_path(output_directory: &Path) -> EngineResult<std::path::PathBuf> {
+/// Atomically creates and returns the bundle directory owned by this export.
+fn create_unique_diagnostics_bundle_directory(
+    output_directory: &Path,
+) -> EngineResult<std::path::PathBuf> {
     let timestamp = Utc::now().format("%Y%m%dT%H%M%SZ");
     let base_name = format!("argyllux-diagnostics-{timestamp}");
 
@@ -355,8 +364,10 @@ fn unique_diagnostics_bundle_path(output_directory: &Path) -> EngineResult<std::
             output_directory.join(format!("{base_name}-{suffix}"))
         };
 
-        if !candidate.exists() {
-            return Ok(candidate);
+        match std::fs::create_dir(&candidate) {
+            Ok(()) => return Ok(candidate),
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error.into()),
         }
     }
 
@@ -387,10 +398,12 @@ fn export_cli_transcripts(
     database_path: &str,
     bundle_path: &Path,
     job_ids: &[String],
-) -> EngineResult<u32> {
+    include_local_paths: bool,
+) -> EngineResult<(u32, u32)> {
     let connection = open_connection(database_path)?;
     let mut seen = HashSet::new();
     let mut included_count = 0;
+    let mut redacted_paths_count = 0;
 
     for job_id in job_ids.iter().filter_map(|job_id| {
         let trimmed = job_id.trim();
@@ -404,6 +417,13 @@ fn export_cli_transcripts(
         if transcript.trim().is_empty() {
             continue;
         }
+        let transcript = if include_local_paths {
+            transcript
+        } else {
+            let (redacted, count) = diagnostics::redact_export_text(&transcript);
+            redacted_paths_count += count;
+            redacted
+        };
 
         let transcript_dir = bundle_path.join("cli-transcripts");
         ensure_directory(&transcript_dir)?;
@@ -414,7 +434,7 @@ fn export_cli_transcripts(
         included_count += 1;
     }
 
-    Ok(included_count)
+    Ok((included_count, redacted_paths_count))
 }
 
 fn load_cli_transcript_for_export(connection: &Connection, job_id: &str) -> EngineResult<String> {
@@ -4781,6 +4801,92 @@ mod tests {
         let readme = std::fs::read_to_string(bundle_path.join("README.md")).unwrap();
         assert!(readme.contains("Included CLI transcripts: 0"));
         assert!(!bundle_path.join("cli-transcripts").exists());
+    }
+
+    #[test]
+    fn export_bundle_redacts_local_paths_from_explicit_cli_transcripts() {
+        let temp = tempdir().unwrap();
+        let config = build_config(temp.path());
+        std::fs::create_dir_all(temp.path().join("app-support")).unwrap();
+        initialize_database(&config).unwrap();
+
+        let connection = open_connection(&config.database_path).unwrap();
+        connection
+            .execute(
+                r#"
+                INSERT INTO jobs (
+                    id, name, kind, route, title, printer_name, paper_name,
+                    stage, next_action, status, created_at, updated_at
+                )
+                VALUES (
+                    'job-transcript', 'Transcript Test', 'new_profile', 'home', 'Transcript Test',
+                    '', '', 'context', 'Generate target', 'draft',
+                    '2026-04-20T00:00:00Z', '2026-04-20T00:00:00Z'
+                )
+                "#,
+                [],
+            )
+            .unwrap();
+        drop(connection);
+
+        let command_id = insert_job_command(
+            &config.database_path,
+            "job-transcript",
+            WorkflowStage::Target,
+            "Generate Target",
+            &[
+                "targen".to_string(),
+                "/Users/tylermiller/profile/input.ti3".to_string(),
+                "/var/folders/h3/private-cache/chart.ti1".to_string(),
+                "/private/var/tmp/argyllux/output.icc".to_string(),
+            ],
+        )
+        .unwrap();
+        append_job_command_event(
+            &config.database_path,
+            &command_id,
+            CommandStream::Stdout,
+            1,
+            "Loaded /Users/tylermiller/profile/input.ti3",
+        )
+        .unwrap();
+        append_job_command_event(
+            &config.database_path,
+            &command_id,
+            CommandStream::Stderr,
+            2,
+            "Temporary data at /var/folders/h3/private-cache and /private/var/tmp/argyllux/output.icc",
+        )
+        .unwrap();
+
+        let result = export_diagnostics_bundle(
+            &config.database_path,
+            crate::model::DiagnosticsExportOptions {
+                output_directory: temp.path().join("exports").to_string_lossy().to_string(),
+                include_cli_transcripts: true,
+                include_local_paths: false,
+                job_ids: vec!["job-transcript".to_string()],
+            },
+        )
+        .unwrap();
+
+        assert!(result.success);
+        assert_eq!(result.included_transcript_count, 1);
+        assert!(result.redacted_paths_count > 0);
+
+        let bundle_path = Path::new(&result.bundle_path);
+        let transcript = std::fs::read_to_string(
+            bundle_path
+                .join("cli-transcripts")
+                .join("job-transcript.txt"),
+        )
+        .unwrap();
+        assert!(transcript.contains("Generate Target"));
+        assert!(transcript.contains("Argv:"));
+        assert!(transcript.contains("[stdout]"));
+        assert!(!transcript.contains("/Users/"));
+        assert!(!transcript.contains("/var/folders/"));
+        assert!(!transcript.contains("/private/var/"));
     }
 
     #[test]
