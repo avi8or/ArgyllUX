@@ -136,25 +136,9 @@ struct HomeView: View {
         ) {
             LazyVGrid(columns: launcherColumns, alignment: .leading, spacing: 10) {
                 ForEach(model.plannedLauncherActions) { action in
-                    Button {} label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 8) {
-                                Text(action.title)
-                                    .font(.headline)
-                                Text(action.status)
-                                    .font(.caption.weight(.semibold))
-                            }
-                            Text(action.detail)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(3)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 76, alignment: .topLeading)
+                    if let descriptor = action.plannedDescriptor {
+                        PlannedActionSurface(descriptor: descriptor, minimumHeight: 76)
                     }
-                    .buttonStyle(SurfaceRowButtonStyle(cornerRadius: 8))
-                    .disabled(true)
-                    .accessibilityLabel("\(action.title). Planned workflow. \(action.detail)")
-                    .help("Planned workflow. Not runnable in this build.")
                 }
             }
         }

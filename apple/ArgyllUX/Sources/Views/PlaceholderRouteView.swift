@@ -45,17 +45,17 @@ private struct TroubleshootEntryRouteView: View {
             RouteSection("What looks wrong?") {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 10)], alignment: .leading, spacing: 10) {
                     ForEach(symptoms, id: \.self) { symptom in
-                        PlannedChip(title: symptom)
+                        PlannedChipSurface(descriptor: plannedSymptomOption(symptom))
                     }
                 }
             }
 
             RouteSection("Evidence") {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 10)], alignment: .leading, spacing: 10) {
-                    PlannedRouteAction("Import Measurements")
-                    PlannedRouteAction("Use Existing Measurements")
-                    PlannedRouteAction("Link Current Profile")
-                    PlannedRouteAction("Add Notes")
+                    PlannedActionSurface(descriptor: plannedRouteAction("Import Measurements"))
+                    PlannedActionSurface(descriptor: plannedRouteAction("Use Existing Measurements"))
+                    PlannedActionSurface(descriptor: plannedRouteAction("Link Current Profile"))
+                    PlannedActionSurface(descriptor: plannedRouteAction("Add Notes"))
                 }
             }
 
@@ -91,7 +91,7 @@ private struct InspectEntryRouteView: View {
 
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 10) {
                         ForEach(selectedSection.plannedViews, id: \.self) { plannedView in
-                            PlannedRouteAction(plannedView)
+                            PlannedActionSurface(descriptor: plannedRouteAction(plannedView))
                         }
                     }
                 }
@@ -128,10 +128,10 @@ private struct BlackAndWhiteTuningEntryRouteView: View {
 
             RouteSection("Actions") {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 10)], alignment: .leading, spacing: 10) {
-                    PlannedRouteAction("Print Wedge")
-                    PlannedRouteAction("Measure Wedge")
-                    PlannedRouteAction("Validate Output")
-                    PlannedRouteAction("Open Issue Case")
+                    PlannedActionSurface(descriptor: plannedRouteAction("Print Wedge"))
+                    PlannedActionSurface(descriptor: plannedRouteAction("Measure Wedge"))
+                    PlannedActionSurface(descriptor: plannedRouteAction("Validate Output"))
+                    PlannedActionSurface(descriptor: plannedRouteAction("Open Issue Case"))
                 }
             }
         }
@@ -224,31 +224,6 @@ private struct RouteSection<Content: View>: View {
     }
 }
 
-private struct PlannedRouteAction: View {
-    let title: String
-
-    init(_ title: String) {
-        self.title = title
-    }
-
-    var body: some View {
-        Button {} label: {
-            HStack(spacing: 8) {
-                Text(title)
-                    .font(.headline)
-                Text("Planned")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        }
-        .buttonStyle(SurfaceRowButtonStyle(cornerRadius: 8, horizontalPadding: 12, verticalPadding: 0))
-        .disabled(true)
-        .accessibilityLabel("\(title). Planned.")
-        .help("Planned action. Not runnable in this build.")
-    }
-}
-
 private struct EmptyRouteState: View {
     let title: String
     let message: String
@@ -273,23 +248,6 @@ private struct EmptyRouteState: View {
     }
 }
 
-private struct PlannedChip: View {
-    let title: String
-
-    var body: some View {
-        Text(title)
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color.secondary.opacity(0.08), in: Capsule())
-            .overlay {
-                Capsule()
-                    .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
-            }
-            .accessibilityLabel("\(title). Planned symptom option.")
-    }
-}
-
 private struct SummaryTile: View {
     let title: String
     let value: String
@@ -306,4 +264,18 @@ private struct SummaryTile: View {
         .padding(12)
         .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
     }
+}
+
+private func plannedRouteAction(_ title: String) -> PlannedActionDescriptor {
+    PlannedActionDescriptor(
+        title: title,
+        message: "\(title) is named for this workspace. Not runnable in this build."
+    )
+}
+
+private func plannedSymptomOption(_ title: String) -> PlannedActionDescriptor {
+    PlannedActionDescriptor(
+        title: title,
+        message: "\(title) is a planned symptom option. It does not create an Issue Case in this build."
+    )
 }

@@ -112,14 +112,14 @@ struct PrinterProfilesView: View {
                             }
                             .buttonStyle(.borderedProminent)
 
-                            PlannedProfileAction("Improve Profile")
-                            PlannedProfileAction("Verify Output")
-                            PlannedProfileAction("Recalibrate")
-                            PlannedProfileAction("Rebuild")
-                            PlannedProfileAction("Match a Reference")
-                            PlannedProfileAction("Inspect Measurements")
-                            PlannedProfileAction("Inspect Gamut")
-                            PlannedProfileAction("Inspect Profile")
+                            PlannedActionSurface(descriptor: plannedProfileAction("Improve Profile"), minimumHeight: 36)
+                            PlannedActionSurface(descriptor: plannedProfileAction("Verify Output"), minimumHeight: 36)
+                            PlannedActionSurface(descriptor: plannedProfileAction("Recalibrate"), minimumHeight: 36)
+                            PlannedActionSurface(descriptor: plannedProfileAction("Rebuild"), minimumHeight: 36)
+                            PlannedActionSurface(descriptor: plannedProfileAction("Match a Reference"), minimumHeight: 36)
+                            PlannedActionSurface(descriptor: plannedProfileAction("Inspect Measurements"), minimumHeight: 36)
+                            PlannedActionSurface(descriptor: plannedProfileAction("Inspect Gamut"), minimumHeight: 36)
+                            PlannedActionSurface(descriptor: plannedProfileAction("Inspect Profile"), minimumHeight: 36)
                         }
                     }
 
@@ -146,6 +146,13 @@ struct PrinterProfilesView: View {
 
     private var detailColumns: [GridItem] {
         [GridItem(.adaptive(minimum: 210), spacing: 12)]
+    }
+
+    private func plannedProfileAction(_ title: String) -> PlannedActionDescriptor {
+        PlannedActionDescriptor(
+            title: title,
+            message: "\(title) is planned for Printer Profiles. Not runnable in this build."
+        )
     }
 }
 
@@ -193,31 +200,6 @@ private struct ProfileDetailSection<Content: View>: View {
         }
         .padding(18)
         .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
-    }
-}
-
-private struct PlannedProfileAction: View {
-    let title: String
-
-    init(_ title: String) {
-        self.title = title
-    }
-
-    var body: some View {
-        Button {} label: {
-            HStack(spacing: 8) {
-                Text(title)
-                    .font(.headline)
-                Text("Planned")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
-        }
-        .buttonStyle(SurfaceRowButtonStyle(cornerRadius: 8, horizontalPadding: 12, verticalPadding: 8))
-        .disabled(true)
-        .accessibilityLabel("\(title). Planned.")
-        .help("Planned action. Not runnable in this build.")
     }
 }
 
