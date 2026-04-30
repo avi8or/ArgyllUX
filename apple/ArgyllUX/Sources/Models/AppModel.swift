@@ -101,73 +101,73 @@ final class AppModel: ObservableObject {
         LauncherAction(
             title: "Troubleshoot",
             detail: "Start from a visible print problem and collect evidence.",
-            status: "Entry screen",
+            status: "Ready",
             kind: .route(.troubleshoot)
         ),
         LauncherAction(
             title: "Inspect",
             detail: "Review measurements, gamuts, and profile internals.",
-            status: "Entry screen",
+            status: "Ready",
             kind: .route(.inspect)
         ),
         LauncherAction(
             title: "B&W Tuning",
             detail: "Review monochrome neutrality and tonal behavior.",
-            status: "Entry screen",
+            status: "Ready",
             kind: .route(.blackAndWhiteTuning)
         ),
         LauncherAction(
             title: "Improve Profile",
             detail: "Add better data to an existing profile.",
-            status: "Planned",
+            status: "Later",
             kind: .planned
         ),
         LauncherAction(
             title: "Import Profile",
             detail: "Bring a finished ICC profile into the library.",
-            status: "Planned",
+            status: "Later",
             kind: .planned
         ),
         LauncherAction(
             title: "Import Measurements",
             detail: "Bring raw measurement data into analysis or follow-up work.",
-            status: "Planned",
+            status: "Later",
             kind: .planned
         ),
         LauncherAction(
             title: "Match a Reference",
             detail: "Push output toward a known reference condition.",
-            status: "Planned",
+            status: "Later",
             kind: .planned
         ),
         LauncherAction(
             title: "Verify Output",
             detail: "Check whether current output is still trustworthy.",
-            status: "Planned",
+            status: "Later",
             kind: .planned
         ),
         LauncherAction(
             title: "Recalibrate",
             detail: "Restore a previously trusted calibrated state.",
-            status: "Planned",
+            status: "Later",
             kind: .planned
         ),
         LauncherAction(
             title: "Rebuild",
             detail: "Create a new characterization when assumptions changed.",
-            status: "Planned",
+            status: "Later",
             kind: .planned
         ),
         LauncherAction(
             title: "Spot Measure",
             detail: "Capture individual color readings as evidence.",
-            status: "Planned",
+            status: "Later",
             kind: .planned
         ),
         LauncherAction(
             title: "Compare Measurements",
             detail: "Compare current readings to a trusted baseline.",
-            status: "Planned",
+            status: "Later",
             kind: .planned
         ),
     ]
@@ -206,6 +206,10 @@ final class AppModel: ObservableObject {
 
     var activeWorkItems: [ActiveWorkItem] {
         dashboardSnapshot?.activeWorkItems ?? []
+    }
+
+    var showsActiveWorkDock: Bool {
+        shellChromeConfiguration.showsActiveWorkDock && !activeWorkItems.isEmpty
     }
 
     var jobsCount: Int {

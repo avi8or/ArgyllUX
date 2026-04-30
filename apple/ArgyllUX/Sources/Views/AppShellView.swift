@@ -17,7 +17,7 @@ struct AppShellView: View {
 
             contentRow(for: chrome)
 
-            if chrome.showsActiveWorkDock {
+            if model.showsActiveWorkDock {
                 Divider()
 
                 ActiveWorkDockView(

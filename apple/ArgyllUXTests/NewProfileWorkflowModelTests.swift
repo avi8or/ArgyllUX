@@ -26,6 +26,40 @@ struct NewProfileWorkflowModelTests {
     }
 
     @Test
+    func primaryActionPresentationRequiresUnmanagedPrintConfirmation() async {
+        let fakeEngine = FakeEngine()
+        let detail = makeJobDetail(stage: .print, nextAction: "Mark Chart as Printed")
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [makeActiveWorkItem(id: detail.id, stage: .print)])
+        fakeEngine.loadedJobDetails[detail.id] = detail
+
+        let model = makeWorkflowModel(fakeEngine: fakeEngine)
+        await model.openNewProfileWorkflow()
+        model.workflowPrintWithoutColorManagement = false
+
+        let presentation = model.workflowPrimaryActionPresentation
+
+        #expect(presentation.title == "Mark Chart as Printed")
+        #expect(presentation.isEnabled == false)
+        #expect(presentation.disabledReason == "Confirm that the target was printed without color management before marking it printed.")
+    }
+
+    @Test
+    func savePrintSettingsDoesNotPersistManagedTargetOutput() async {
+        let fakeEngine = FakeEngine()
+        let detail = makeJobDetail(stage: .print, nextAction: "Mark Chart as Printed")
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [makeActiveWorkItem(id: detail.id, stage: .print)])
+        fakeEngine.loadedJobDetails[detail.id] = detail
+
+        let model = makeWorkflowModel(fakeEngine: fakeEngine)
+        await model.openNewProfileWorkflow()
+        model.workflowPrintWithoutColorManagement = false
+
+        await model.savePrintSettings()
+
+        #expect(fakeEngine.lastSavePrintSettingsInput == nil)
+    }
+
+    @Test
     func primaryActionPresentationExplainsMissingScanFile() async {
         let fakeEngine = FakeEngine()
         let detail = makeJobDetail(stage: .measure, nextAction: "Measure")

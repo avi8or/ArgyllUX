@@ -3,54 +3,77 @@ import SwiftUI
 struct HomeView: View {
     @ObservedObject var model: AppModel
 
-    private let launcherColumns = [
-        GridItem(.flexible(minimum: 190), spacing: 10),
-        GridItem(.flexible(minimum: 190), spacing: 10),
+    private let taskColumns = [
+        GridItem(.flexible(minimum: 180), spacing: 10),
+        GridItem(.flexible(minimum: 180), spacing: 10),
     ]
 
-    private var routeActions: [LauncherAction] {
+    private var newProfileAction: LauncherAction? {
+        model.availableLauncherActions.first { $0.kind == .newProfile }
+    }
+
+    private var troubleshootAction: LauncherAction? {
+        model.availableLauncherActions.first { $0.kind == .route(.troubleshoot) }
+    }
+
+    private var supportingRouteActions: [LauncherAction] {
         model.availableLauncherActions.filter {
-            if case .route = $0.kind {
+            switch $0.kind {
+            case .route(.inspect), .route(.blackAndWhiteTuning):
                 return true
+            case .newProfile, .route, .planned:
+                return false
             }
-            return false
         }
     }
 
     var body: some View {
         GeometryReader { geometry in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    header
-
-                    if geometry.size.width < 1060 {
-                        VStack(alignment: .leading, spacing: 18) {
-                            primaryLauncherPanel
-                            activeWorkPanel
-                            profileHealthPanel
-                            routeEntryPanel
-                            plannedWorkPanel
-                        }
-                    } else {
-                        HStack(alignment: .top, spacing: 18) {
-                            VStack(alignment: .leading, spacing: 18) {
-                                primaryLauncherPanel
-                                routeEntryPanel
-                                plannedWorkPanel
-                            }
-                            .frame(maxWidth: .infinity, alignment: .topLeading)
-
-                            VStack(alignment: .leading, spacing: 18) {
-                                activeWorkPanel
-                                profileHealthPanel
-                            }
-                            .frame(width: 380)
-                        }
-                    }
+            if geometry.size.width < 980 {
+                ScrollView {
+                    compactDashboard
+                        .padding(24)
                 }
-                .padding(24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                desktopDashboard
+                    .padding(24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private var desktopDashboard: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            header
+
+            HStack(alignment: .top, spacing: 18) {
+                VStack(alignment: .leading, spacing: 18) {
+                    primaryLauncherPanel
+                    supportingWorkspacesPanel
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                activeWorkPanel
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                VStack(alignment: .leading, spacing: 18) {
+                    profileHealthPanel
+                    readinessPanel
+                }
+                .frame(width: 360, alignment: .topLeading)
+            }
+        }
+    }
+
+    private var compactDashboard: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            header
+            primaryLauncherPanel
+            activeWorkPanel
+            profileHealthPanel
+            readinessPanel
+            supportingWorkspacesPanel
         }
     }
 
@@ -58,7 +81,7 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Home")
                 .font(.largeTitle.weight(.semibold))
-            Text("Start new profiling work, resume active jobs, or check whether recent profiles are still trustworthy.")
+            Text("Start the right task, resume work that needs attention, and check whether recent profiles are trustworthy.")
                 .font(.title3)
                 .foregroundStyle(.secondary)
         }
@@ -66,79 +89,42 @@ struct HomeView: View {
 
     private var primaryLauncherPanel: some View {
         dashboardPanel(
-            title: "Start Work",
-            subtitle: "Use goal-first actions. New Profile is the runnable profiling workflow in this build."
+            title: "Start a Task",
+            subtitle: "Begin with the profile you need to make or the print problem you need to understand."
         ) {
-            if let newProfileAction = model.availableLauncherActions.first(where: { $0.kind == .newProfile }) {
-                Button {
-                    Task { await model.openNewProfileWorkflow() }
-                } label: {
-                    HStack(alignment: .top, spacing: 14) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(Color.accentColor)
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 8) {
-                                Text(newProfileAction.title)
-                                    .font(.headline)
-                                    .foregroundStyle(.primary)
-                                StatusBadgeView(title: newProfileAction.status, tone: .ready)
-                            }
-                            Text(newProfileAction.detail)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 76, alignment: .topLeading)
+            VStack(alignment: .leading, spacing: 10) {
+                if let newProfileAction {
+                    launcherButton(
+                        action: newProfileAction,
+                        symbolName: "plus.circle.fill",
+                        tone: .ready
+                    )
                 }
-                .buttonStyle(SurfaceRowButtonStyle(cornerRadius: 8, horizontalPadding: 14, verticalPadding: 14))
-            }
-        }
-    }
 
-    private var routeEntryPanel: some View {
-        dashboardPanel(
-            title: "Open a Workspace",
-            subtitle: "These routes are available as entry screens. They do not run the missing workflow engines yet."
-        ) {
-            LazyVGrid(columns: launcherColumns, alignment: .leading, spacing: 10) {
-                ForEach(routeActions) { action in
-                    Button {
-                        open(action)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 7) {
-                            HStack(spacing: 8) {
-                                Text(action.title)
-                                    .font(.headline)
-                                    .foregroundStyle(.primary)
-                                Text(action.status)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                            }
-                            Text(action.detail)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(3)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 82, alignment: .topLeading)
-                    }
-                    .buttonStyle(SurfaceRowButtonStyle(cornerRadius: 8))
+                if let troubleshootAction {
+                    launcherButton(
+                        action: troubleshootAction,
+                        symbolName: "stethoscope",
+                        tone: .attention
+                    )
                 }
             }
         }
     }
 
-    private var plannedWorkPanel: some View {
+    private var supportingWorkspacesPanel: some View {
         dashboardPanel(
-            title: "Planned Workflows",
-            subtitle: "These actions are named now so the app language stays consistent. They are not runnable in this build."
+            title: "Understand Existing Work",
+            subtitle: "Use focused workspaces for analysis and monochrome checks without leaving the shell."
         ) {
-            LazyVGrid(columns: launcherColumns, alignment: .leading, spacing: 10) {
-                ForEach(model.plannedLauncherActions) { action in
-                    if let descriptor = action.plannedDescriptor {
-                        PlannedActionSurface(descriptor: descriptor, minimumHeight: 76)
-                    }
+            LazyVGrid(columns: taskColumns, alignment: .leading, spacing: 10) {
+                ForEach(supportingRouteActions) { action in
+                    launcherButton(
+                        action: action,
+                        symbolName: symbolName(for: action),
+                        tone: .attention,
+                        isCompact: true
+                    )
                 }
             }
         }
@@ -147,13 +133,13 @@ struct HomeView: View {
     private var activeWorkPanel: some View {
         dashboardPanel(
             title: "Active Work",
-            subtitle: "Resume jobs that already have a next step."
+            subtitle: "Resume jobs with a saved next step. The dock appears only when work is active or resumable."
         ) {
             if model.activeWorkItems.isEmpty {
-                dashboardEmptyState(ActiveWorkCopy.emptyStateMessage)
+                dashboardEmptyState("No active work. Start a New Profile when you are ready to print and measure a target.")
             } else {
                 VStack(alignment: .leading, spacing: 10) {
-                    ForEach(model.activeWorkItems.prefix(3), id: \.id) { item in
+                    ForEach(model.activeWorkItems.prefix(4), id: \.id) { item in
                         HStack(alignment: .top, spacing: 10) {
                             Button {
                                 model.openActiveWorkItem(item)
@@ -162,6 +148,10 @@ struct HomeView: View {
                                     Text(item.title)
                                         .font(.headline)
                                         .foregroundStyle(.primary)
+                                    Text("\(item.printerName) / \(item.paperName)")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
                                     Text(workflowStageDisplayTitle(item.stage))
                                         .font(AppTypography.activeWorkStage)
                                         .foregroundStyle(.secondary)
@@ -193,10 +183,17 @@ struct HomeView: View {
     private var profileHealthPanel: some View {
         dashboardPanel(
             title: "Profile Health",
-            subtitle: "Recent trust summaries are separate from active jobs."
+            subtitle: "Recent Printer Profiles stay separate from active jobs."
         ) {
             if model.printerProfiles.isEmpty {
-                dashboardEmptyState("Published Printer Profiles will appear here with verification and print-setting context.")
+                VStack(alignment: .leading, spacing: 10) {
+                    dashboardEmptyState("Published Printer Profiles will appear here with verification and print-setting context.")
+
+                    Button("Open Printer Profiles") {
+                        model.selectRoute(.printerProfiles)
+                    }
+                    .buttonStyle(.bordered)
+                }
             } else {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(model.printerProfiles.prefix(3), id: \.id) { profile in
@@ -204,12 +201,19 @@ struct HomeView: View {
                             model.openPrinterProfile(profile)
                         } label: {
                             VStack(alignment: .leading, spacing: 5) {
-                                Text(profile.name)
-                                    .font(.headline)
-                                    .foregroundStyle(.primary)
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Text(profile.name)
+                                        .font(.headline)
+                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                    Text(profile.contextStatus)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                }
                                 Text("\(profile.printerName) / \(profile.paperName)")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
+                                    .lineLimit(2)
                                 Text("Result: \(profile.result)")
                                     .font(AppTypography.trustSummarySupporting)
                                     .foregroundStyle(.secondary)
@@ -220,6 +224,98 @@ struct HomeView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var readinessPanel: some View {
+        dashboardPanel(
+            title: "Readiness",
+            subtitle: "Check toolchain, app, and instrument status before starting measured work."
+        ) {
+            VStack(alignment: .leading, spacing: 10) {
+                readinessRow(title: "ArgyllCMS", value: model.argyllStatusLabel, tone: model.toolchainTone)
+                readinessRow(title: "App", value: model.readinessLabel, tone: model.readinessTone)
+                readinessRow(title: "Instrument", value: model.instrumentStatusLabel, tone: model.instrumentStatusTone)
+
+                if let appHealth = model.appHealth {
+                    let issues = Array(appHealth.blockingIssues.prefix(2))
+                    let warnings = Array(appHealth.warnings.prefix(2))
+
+                    if !issues.isEmpty || !warnings.isEmpty {
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(issues, id: \.self) { issue in
+                                readinessMessage(issue, systemImage: "xmark.octagon", tone: .blocked)
+                            }
+
+                            ForEach(warnings, id: \.self) { warning in
+                                readinessMessage(warning, systemImage: "exclamationmark.triangle", tone: .attention)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func launcherButton(
+        action: LauncherAction,
+        symbolName: String,
+        tone: StatusBadgeView.Tone,
+        isCompact: Bool = false
+    ) -> some View {
+        Button {
+            open(action)
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: symbolName)
+                    .font(isCompact ? .title3 : .title2)
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 26)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(action.title)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+
+                        StatusBadgeView(title: action.status, tone: tone)
+                    }
+
+                    Text(action.detail)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(isCompact ? 3 : 2)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, minHeight: isCompact ? 92 : 82, alignment: .topLeading)
+        }
+        .buttonStyle(SurfaceRowButtonStyle(cornerRadius: 8, horizontalPadding: 14, verticalPadding: 14))
+    }
+
+    private func readinessRow(title: String, value: String, tone: StatusBadgeView.Tone) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(title)
+                .font(.headline)
+            Spacer()
+            StatusBadgeView(title: value, tone: tone)
+        }
+        .padding(10)
+        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func readinessMessage(_ message: String, systemImage: String, tone: StatusBadgeView.Tone) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: systemImage)
+                .foregroundStyle(tone.foregroundColor)
+                .frame(width: 16)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -249,6 +345,21 @@ struct HomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
             .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func symbolName(for action: LauncherAction) -> String {
+        switch action.kind {
+        case .route(.inspect):
+            return "waveform.path.ecg"
+        case .route(.blackAndWhiteTuning):
+            return "circle.lefthalf.filled"
+        case .route(.troubleshoot):
+            return "stethoscope"
+        case .newProfile:
+            return "plus.circle.fill"
+        case .route, .planned:
+            return "square.grid.2x2"
+        }
     }
 
     private func open(_ action: LauncherAction) {

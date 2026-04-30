@@ -39,7 +39,7 @@ struct FooterStatusBarView: View {
                 Button("CLI Transcript", action: onOpenCliTranscript)
                     .buttonStyle(FooterLinkButtonStyle())
 
-                Button("Error Log Viewer", action: onOpenErrorLogs)
+                Button("Error Log", action: onOpenErrorLogs)
                     .buttonStyle(FooterLinkButtonStyle())
             }
         }

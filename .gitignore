@@ -5,6 +5,7 @@ docs/argyll-reference/
 target/
 .cargo-home/
 .build/
+dist/
 DerivedData/
 *.xcworkspace/xcuserdata/
 *.xcuserstate

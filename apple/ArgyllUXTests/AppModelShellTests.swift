@@ -5,7 +5,7 @@ import Testing
 @MainActor
 struct AppModelShellTests {
     @Test
-    func launcherActionsSeparateAvailableEntriesFromPlannedWorkflows() {
+    func launcherActionsExposeAvailableTaskEntriesWithoutRoadmapCopy() {
         let model = makeAppModel()
 
         #expect(model.availableLauncherActions.map(\.title) == ["New Profile", "Troubleshoot", "Inspect", "B&W Tuning"])
@@ -22,6 +22,9 @@ struct AppModelShellTests {
         ])
         #expect(model.launcherActions.allSatisfy { !$0.detail.localizedCaseInsensitiveContains("comes next") })
         #expect(model.launcherActions.allSatisfy { !$0.detail.localizedCaseInsensitiveContains("locked into the shell") })
+        #expect(model.launcherActions.allSatisfy { !$0.detail.localizedCaseInsensitiveContains("runnable in this build") })
+        #expect(model.launcherActions.allSatisfy { !$0.detail.localizedCaseInsensitiveContains("entry screen") })
+        #expect(model.availableLauncherActions.allSatisfy { $0.isEnabled })
     }
 
     @Test
@@ -51,20 +54,68 @@ struct AppModelShellTests {
     }
 
     @Test
-    func plannedActionDescriptorMakesUnavailableStateExplicit() {
+    func plannedActionDescriptorKeepsLaterActionsOutOfRoadmapCopy() {
         let action = LauncherAction(
             title: "Verify Output",
             detail: "Check whether current output is still trustworthy.",
-            status: "Planned",
+            status: "Later",
             kind: .planned
         )
 
         let descriptor = action.plannedDescriptor
 
         #expect(descriptor?.title == "Verify Output")
-        #expect(descriptor?.status == "Planned")
-        #expect(descriptor?.message == "Check whether current output is still trustworthy. Not runnable in this build.")
-        #expect(descriptor?.accessibilityLabel == "Verify Output. Planned. Check whether current output is still trustworthy. Not runnable in this build.")
+        #expect(descriptor?.status == "Later")
+        #expect(descriptor?.message == "Check whether current output is still trustworthy.")
+        #expect(descriptor?.accessibilityLabel == "Verify Output. Available later. Check whether current output is still trustworthy.")
+        #expect(descriptor?.accessibilityLabel.localizedCaseInsensitiveContains("not runnable in this build") == false)
+    }
+
+    @Test
+    func activeWorkDockHidesWhenNoWorkIsResumable() async {
+        let fakeEngine = FakeEngine()
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [])
+
+        let model = makeAppModel(fakeEngine: fakeEngine)
+        await model.bootstrapIfNeeded()
+
+        #expect(model.activeWorkItems.isEmpty)
+        #expect(model.showsActiveWorkDock == false)
+    }
+
+    @Test
+    func activeWorkDockShowsWhenWorkIsResumable() async {
+        let activeWork = makeActiveWorkItem(id: "job-1", stage: .print, status: "print")
+        let fakeEngine = FakeEngine()
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [activeWork])
+
+        let model = makeAppModel(fakeEngine: fakeEngine)
+        await model.bootstrapIfNeeded()
+
+        #expect(model.activeWorkItems.map(\.id) == ["job-1"])
+        #expect(model.showsActiveWorkDock)
+    }
+
+    @Test
+    func activeWorkDockHidesAfterLastJobDeletion() async {
+        let draftDetail = makeJobDetail(stage: .context, nextAction: "Save Context")
+        let fakeEngine = FakeEngine()
+        fakeEngine.toolchainStatusValue = makeToolchainStatus(state: .ready, path: "/opt/homebrew/bin")
+        fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [makeActiveWorkItem(id: draftDetail.id)])
+        fakeEngine.loadedJobDetails[draftDetail.id] = draftDetail
+        fakeEngine.deleteNewProfileJobResult = DeleteResult(success: true, message: "")
+
+        let model = makeAppModel(fakeEngine: fakeEngine)
+        await model.openNewProfileWorkflow()
+
+        #expect(model.showsActiveWorkDock)
+
+        model.requestActiveWorkDeletion(makeActiveWorkItem(id: draftDetail.id))
+        let deletionTask = model.confirmPendingDeletion()
+        await deletionTask?.value
+
+        #expect(model.activeWorkItems.isEmpty)
+        #expect(model.showsActiveWorkDock == false)
     }
 
     @Test

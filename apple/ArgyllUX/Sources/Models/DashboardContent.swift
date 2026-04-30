@@ -29,8 +29,8 @@ extension LauncherAction {
 
         let trimmedDetail = detail.trimmingCharacters(in: .whitespacesAndNewlines)
         let message = trimmedDetail.isEmpty
-            ? "Not runnable in this build."
-            : "\(trimmedDetail) Not runnable in this build."
+            ? "This action is not available from the current Home surface."
+            : trimmedDetail
 
         return PlannedActionDescriptor(title: title, message: message)
     }
@@ -63,11 +63,11 @@ struct PlannedActionDescriptor: Identifiable, Hashable {
     }
 
     var status: String {
-        "Planned"
+        "Later"
     }
 
     var accessibilityLabel: String {
-        "\(title). Planned. \(message)"
+        "\(title). Available later. \(message)"
     }
 
     var help: String {

@@ -635,13 +635,8 @@ struct NewProfileTargetWorkspaceView: View {
                 message: "Use a planning profile only when the older profile was trustworthy. It helps target placement; it does not repair a bad print path."
             )
 
-            HStack(spacing: 10) {
-                Text("Secondary")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
-                Button("Save Target Settings", action: actions.saveTargetSettings)
-            }
+            Button("Save Target Settings", action: actions.saveTargetSettings)
+                .buttonStyle(.bordered)
         }
     }
 }
@@ -655,8 +650,15 @@ struct NewProfilePrintWorkspaceView: View {
         VStack(alignment: .leading, spacing: 18) {
             workflowSection("Print Target") {
                 WorkflowColumns {
-                    Toggle("Print Without Color Management", isOn: $workflow.workflowPrintWithoutColorManagement)
-                        .help("Profiling targets must print without color management.")
+                    Toggle(isOn: $workflow.workflowPrintWithoutColorManagement) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Target was printed without color management")
+                            Text("Required before marking the chart as printed.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .help("Profiling targets must print without color management.")
 
                     TextField("Drying Time", text: $workflow.workflowDryingTimeMinutes)
                         .textFieldStyle(.roundedBorder)
@@ -673,13 +675,16 @@ struct NewProfilePrintWorkspaceView: View {
                     message: "Fine-art and high-ink papers often need more time to stabilize. Measuring too soon can bake temporary color into the profile."
                 )
 
-                HStack(spacing: 10) {
-                    Text("Secondary")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-
-                    Button("Save Print Settings", action: actions.savePrintSettings)
+                if !workflow.workflowPrintWithoutColorManagement {
+                    InlineGuidance(
+                        title: "Confirmation required",
+                        message: "Confirm that the target was printed without color management before marking it printed. Managed target output will produce an invalid profile."
+                    )
                 }
+
+                Button("Save Print Settings", action: actions.savePrintSettings)
+                    .buttonStyle(.bordered)
+                    .disabled(!workflow.workflowPrintWithoutColorManagement)
             }
 
             workflowSection("Generated target artifacts") {
@@ -766,13 +771,8 @@ struct NewProfileMeasurementWorkspaceView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                HStack(spacing: 10) {
-                    Text("Secondary")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-
-                    Button("Update Measurement Setup", action: actions.saveContext)
-                }
+                Button("Update Measurement Setup", action: actions.saveContext)
+                    .buttonStyle(.bordered)
             }
 
             workflowSection("Measurement artifacts") {

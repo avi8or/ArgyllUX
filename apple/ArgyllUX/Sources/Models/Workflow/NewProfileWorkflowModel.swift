@@ -149,7 +149,11 @@ final class NewProfileWorkflowModel: ObservableObject {
             return "Name the profile, choose a printer and paper, and choose printer and paper settings to continue."
         case .target:
             return parsedPatchCount > 0 ? nil : "Enter a patch count greater than 0."
-        case .print, .drying:
+        case .print:
+            return workflowPrintWithoutColorManagement
+                ? nil
+                : "Confirm that the target was printed without color management before marking it printed."
+        case .drying:
             return nil
         case .measure:
             if workflowMeasurementMode == .scanFile,
@@ -189,7 +193,9 @@ final class NewProfileWorkflowModel: ObservableObject {
             return canSaveWorkflowContext
         case .target:
             return parsedPatchCount > 0
-        case .print, .drying:
+        case .print:
+            return workflowPrintWithoutColorManagement
+        case .drying:
             return true
         case .measure:
             if workflowMeasurementMode == .scanFile {
@@ -547,6 +553,7 @@ final class NewProfileWorkflowModel: ObservableObject {
 
     func savePrintSettings() async {
         guard let jobId = activeNewProfileDetail?.id else { return }
+        guard workflowPrintWithoutColorManagement else { return }
 
         let detail = await bridge.savePrintSettings(
             input: SavePrintSettingsInput(
@@ -590,6 +597,7 @@ final class NewProfileWorkflowModel: ObservableObject {
 
     func markChartPrinted() async {
         guard let jobId = activeNewProfileDetail?.id else { return }
+        guard workflowPrintWithoutColorManagement else { return }
         await savePrintSettings()
         let detail = await bridge.markNewProfilePrinted(jobId: jobId)
         await handleWorkflowResult(detail, refreshProfiles: false, forceEditorSync: true)

@@ -6,17 +6,12 @@ struct ActiveWorkDockView: View {
     let onDelete: (ActiveWorkItem) -> Void
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            Text("Active work")
-                .font(.headline)
-                .frame(width: 110, alignment: .leading)
+        if !items.isEmpty {
+            HStack(alignment: .center, spacing: 14) {
+                Text("Active work")
+                    .font(.headline)
+                    .frame(width: 110, alignment: .leading)
 
-            if items.isEmpty {
-                Text(ActiveWorkCopy.emptyStateMessage)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(items, id: \.id) { item in
@@ -55,8 +50,8 @@ struct ActiveWorkDockView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
     }
 }

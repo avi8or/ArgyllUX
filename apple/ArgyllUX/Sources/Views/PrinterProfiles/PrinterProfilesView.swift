@@ -105,21 +105,34 @@ struct PrinterProfilesView: View {
                         }
                     }
 
-                    ProfileDetailSection("Actions") {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 10)], alignment: .leading, spacing: 10) {
-                            Button("Open Job") {
+                    ProfileDetailSection("Recommended Next Action") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Open the source job to review how this profile was created, then decide whether the current output needs verification, repair, or a rebuild.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            Button("Open Source Job") {
                                 onOpenJob(profile.createdFromJobId)
                             }
                             .buttonStyle(.borderedProminent)
+                        }
+                    }
 
-                            PlannedActionSurface(descriptor: plannedProfileAction("Improve Profile"), minimumHeight: 36)
-                            PlannedActionSurface(descriptor: plannedProfileAction("Verify Output"), minimumHeight: 36)
-                            PlannedActionSurface(descriptor: plannedProfileAction("Recalibrate"), minimumHeight: 36)
-                            PlannedActionSurface(descriptor: plannedProfileAction("Rebuild"), minimumHeight: 36)
-                            PlannedActionSurface(descriptor: plannedProfileAction("Match a Reference"), minimumHeight: 36)
-                            PlannedActionSurface(descriptor: plannedProfileAction("Inspect Measurements"), minimumHeight: 36)
-                            PlannedActionSurface(descriptor: plannedProfileAction("Inspect Gamut"), minimumHeight: 36)
-                            PlannedActionSurface(descriptor: plannedProfileAction("Inspect Profile"), minimumHeight: 36)
+                    ProfileDetailSection("Follow-up Guidance") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ProfileFollowUpRow(
+                                title: "Verify Output",
+                                message: "Use fresh evidence when the last verification is old or the print no longer matches expectations."
+                            )
+                            ProfileFollowUpRow(
+                                title: "Improve Profile",
+                                message: "Use when the printer, paper, and settings are still correct but better measurement data is available."
+                            )
+                            ProfileFollowUpRow(
+                                title: "Rebuild",
+                                message: "Use when printer, paper, driver, media setting, or calibration context has changed."
+                            )
                         }
                     }
 
@@ -147,12 +160,24 @@ struct PrinterProfilesView: View {
     private var detailColumns: [GridItem] {
         [GridItem(.adaptive(minimum: 210), spacing: 12)]
     }
+}
 
-    private func plannedProfileAction(_ title: String) -> PlannedActionDescriptor {
-        PlannedActionDescriptor(
-            title: title,
-            message: "\(title) is planned for Printer Profiles. Not runnable in this build."
-        )
+private struct ProfileFollowUpRow: View {
+    let title: String
+    let message: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.headline)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
     }
 }
 

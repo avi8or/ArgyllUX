@@ -66,6 +66,7 @@ final class FakeEngine: EngineProtocol, @unchecked Sendable {
     private(set) var lastUpdatedPaperInput: UpdatePaperInput?
     private(set) var lastCreatedPresetInput: CreatePrinterPaperPresetInput?
     private(set) var lastSaveContextInput: SaveNewProfileContextInput?
+    private(set) var lastSavePrintSettingsInput: SavePrintSettingsInput?
     private(set) var lastPublishedJobId: String?
     private(set) var lastDeletedJobId: String?
     private(set) var lastDeletedProfileId: String?
@@ -328,6 +329,7 @@ final class FakeEngine: EngineProtocol, @unchecked Sendable {
     }
 
     func savePrintSettings(input: SavePrintSettingsInput) -> NewProfileJobDetail {
+        lastSavePrintSettingsInput = input
         loadedJobDetails[input.jobId] = savePrintSettingsResult
         return savePrintSettingsResult
     }
