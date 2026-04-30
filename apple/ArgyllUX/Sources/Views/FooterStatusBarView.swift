@@ -45,7 +45,7 @@ struct FooterStatusBarView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
-        .font(.caption)
+        .font(AppTypography.readableMetadata)
     }
 
     private func footerDetail(title: String, value: String) -> some View {

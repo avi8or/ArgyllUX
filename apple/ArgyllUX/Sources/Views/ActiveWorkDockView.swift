@@ -10,7 +10,9 @@ struct ActiveWorkDockView: View {
             HStack(alignment: .center, spacing: 14) {
                 Text("Active work")
                     .font(.headline)
-                    .frame(width: 110, alignment: .leading)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .frame(width: 112, alignment: .leading)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {

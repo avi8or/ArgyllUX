@@ -111,7 +111,7 @@ private struct InspectEntryRouteView: View {
                                     Text(section.title)
                                         .font(.headline)
                                     Text(section.sidebarSummary)
-                                        .font(.caption)
+                                        .font(AppTypography.readableMetadata)
                                         .foregroundStyle(.secondary)
                                         .lineLimit(2)
                                 }
@@ -413,8 +413,10 @@ private struct SummaryTile: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title)
                 .font(.headline)
+                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
             Text(value)
-                .font(.subheadline)
+                .font(AppTypography.trustSummarySupporting)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, minHeight: 64, alignment: .topLeading)
@@ -426,8 +428,10 @@ private struct SummaryTile: View {
 private struct SymptomChipButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.subheadline.weight(.semibold))
+            .font(AppTypography.statusBadge)
             .foregroundStyle(configuration.isPressed ? .primary : .secondary)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(Color.secondary.opacity(configuration.isPressed ? 0.12 : 0.06), in: Capsule())

@@ -144,9 +144,10 @@ private struct WorkflowProgressRibbon: View {
             }
 
             Text("\(completedCount)/\(items.count) done")
-                .font(.caption2.weight(.semibold))
+                .font(AppTypography.statusBadge)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
     }
 
@@ -172,13 +173,15 @@ private struct WorkflowProgressPill: View {
                 .frame(width: 7, height: 7)
 
             Text(item.title)
-                .font(.caption.weight(item.state == .current ? .semibold : .regular))
+                .font(item.state == .current ? AppTypography.statusBadge : AppTypography.readableMetadata)
                 .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
 
             Text(item.status)
-                .font(.caption2.weight(.semibold))
+                .font(AppTypography.statusBadge)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 5)
@@ -212,7 +215,7 @@ private struct WorkflowCompactProgressPill: View {
                 .frame(width: 7, height: 7)
 
             Text("\(item.title): \(item.status)")
-                .font(.caption.weight(.semibold))
+                .font(AppTypography.statusBadge)
                 .lineLimit(1)
                 .truncationMode(.tail)
         }
@@ -312,19 +315,19 @@ struct NewProfileJobContextStrip: View {
                 .font(.headline)
 
             Text(detail.title)
-                .font(.subheadline)
+                .font(AppTypography.readableMetadata)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
             Spacer(minLength: 12)
 
             Text(printerName)
-                .font(.caption)
+                .font(AppTypography.readableMetadata)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
             Text(paperName)
-                .font(.caption)
+                .font(AppTypography.readableMetadata)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
@@ -499,7 +502,7 @@ struct NewProfileContextWorkspaceView: View {
                             detailLine(title: "Media / quality", value: "\(workflow.workflowMediaSetting) / \(workflow.workflowQualityMode)")
                             detailLine(title: "Channels", value: currentWorkflowChannelSummary(workflow: workflow, detail: detail))
                             Text("Create Printer and Paper Settings to keep using structured command defaults for this print path.")
-                                .font(.footnote)
+                                .font(AppTypography.readableMetadata)
                                 .foregroundStyle(.secondary)
                         }
                     } else if workflow.workflowAvailablePrinterPaperPresets.isEmpty {
@@ -654,7 +657,7 @@ struct NewProfilePrintWorkspaceView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Target was printed without color management")
                             Text("Required before marking the chart as printed.")
-                                .font(.caption)
+                                .font(AppTypography.readableMetadata)
                                 .foregroundStyle(.secondary)
                         }
                     }

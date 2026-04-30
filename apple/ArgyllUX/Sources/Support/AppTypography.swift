@@ -11,4 +11,5 @@ enum AppTypography {
     static let detailLabel = Font.callout.weight(.semibold)
     static let detailValue = Font.body
     static let trustSummarySupporting = Font.callout
+    static let readableMetadata = Font.callout
 }

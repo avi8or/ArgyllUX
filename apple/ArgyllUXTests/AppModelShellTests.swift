@@ -72,6 +72,31 @@ struct AppModelShellTests {
     }
 
     @Test
+    func inspectorPresentationUsesFallbackWhenRightInspectorCannotFit() {
+        let chrome = ShellChromeConfiguration.standard
+        let wideWidth = ShellInspectorPresentation.minimumWidthForRightInspector
+        let compactWidth = wideWidth - 1
+
+        #expect(ShellInspectorPresentation.showsRightInspector(for: chrome, availableWidth: wideWidth))
+        #expect(ShellInspectorPresentation.showsInspectorFallback(for: chrome, availableWidth: wideWidth) == false)
+        #expect(ShellInspectorPresentation.showsRightInspector(for: chrome, availableWidth: compactWidth) == false)
+        #expect(ShellInspectorPresentation.showsInspectorFallback(for: chrome, availableWidth: compactWidth))
+    }
+
+    @Test
+    func inspectorPresentationDoesNotShowFallbackWhenInspectorIsDisabled() {
+        let chrome = ShellChromeConfiguration(
+            routeAccessory: .none,
+            showsRightInspector: false,
+            showsActiveWorkDock: true,
+            showsFooterStatusBar: true
+        )
+
+        #expect(ShellInspectorPresentation.showsRightInspector(for: chrome, availableWidth: 900) == false)
+        #expect(ShellInspectorPresentation.showsInspectorFallback(for: chrome, availableWidth: 900) == false)
+    }
+
+    @Test
     func activeWorkDockHidesWhenNoWorkIsResumable() async {
         let fakeEngine = FakeEngine()
         fakeEngine.dashboardSnapshotCurrent = makeDashboard(activeWorkItems: [])

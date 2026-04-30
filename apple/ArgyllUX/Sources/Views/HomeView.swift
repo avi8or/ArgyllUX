@@ -206,9 +206,7 @@ struct HomeView: View {
                                         .font(.headline)
                                         .foregroundStyle(.primary)
                                     Spacer()
-                                    Text(profile.contextStatus)
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.secondary)
+                                    MetadataPillView(title: profile.contextStatus)
                                 }
                                 Text("\(profile.printerName) / \(profile.paperName)")
                                     .font(.subheadline)
@@ -275,10 +273,12 @@ struct HomeView: View {
                     .frame(width: 26)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
                         Text(action.title)
                             .font(.headline)
                             .foregroundStyle(.primary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
 
                         StatusBadgeView(title: action.status, tone: tone)
                     }
@@ -300,7 +300,9 @@ struct HomeView: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(title)
                 .font(.headline)
-            Spacer()
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+            Spacer(minLength: 12)
             StatusBadgeView(title: value, tone: tone)
         }
         .padding(10)

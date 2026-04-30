@@ -46,9 +46,11 @@ struct SettingsSidebarView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.caption.weight(.semibold))
+                .font(AppTypography.statusBadge)
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
 
             content()
         }
@@ -83,8 +85,8 @@ struct SettingsSidebarView: View {
                     .fill(isSelected(selection) ? Color.accentColor : Color.secondary.opacity(0.6))
                     .frame(width: 6, height: 6)
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(2)
+                    .font(AppTypography.activeWorkStage)
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 22)
@@ -228,8 +230,10 @@ private struct ToolchainSettingsDetailPane: View {
                 HStack(spacing: 10) {
                     StatusBadgeView(title: settings.argyllStatusLabel, tone: toolchainTone)
                     Text("ArgyllCMS \(settings.argyllVersionLabel)")
-                        .font(.subheadline)
+                        .font(AppTypography.readableMetadata)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
 
                 OperationalDetailRow(title: "Detected path", value: settings.detectedToolchainPath)

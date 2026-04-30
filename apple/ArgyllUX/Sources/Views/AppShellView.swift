@@ -5,54 +5,61 @@ struct AppShellView: View {
     @ObservedObject var model: AppModel
     @State private var isShowingErrorLogViewer = false
     @State private var isShowingJumpSheet = false
-    private let rightInspectorWidth: CGFloat = 320
-    private let minimumWidthForRightInspector: CGFloat = 1180
+    @State private var isShowingInspectorSheet = false
 
     var body: some View {
         let chrome = model.shellChromeConfiguration
 
-        VStack(spacing: 0) {
-            topStrip
-            Divider()
+        GeometryReader { geometry in
+            let availableWidth = geometry.size.width
+            let showsInspectorFallback = ShellInspectorPresentation.showsInspectorFallback(
+                for: chrome,
+                availableWidth: availableWidth
+            )
 
-            contentRow(for: chrome)
-
-            if model.showsActiveWorkDock {
+            VStack(spacing: 0) {
+                topStrip(showsInspectorFallback: showsInspectorFallback)
                 Divider()
 
-                ActiveWorkDockView(
-                    items: model.activeWorkItems,
-                    onSelect: { item in
-                        model.openActiveWorkItem(item)
-                    },
-                    onDelete: { item in
-                        model.requestActiveWorkDeletion(item)
-                    }
-                )
-            }
+                contentRow(for: chrome, availableWidth: availableWidth)
 
-            if chrome.showsFooterStatusBar {
-                Divider()
+                if model.showsActiveWorkDock {
+                    Divider()
 
-                FooterStatusBarView(
-                    argylluxVersion: model.argylluxVersionLabel,
-                    argyllVersion: model.argyllVersionLabel,
-                    toolchainStatusLabel: model.argyllStatusLabel,
-                    toolchainTone: model.toolchainTone,
-                    appReadinessLabel: model.readinessLabel,
-                    appReadinessTone: model.readinessTone,
-                    instrumentStatusLabel: model.instrumentStatusLabel,
-                    instrumentTone: model.instrumentStatusTone,
-                    lastValidationLabel: model.lastValidationLabel,
-                    isRefreshing: model.isRefreshing,
-                    onOpenCliTranscript: {
-                        openWindow(id: CliTranscriptWindowView.windowID)
-                        Task { await model.openLatestCliTranscript() }
-                    },
-                    onOpenErrorLogs: {
-                        isShowingErrorLogViewer = true
-                    }
-                )
+                    ActiveWorkDockView(
+                        items: model.activeWorkItems,
+                        onSelect: { item in
+                            model.openActiveWorkItem(item)
+                        },
+                        onDelete: { item in
+                            model.requestActiveWorkDeletion(item)
+                        }
+                    )
+                }
+
+                if chrome.showsFooterStatusBar {
+                    Divider()
+
+                    FooterStatusBarView(
+                        argylluxVersion: model.argylluxVersionLabel,
+                        argyllVersion: model.argyllVersionLabel,
+                        toolchainStatusLabel: model.argyllStatusLabel,
+                        toolchainTone: model.toolchainTone,
+                        appReadinessLabel: model.readinessLabel,
+                        appReadinessTone: model.readinessTone,
+                        instrumentStatusLabel: model.instrumentStatusLabel,
+                        instrumentTone: model.instrumentStatusTone,
+                        lastValidationLabel: model.lastValidationLabel,
+                        isRefreshing: model.isRefreshing,
+                        onOpenCliTranscript: {
+                            openWindow(id: CliTranscriptWindowView.windowID)
+                            Task { await model.openLatestCliTranscript() }
+                        },
+                        onOpenErrorLogs: {
+                            isShowingErrorLogViewer = true
+                        }
+                    )
+                }
             }
         }
         .background(Color(nsColor: .windowBackgroundColor))
@@ -67,6 +74,9 @@ struct AppShellView: View {
                 model.openJumpItem(item)
                 isShowingJumpSheet = false
             }
+        }
+        .sheet(isPresented: $isShowingInspectorSheet) {
+            ShellInspectorSheetView(content: currentInspectorContent)
         }
         .confirmationDialog(
             model.deletionConfirmationTitle,
@@ -109,7 +119,7 @@ struct AppShellView: View {
         }
     }
 
-    private var topStrip: some View {
+    private func topStrip(showsInspectorFallback: Bool) -> some View {
         HStack(spacing: 12) {
             brandPlate
 
@@ -117,13 +127,17 @@ struct AppShellView: View {
                 Button {
                     model.selectRoute(route)
                 } label: {
-                    Label(route.title, systemImage: route.symbolName)
-                        .labelStyle(.titleAndIcon)
-                        .font(
-                            isRouteHighlighted(route)
-                                ? AppTypography.shellNavigation.weight(.semibold)
-                                : AppTypography.shellNavigation
-                        )
+                    HStack(spacing: 6) {
+                        Image(systemName: route.symbolName)
+                            .imageScale(.medium)
+                        Text(route.title)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    .font(
+                        isRouteHighlighted(route)
+                            ? AppTypography.shellNavigation.weight(.semibold)
+                            : AppTypography.shellNavigation
+                    )
                 }
                 .buttonStyle(ShellNavigationButtonStyle(isSelected: isRouteHighlighted(route)))
             }
@@ -138,6 +152,23 @@ struct AppShellView: View {
             .buttonStyle(ShellNavigationButtonStyle(isSelected: false))
             .keyboardShortcut("k", modifiers: [.command])
             .help("Jump to routes, active jobs, profiles, printers, or papers.")
+
+            if showsInspectorFallback {
+                Button {
+                    isShowingInspectorSheet = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sidebar.right")
+                            .imageScale(.medium)
+                        Text("Guidance")
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                }
+                .buttonStyle(ShellNavigationButtonStyle(isSelected: isShowingInspectorSheet))
+                .keyboardShortcut("i", modifiers: [.command, .option])
+                .help("Open Recommended, Advanced, and Technical guidance.")
+                .accessibilityLabel("Open guidance inspector")
+            }
 
             utilityPill(title: model.instrumentStatusLabel, systemImage: "scope")
             utilityPill(title: "Jobs \(model.jobsCount)", systemImage: "clock")
@@ -156,18 +187,16 @@ struct AppShellView: View {
             .accessibilityLabel("ArgyllUX")
     }
 
-    private func contentRow(for chrome: ShellChromeConfiguration) -> some View {
-        GeometryReader { geometry in
-            HStack(spacing: 0) {
-                currentRouteSurface(for: chrome)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    private func contentRow(for chrome: ShellChromeConfiguration, availableWidth: CGFloat) -> some View {
+        HStack(spacing: 0) {
+            currentRouteSurface(for: chrome)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-                if shouldShowRightInspector(for: chrome, availableWidth: geometry.size.width) {
-                    Divider()
+            if ShellInspectorPresentation.showsRightInspector(for: chrome, availableWidth: availableWidth) {
+                Divider()
 
-                    InspectorView(content: currentInspectorContent)
-                        .frame(width: rightInspectorWidth)
-                }
+                InspectorView(content: currentInspectorContent)
+                    .frame(width: ShellInspectorPresentation.rightInspectorWidth)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -307,18 +336,13 @@ struct AppShellView: View {
         )
     }
 
-    private func shouldShowRightInspector(
-        for chrome: ShellChromeConfiguration,
-        availableWidth: CGFloat
-    ) -> Bool {
-        chrome.showsRightInspector && availableWidth >= minimumWidthForRightInspector
-    }
-
     private func utilityPill(title: String, systemImage: String) -> some View {
         Label(title, systemImage: systemImage)
             .labelStyle(.titleAndIcon)
             .font(AppTypography.shellUtility)
             .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 9)
             .padding(.vertical, 7)
             .background(Color.secondary.opacity(0.06), in: Capsule())
@@ -334,6 +358,53 @@ struct AppShellView: View {
         }
 
         return model.selectedRoute == route
+    }
+}
+
+enum ShellInspectorPresentation {
+    static let rightInspectorWidth: CGFloat = 320
+    static let minimumWidthForRightInspector: CGFloat = 1180
+
+    static func showsRightInspector(
+        for chrome: ShellChromeConfiguration,
+        availableWidth: CGFloat
+    ) -> Bool {
+        chrome.showsRightInspector && availableWidth >= minimumWidthForRightInspector
+    }
+
+    static func showsInspectorFallback(
+        for chrome: ShellChromeConfiguration,
+        availableWidth: CGFloat
+    ) -> Bool {
+        chrome.showsRightInspector && !showsRightInspector(for: chrome, availableWidth: availableWidth)
+    }
+}
+
+private struct ShellInspectorSheetView: View {
+    let content: InspectorContent
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Label("Guidance", systemImage: "sidebar.right")
+                    .font(.title3.weight(.semibold))
+
+                Spacer()
+
+                Button("Done") {
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+
+            Divider()
+
+            InspectorView(content: content)
+        }
+        .frame(minWidth: 420, idealWidth: 460, minHeight: 520, idealHeight: 620)
     }
 }
 
@@ -409,8 +480,7 @@ private struct ShellJumpSheetView: View {
 
             Divider()
 
-            HStack {
-                Spacer()
+            HStack(spacing: 12) {
                 Button("Close") {
                     dismiss()
                 }

@@ -96,9 +96,11 @@ private struct ShellNavigationButton: View {
         let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
 
         configuration.label
-            .padding(.horizontal, 10)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .frame(minHeight: 36, alignment: .center)
+            .frame(minHeight: 38, alignment: .center)
             .contentShape(.interaction, shape)
             .background(backgroundColor, in: shape)
             .overlay {
@@ -245,9 +247,9 @@ private struct FooterLinkButton: View {
 
         configuration.label
             .foregroundStyle(foregroundColor)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-            .frame(minHeight: 28, alignment: .center)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .frame(minHeight: 30, alignment: .center)
             .contentShape(.interaction, shape)
             .background(backgroundColor, in: shape)
             .opacity(isEnabled ? 1 : 0.45)

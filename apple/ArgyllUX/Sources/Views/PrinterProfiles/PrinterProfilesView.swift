@@ -45,9 +45,7 @@ struct PrinterProfilesView: View {
                                             .font(.headline)
                                             .foregroundStyle(.primary)
                                         Spacer()
-                                        Text(profile.contextStatus)
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(.secondary)
+                                        MetadataPillView(title: profile.contextStatus)
                                     }
 
                                     Text("\(profile.printerName) / \(profile.paperName)")
@@ -60,7 +58,7 @@ struct PrinterProfilesView: View {
                                         .foregroundStyle(.secondary)
 
                                     Text("Last verification date: \(profile.lastVerificationDate ?? "Not yet verified")")
-                                        .font(.caption)
+                                        .font(AppTypography.readableMetadata)
                                         .foregroundStyle(.secondary)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -186,15 +184,18 @@ private struct ProfileTrustHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(profile.name)
-                    .font(.title.weight(.semibold))
-                Text(profile.contextStatus)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.secondary.opacity(0.08), in: Capsule())
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(profile.name)
+                        .font(.title.weight(.semibold))
+                    MetadataPillView(title: profile.contextStatus)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(profile.name)
+                        .font(.title.weight(.semibold))
+                    MetadataPillView(title: profile.contextStatus)
+                }
             }
 
             Text("\(profile.printerName) / \(profile.paperName)")
@@ -202,7 +203,7 @@ private struct ProfileTrustHeader: View {
                 .foregroundStyle(.secondary)
 
             Text("Use this view to decide whether the profile is still trustworthy before improving, rebuilding, or using it as a reference.")
-                .font(.subheadline)
+                .font(AppTypography.trustSummarySupporting)
                 .foregroundStyle(.secondary)
         }
     }
@@ -239,7 +240,7 @@ private struct ArtifactRow: View {
                 Text(title)
                     .font(.headline)
                 Text(path)
-                    .font(.system(.footnote, design: .monospaced))
+                    .font(.system(.callout, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
             }

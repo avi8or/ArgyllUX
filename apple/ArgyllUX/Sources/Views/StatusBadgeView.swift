@@ -29,8 +29,29 @@ struct StatusBadgeView: View {
         Text(title)
             .font(AppTypography.statusBadge)
             .foregroundStyle(tone.foregroundColor)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(tone.backgroundColor, in: Capsule())
+    }
+}
+
+struct MetadataPillView: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(AppTypography.statusBadge)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color.secondary.opacity(0.08), in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
+            }
     }
 }
